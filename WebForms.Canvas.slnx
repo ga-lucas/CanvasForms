@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="WebForms.Canvas.Host/WebForms.Canvas.Host.csproj" />
+  <Project Path="WebForms.Canvas/WebForms.Canvas.csproj" />
+</Solution>

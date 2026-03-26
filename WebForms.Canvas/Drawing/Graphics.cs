@@ -1,0 +1,87 @@
+namespace WebForms.Canvas.Drawing;
+
+public class Graphics : IDisposable
+{
+    private readonly List<DrawingCommand> _commands = new();
+    private readonly int _width;
+    private readonly int _height;
+
+    public Graphics(int width, int height)
+    {
+        _width = width;
+        _height = height;
+    }
+
+    public void Clear(Color color)
+    {
+        _commands.Clear();
+        _commands.Add(new ClearCommand(color, _width, _height));
+    }
+
+    public void DrawLine(Pen pen, int x1, int y1, int x2, int y2)
+    {
+        _commands.Add(new DrawLineCommand(pen, x1, y1, x2, y2));
+    }
+
+    public void DrawLine(Pen pen, Point pt1, Point pt2)
+    {
+        DrawLine(pen, pt1.X, pt1.Y, pt2.X, pt2.Y);
+    }
+
+    public void DrawRectangle(Pen pen, int x, int y, int width, int height)
+    {
+        _commands.Add(new DrawRectangleCommand(pen, x, y, width, height));
+    }
+
+    public void DrawRectangle(Pen pen, Rectangle rect)
+    {
+        DrawRectangle(pen, rect.X, rect.Y, rect.Width, rect.Height);
+    }
+
+    public void FillRectangle(Brush brush, int x, int y, int width, int height)
+    {
+        _commands.Add(new FillRectangleCommand(brush, x, y, width, height));
+    }
+
+    public void FillRectangle(Brush brush, Rectangle rect)
+    {
+        FillRectangle(brush, rect.X, rect.Y, rect.Width, rect.Height);
+    }
+
+    public void DrawEllipse(Pen pen, int x, int y, int width, int height)
+    {
+        _commands.Add(new DrawEllipseCommand(pen, x, y, width, height));
+    }
+
+    public void DrawEllipse(Pen pen, Rectangle rect)
+    {
+        DrawEllipse(pen, rect.X, rect.Y, rect.Width, rect.Height);
+    }
+
+    public void FillEllipse(Brush brush, int x, int y, int width, int height)
+    {
+        _commands.Add(new FillEllipseCommand(brush, x, y, width, height));
+    }
+
+    public void FillEllipse(Brush brush, Rectangle rect)
+    {
+        FillEllipse(brush, rect.X, rect.Y, rect.Width, rect.Height);
+    }
+
+    public void DrawString(string text, string fontFamily, int fontSize, Brush brush, int x, int y)
+    {
+        _commands.Add(new DrawStringCommand(text, fontFamily, fontSize, brush, x, y));
+    }
+
+    public void DrawString(string text, string fontFamily, int fontSize, Brush brush, Point point)
+    {
+        DrawString(text, fontFamily, fontSize, brush, point.X, point.Y);
+    }
+
+    public IEnumerable<DrawingCommand> GetCommands() => _commands;
+
+    public void Dispose()
+    {
+        _commands.Clear();
+    }
+}

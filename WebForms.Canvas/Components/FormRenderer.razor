@@ -1,0 +1,62 @@
+@using WebForms.Canvas.Forms
+@using WebForms.Canvas.Drawing
+@inject IJSRuntime JSRuntime
+
+<div class="winforms-container" style="display: inline-block; box-shadow: 0 0 10px rgba(0,0,0,0.2);">
+    @if (Form != null && Form.Visible)
+    {
+        <div class="form-titlebar" style="background: linear-gradient(to bottom, #4a90e2, #357abd); color: white; padding: 8px; font-size: 14px; font-family: 'Segoe UI', Arial, sans-serif; cursor: move;">
+            @Form.Text
+            <button @onclick="CloseForm" style="float: right; background: transparent; border: none; color: white; cursor: pointer; font-size: 18px; line-height: 1;">×</button>
+        </div>
+        <canvas @ref="_canvasRef" 
+                width="@Form.Width" 
+                height="@Form.Height"
+                style="display: block; background: @Form.BackColor.ToHexString();">
+        </canvas>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public Form? Form { get; set; }
+
+    private ElementReference _canvasRef;
+    private bool _initialized = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && Form != null)
+        {
+            _initialized = true;
+            Form.RequestRender = RenderForm;
+            await RenderForm();
+        }
+    }
+
+    private async Task RenderForm()
+    {
+        if (!_initialized || Form == null) return;
+
+        using var graphics = new Graphics(Form.Width, Form.Height);
+
+        // Clear with background color
+        graphics.Clear(Form.BackColor);
+
+        // Trigger Paint event
+        var paintArgs = new PaintEventArgs(graphics, new Rectangle(0, 0, Form.Width, Form.Height));
+        Form.OnPaint(paintArgs);
+
+        // Execute drawing commands
+        var commands = graphics.GetCommands();
+        var jsCommands = string.Join("\n", commands.Select(c => c.ToJavaScript()));
+
+        await JSRuntime.InvokeVoidAsync("renderCanvas", _canvasRef, jsCommands);
+    }
+
+    private void CloseForm()
+    {
+        Form?.Close();
+        StateHasChanged();
+    }
+}

@@ -1,0 +1,19 @@
+﻿@page "/"
+@using WebForms.Canvas.Components
+@using WebForms.Canvas.Samples
+
+<PageTitle>Windows Forms Canvas Clone</PageTitle>
+
+<h1>Windows Forms Canvas Clone</h1>
+
+<FormRenderer Form="@_sampleForm" />
+
+@code {
+    private SampleDrawingForm _sampleForm = new();
+
+    protected override void OnInitialized()
+    {
+        _sampleForm.Show();
+    }
+}
+
