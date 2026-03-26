@@ -43,11 +43,20 @@ This project provides a canvas-based clone of Windows Forms that can render grap
 - Command buffering for efficient rendering
 - Paint event system
 
+✅ **Event System**
+- Mouse events (MouseDown, MouseUp, MouseMove, MouseClick, MouseDoubleClick, MouseEnter, MouseLeave)
+- Keyboard events (KeyDown, KeyUp, KeyPress)
+- Touch events for mobile devices (mapped to mouse events)
+
 ✅ **Form Management**
-- Basic form display
+- Form display and visibility control
 - Background color support
 - Show/Close operations
 - Title bar with close button
+- **Form dragging** - Click and drag title bar to move forms
+- **Form resizing** - Drag edges and corners to resize forms
+- Minimum/Maximum size constraints
+- Position management (Left, Top properties)
 
 ## Usage Example
 
@@ -106,18 +115,22 @@ In your Blazor page:
 
 ## Roadmap
 
-### Phase 1: Drawing (Current)
+### Phase 1: Drawing ✅ COMPLETED
 - ✅ Basic shapes (lines, rectangles, ellipses)
 - ✅ Fill operations
 - ✅ Text rendering
 - ✅ Color support
 
-### Phase 2: Interaction
-- ⬜ Mouse events (click, move, drag)
-- ⬜ Keyboard events
+### Phase 2: Interaction ✅ COMPLETED
+- ✅ Mouse events (click, double-click, move, down, up, enter, leave)
+- ✅ Keyboard events (keydown, keyup, keypress)
+- ✅ Touch events for mobile devices
+- ✅ Form dragging (move via title bar)
+- ✅ Form resizing (drag edges/corners)
 - ⬜ Focus management
+- ⬜ Tab order
 
-### Phase 3: Controls
+### Phase 3: Controls (NEXT)
 - ⬜ Button
 - ⬜ Label
 - ⬜ TextBox
@@ -153,14 +166,17 @@ WebForms.Canvas/              # Core library (Razor Class Library)
 │   ├── Brush.cs
 │   ├── Graphics.cs
 │   └── DrawingCommands.cs
-├── Forms/                    # Form system
+├── Forms/                    # Form system and events
 │   ├── Control.cs
 │   ├── Form.cs
-│   └── PaintEventArgs.cs
+│   ├── PaintEventArgs.cs
+│   ├── MouseEventArgs.cs
+│   └── KeyEventArgs.cs
 ├── Components/               # Blazor components
 │   └── FormRenderer.razor
 ├── Samples/                  # Example forms
-│   └── SampleDrawingForm.cs
+│   ├── SampleDrawingForm.cs
+│   └── InteractiveForm.cs
 └── wwwroot/
     └── canvas-renderer.js    # JavaScript interop
 
@@ -178,6 +194,16 @@ The graphics system uses a command pattern where drawing operations are buffered
 - Allows for batched rendering
 - Provides a clean separation between .NET and JavaScript
 - Enables future optimization opportunities (command merging, caching, etc.)
+
+### Event Handling
+
+Mouse, keyboard, and touch events are captured by Blazor and converted to Windows Forms-compatible event arguments:
+
+- **Mouse Events**: Blazor mouse events are mapped to `MouseEventArgs` with button, position, and click count
+- **Keyboard Events**: Keyboard events are mapped to `KeyEventArgs` with key codes and modifiers (Ctrl, Alt, Shift)
+- **Touch Events**: Touch events are converted to mouse events for compatibility
+
+Global mouse handlers enable smooth dragging and resizing outside the form bounds.
 
 ### JavaScript Interop
 

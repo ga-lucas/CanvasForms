@@ -1,19 +1,80 @@
 @using WebForms.Canvas.Forms
 @using WebForms.Canvas.Drawing
+@using BlazorMouseEventArgs = Microsoft.AspNetCore.Components.Web.MouseEventArgs
+@using BlazorKeyboardEventArgs = Microsoft.AspNetCore.Components.Web.KeyboardEventArgs
+@using BlazorTouchEventArgs = Microsoft.AspNetCore.Components.Web.TouchEventArgs
 @inject IJSRuntime JSRuntime
 
-<div class="winforms-container" style="display: inline-block; box-shadow: 0 0 10px rgba(0,0,0,0.2);">
+<div class="winforms-container"
+     style="position: absolute; 
+            left: @(Form?.Left ?? 50)px; 
+            top: @(Form?.Top ?? 50)px; 
+            z-index: @(Form?.ZIndex ?? 0);
+            display: @(Form?.Visible == true ? "inline-block" : "none"); 
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+            border: 2px solid rgba(74, 144, 226, 0.3);
+            user-select: none;">
     @if (Form != null && Form.Visible)
     {
-        <div class="form-titlebar" style="background: linear-gradient(to bottom, #4a90e2, #357abd); color: white; padding: 8px; font-size: 14px; font-family: 'Segoe UI', Arial, sans-serif; cursor: move;">
+        <div class="form-titlebar" 
+             @onmousedown="StartDrag"
+             @onmousedown:preventDefault
+             style="background: linear-gradient(to bottom, #4a90e2, #357abd); 
+                    color: white; 
+                    padding: 8px; 
+                    font-size: 14px; 
+                    font-family: 'Segoe UI', Arial, sans-serif; 
+                    cursor: @(Form.AllowMove ? "move" : "default");">
             @Form.Text
-            <button @onclick="CloseForm" style="float: right; background: transparent; border: none; color: white; cursor: pointer; font-size: 18px; line-height: 1;">×</button>
+            <span style="font-size: 10px; opacity: 0.7; margin-left: 10px;">[z:@Form.ZIndex]</span>
+            <button @onclick="CloseForm" 
+                    @onclick:stopPropagation
+                    style="float: right; 
+                           background: transparent; 
+                           border: none; 
+                           color: white; 
+                           cursor: pointer;
+                           font-size: 18px; 
+                           line-height: 1;">×</button>
         </div>
-        <canvas @ref="_canvasRef" 
-                width="@Form.Width" 
-                height="@Form.Height"
-                style="display: block; background: @Form.BackColor.ToHexString();">
-        </canvas>
+        <div style="position: relative;">
+            <canvas @ref="_canvasRef" 
+                    @onmousedown="HandleMouseDown"
+                    @onmouseup="HandleMouseUp"
+                    @onmousemove="HandleMouseMove"
+                    @onmouseleave="HandleMouseLeave"
+                    @onmouseenter="HandleMouseEnter"
+                    @onclick="HandleClick"
+                    @ondblclick="HandleDoubleClick"
+                    @ontouchstart="HandleTouchStart"
+                    @ontouchmove="HandleTouchMove"
+                    @ontouchend="HandleTouchEnd"
+                    tabindex="0"
+                    @onkeydown="HandleKeyDown"
+                    @onkeyup="HandleKeyUp"
+                    @onkeypress="HandleKeyPress"
+                    width="@Form.Width" 
+                    height="@Form.Height"
+                    style="display: block; 
+                           background: @Form.BackColor.ToHexString();
+                           outline: none;
+                           cursor: @GetCanvasCursor();">
+            </canvas>
+
+            @if (Form.AllowResize)
+            {
+                <!-- Resize handles -->
+                <div @onmousedown="e => StartResize(e, ResizeDirection.Right)" 
+                     @onmousedown:preventDefault
+                     style="position: absolute; right: 0; top: 0; width: 8px; height: 100%; cursor: e-resize;"></div>
+                <div @onmousedown="e => StartResize(e, ResizeDirection.Bottom)" 
+                     @onmousedown:preventDefault
+                     style="position: absolute; left: 0; bottom: 0; width: 100%; height: 8px; cursor: s-resize;"></div>
+                <div @onmousedown="e => StartResize(e, ResizeDirection.BottomRight)" 
+                     @onmousedown:preventDefault
+                     style="position: absolute; right: 0; bottom: 0; width: 12px; height: 12px; cursor: se-resize; background: rgba(74, 144, 226, 0.5);"></div>
+            }
+        </div>
     }
 </div>
 
@@ -24,6 +85,33 @@
     private ElementReference _canvasRef;
     private bool _initialized = false;
 
+    // Dragging state
+    private bool _isDragging = false;
+    private double _dragStartX = 0;
+    private double _dragStartY = 0;
+    private int _formStartLeft = 0;
+    private int _formStartTop = 0;
+
+    // Resizing state
+    private bool _isResizing = false;
+    private ResizeDirection _resizeDirection = ResizeDirection.None;
+    private double _resizeStartX = 0;
+    private double _resizeStartY = 0;
+    private int _formStartWidth = 0;
+    private int _formStartHeight = 0;
+
+    // Touch state
+    private double _lastTouchX = 0;
+    private double _lastTouchY = 0;
+
+    private enum ResizeDirection
+    {
+        None,
+        Right,
+        Bottom,
+        BottomRight
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender && Form != null)
@@ -31,6 +119,9 @@
             _initialized = true;
             Form.RequestRender = RenderForm;
             await RenderForm();
+
+            // Register global mouse handlers for drag/resize
+            await JSRuntime.InvokeVoidAsync("registerGlobalMouseHandlers", DotNetObjectReference.Create(this));
         }
     }
 
@@ -54,9 +145,366 @@
         await JSRuntime.InvokeVoidAsync("renderCanvas", _canvasRef, jsCommands);
     }
 
+    // Bring form to front when clicked (synchronous version for drag/resize)
+    private void BringToFrontSync()
+    {
+        if (Form == null) return;
+        Form.BringToFront();
+        // Don't call StateHasChanged here - let the caller control when to re-render
+    }
+
+    // Bring form to front with logging (async version for click events)
+    private async Task BringToFrontAsync()
+    {
+        if (Form == null) return;
+
+        var oldZIndex = Form.ZIndex;
+        Form.BringToFront();
+
+        await JSRuntime.InvokeVoidAsync("console.log", 
+            $"BringToFront: '{Form.Text}' z-index {oldZIndex} → {Form.ZIndex}");
+
+        StateHasChanged();
+    }
+
+    // Dragging
+    private void StartDrag(BlazorMouseEventArgs e)
+    {
+        if (Form == null || !Form.AllowMove) return;
+
+        // Bring to front when starting to drag (sync to avoid race conditions)
+        BringToFrontSync();
+
+        _isDragging = true;
+        _dragStartX = e.ClientX;
+        _dragStartY = e.ClientY;
+        _formStartLeft = Form.Left;
+        _formStartTop = Form.Top;
+    }
+
+    [JSInvokable]
+    public void OnGlobalMouseMove(double clientX, double clientY)
+    {
+        if (Form == null) return;
+
+        if (_isDragging)
+        {
+            var deltaX = (int)(clientX - _dragStartX);
+            var deltaY = (int)(clientY - _dragStartY);
+            Form.Left = _formStartLeft + deltaX;
+            Form.Top = _formStartTop + deltaY;
+            StateHasChanged();
+        }
+        else if (_isResizing)
+        {
+            var deltaX = (int)(clientX - _resizeStartX);
+            var deltaY = (int)(clientY - _resizeStartY);
+
+            switch (_resizeDirection)
+            {
+                case ResizeDirection.Right:
+                    Form.Width = Math.Max(Form.MinimumWidth, _formStartWidth + deltaX);
+                    if (Form.MaximumWidth > 0) Form.Width = Math.Min(Form.Width, Form.MaximumWidth);
+                    break;
+                case ResizeDirection.Bottom:
+                    Form.Height = Math.Max(Form.MinimumHeight, _formStartHeight + deltaY);
+                    if (Form.MaximumHeight > 0) Form.Height = Math.Min(Form.Height, Form.MaximumHeight);
+                    break;
+                case ResizeDirection.BottomRight:
+                    Form.Width = Math.Max(Form.MinimumWidth, _formStartWidth + deltaX);
+                    Form.Height = Math.Max(Form.MinimumHeight, _formStartHeight + deltaY);
+                    if (Form.MaximumWidth > 0) Form.Width = Math.Min(Form.Width, Form.MaximumWidth);
+                    if (Form.MaximumHeight > 0) Form.Height = Math.Min(Form.Height, Form.MaximumHeight);
+                    break;
+            }
+
+            Form.Invalidate();
+            StateHasChanged();
+        }
+    }
+
+    [JSInvokable]
+    public void OnGlobalMouseUp()
+    {
+        var wasInteracting = _isDragging || _isResizing;
+
+        _isDragging = false;
+        _isResizing = false;
+        _resizeDirection = ResizeDirection.None;
+
+        // Force re-render after drag/resize to update z-index display
+        if (wasInteracting)
+        {
+            StateHasChanged();
+        }
+    }
+
+    private void StartResize(BlazorMouseEventArgs e, ResizeDirection direction)
+    {
+        if (Form == null || !Form.AllowResize) return;
+
+        // Bring to front when starting to resize (sync to avoid race conditions)
+        BringToFrontSync();
+
+        _isResizing = true;
+        _resizeDirection = direction;
+        _resizeStartX = e.ClientX;
+        _resizeStartY = e.ClientY;
+        _formStartWidth = Form.Width;
+        _formStartHeight = Form.Height;
+    }
+
+    private string GetCanvasCursor()
+    {
+        return "default";
+    }
+
+    // Mouse events on canvas
+    private async Task HandleMouseDown(BlazorMouseEventArgs e)
+    {
+        if (Form == null) return;
+
+        // Bring to front when clicking on canvas
+        await BringToFrontAsync();
+
+        var args = new Forms.MouseEventArgs(
+            GetMouseButton(e.Button),
+            1,
+            (int)e.OffsetX,
+            (int)e.OffsetY
+        );
+        Form.OnMouseDown(args);
+    }
+
+    private void HandleMouseUp(BlazorMouseEventArgs e)
+    {
+        if (Form == null) return;
+        var args = new Forms.MouseEventArgs(
+            GetMouseButton(e.Button),
+            1,
+            (int)e.OffsetX,
+            (int)e.OffsetY
+        );
+        Form.OnMouseUp(args);
+    }
+
+    private void HandleMouseMove(BlazorMouseEventArgs e)
+    {
+        if (Form == null) return;
+        var args = new Forms.MouseEventArgs(
+            MouseButtons.None,
+            0,
+            (int)e.OffsetX,
+            (int)e.OffsetY
+        );
+        Form.OnMouseMove(args);
+    }
+
+    private void HandleMouseEnter(BlazorMouseEventArgs e)
+    {
+        if (Form == null) return;
+        Form.OnMouseEnter(EventArgs.Empty);
+    }
+
+    private void HandleMouseLeave(BlazorMouseEventArgs e)
+    {
+        if (Form == null) return;
+        Form.OnMouseLeave(EventArgs.Empty);
+    }
+
+    private void HandleClick(BlazorMouseEventArgs e)
+    {
+        if (Form == null) return;
+        var args = new Forms.MouseEventArgs(
+            GetMouseButton(e.Button),
+            1,
+            (int)e.OffsetX,
+            (int)e.OffsetY
+        );
+        Form.OnMouseClick(args);
+    }
+
+    private void HandleDoubleClick(BlazorMouseEventArgs e)
+    {
+        if (Form == null) return;
+        var args = new Forms.MouseEventArgs(
+            GetMouseButton(e.Button),
+            2,
+            (int)e.OffsetX,
+            (int)e.OffsetY
+        );
+        Form.OnMouseDoubleClick(args);
+    }
+
+    // Touch events
+    private void HandleTouchStart(BlazorTouchEventArgs e)
+    {
+        if (Form == null || e.Touches.Length == 0) return;
+
+        var touch = e.Touches[0];
+        _lastTouchX = touch.ClientX;
+        _lastTouchY = touch.ClientY;
+
+        var args = new Forms.MouseEventArgs(
+            MouseButtons.Left,
+            1,
+            (int)touch.ClientX,
+            (int)touch.ClientY
+        );
+        Form.OnMouseDown(args);
+    }
+
+    private void HandleTouchMove(BlazorTouchEventArgs e)
+    {
+        if (Form == null || e.Touches.Length == 0) return;
+
+        var touch = e.Touches[0];
+        var args = new Forms.MouseEventArgs(
+            MouseButtons.None,
+            0,
+            (int)touch.ClientX,
+            (int)touch.ClientY
+        );
+        Form.OnMouseMove(args);
+    }
+
+    private void HandleTouchEnd(BlazorTouchEventArgs e)
+    {
+        if (Form == null) return;
+
+        var args = new Forms.MouseEventArgs(
+            MouseButtons.Left,
+            1,
+            (int)_lastTouchX,
+            (int)_lastTouchY
+        );
+        Form.OnMouseUp(args);
+    }
+
+    // Keyboard events
+    private void HandleKeyDown(BlazorKeyboardEventArgs e)
+    {
+        if (Form == null) return;
+        var args = new KeyEventArgs(
+            ParseKeyCode(e.Code),
+            e.AltKey,
+            e.CtrlKey,
+            e.ShiftKey
+        );
+        Form.OnKeyDown(args);
+    }
+
+    private void HandleKeyUp(BlazorKeyboardEventArgs e)
+    {
+        if (Form == null) return;
+        var args = new KeyEventArgs(
+            ParseKeyCode(e.Code),
+            e.AltKey,
+            e.CtrlKey,
+            e.ShiftKey
+        );
+        Form.OnKeyUp(args);
+    }
+
+    private void HandleKeyPress(BlazorKeyboardEventArgs e)
+    {
+        if (Form == null || string.IsNullOrEmpty(e.Key)) return;
+
+        if (e.Key.Length == 1)
+        {
+            var args = new KeyPressEventArgs(e.Key[0]);
+            Form.OnKeyPress(args);
+        }
+    }
+
     private void CloseForm()
     {
         Form?.Close();
         StateHasChanged();
+    }
+
+    // Helper methods
+    private MouseButtons GetMouseButton(long button)
+    {
+        return button switch
+        {
+            0 => MouseButtons.Left,
+            1 => MouseButtons.Middle,
+            2 => MouseButtons.Right,
+            _ => MouseButtons.None
+        };
+    }
+
+    private Keys ParseKeyCode(string code)
+    {
+        return code switch
+        {
+            "Backspace" => Keys.Back,
+            "Tab" => Keys.Tab,
+            "Enter" => Keys.Enter,
+            "ShiftLeft" or "ShiftRight" => Keys.Shift,
+            "ControlLeft" or "ControlRight" => Keys.Control,
+            "AltLeft" or "AltRight" => Keys.Alt,
+            "Escape" => Keys.Escape,
+            "Space" => Keys.Space,
+            "PageUp" => Keys.PageUp,
+            "PageDown" => Keys.PageDown,
+            "End" => Keys.End,
+            "Home" => Keys.Home,
+            "ArrowLeft" => Keys.Left,
+            "ArrowUp" => Keys.Up,
+            "ArrowRight" => Keys.Right,
+            "ArrowDown" => Keys.Down,
+            "Delete" => Keys.Delete,
+            "Digit0" => Keys.D0,
+            "Digit1" => Keys.D1,
+            "Digit2" => Keys.D2,
+            "Digit3" => Keys.D3,
+            "Digit4" => Keys.D4,
+            "Digit5" => Keys.D5,
+            "Digit6" => Keys.D6,
+            "Digit7" => Keys.D7,
+            "Digit8" => Keys.D8,
+            "Digit9" => Keys.D9,
+            "KeyA" => Keys.A,
+            "KeyB" => Keys.B,
+            "KeyC" => Keys.C,
+            "KeyD" => Keys.D,
+            "KeyE" => Keys.E,
+            "KeyF" => Keys.F,
+            "KeyG" => Keys.G,
+            "KeyH" => Keys.H,
+            "KeyI" => Keys.I,
+            "KeyJ" => Keys.J,
+            "KeyK" => Keys.K,
+            "KeyL" => Keys.L,
+            "KeyM" => Keys.M,
+            "KeyN" => Keys.N,
+            "KeyO" => Keys.O,
+            "KeyP" => Keys.P,
+            "KeyQ" => Keys.Q,
+            "KeyR" => Keys.R,
+            "KeyS" => Keys.S,
+            "KeyT" => Keys.T,
+            "KeyU" => Keys.U,
+            "KeyV" => Keys.V,
+            "KeyW" => Keys.W,
+            "KeyX" => Keys.X,
+            "KeyY" => Keys.Y,
+            "KeyZ" => Keys.Z,
+            "F1" => Keys.F1,
+            "F2" => Keys.F2,
+            "F3" => Keys.F3,
+            "F4" => Keys.F4,
+            "F5" => Keys.F5,
+            "F6" => Keys.F6,
+            "F7" => Keys.F7,
+            "F8" => Keys.F8,
+            "F9" => Keys.F9,
+            "F10" => Keys.F10,
+            "F11" => Keys.F11,
+            "F12" => Keys.F12,
+            _ => Keys.None
+        };
     }
 }

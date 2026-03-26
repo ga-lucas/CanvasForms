@@ -6,14 +6,75 @@
 
 <h1>Windows Forms Canvas Clone</h1>
 
-<FormRenderer Form="@_sampleForm" />
+<p>This demonstrates an HTML canvas-based implementation of Windows Forms with interactive capabilities.</p>
+
+<div class="alert alert-info" style="background-color: #e3f2fd; border: 1px solid #2196f3; border-radius: 4px; padding: 12px; margin: 20px 0;">
+    <strong>💡 Tip:</strong> Click on any form to bring it to the front! Forms stack on top of each other.
+</div>
+
+<div style="margin: 20px 0; position: relative; height: 1200px; min-height: 1200px;">
+    <FormRenderer Form="@_interactiveForm" />
+    <FormRenderer Form="@_sampleForm" />
+</div>
+
+<div style="margin-top: 20px;">
+    <h3>✅ Features Implemented:</h3>
+    <ul>
+        <li>✅ Basic drawing primitives (lines, rectangles, ellipses)</li>
+        <li>✅ Filled shapes support</li>
+        <li>✅ Pen and Brush abstractions</li>
+        <li>✅ Color management (RGBA support)</li>
+        <li>✅ Text rendering</li>
+        <li>✅ Graphics command buffering</li>
+        <li>✅ Paint event system</li>
+        <li>✅ <strong>Mouse events (click, double-click, move, down, up, enter, leave)</strong></li>
+        <li>✅ <strong>Keyboard events (keydown, keyup, keypress)</strong></li>
+        <li>✅ <strong>Touch events support</strong></li>
+        <li>✅ <strong>Form dragging (drag title bar to move)</strong></li>
+        <li>✅ <strong>Form resizing (drag edges/corners)</strong></li>
+    </ul>
+
+    <h3>🎮 Try it out:</h3>
+    <ul>
+        <li><strong>Click any form:</strong> Click anywhere on a form to bring it to front</li>
+        <li><strong>Move forms:</strong> Click and drag the blue title bar</li>
+        <li><strong>Resize forms:</strong> Drag the right edge, bottom edge, or bottom-right corner</li>
+        <li><strong>Interact:</strong> Click on the interactive form's canvas to draw circles</li>
+        <li><strong>Type:</strong> Click on a form and press keys to see keyboard events</li>
+        <li><strong>Double-click:</strong> Double-click the interactive form to clear circles</li>
+        <li><strong>Press C:</strong> Press 'C' key on the interactive form to clear circles</li>
+    </ul>
+
+    <h3>⬜ Roadmap:</h3>
+    <ul>
+        <li>⬜ Control hierarchy (buttons, labels, textboxes, etc.)</li>
+        <li>⬜ Image support</li>
+        <li>⬜ Path/polygon drawing</li>
+        <li>⬜ Transformations (rotate, scale, translate)</li>
+        <li>⬜ Focus management</li>
+        <li>⬜ Clipboard operations</li>
+        <li>⬜ IL interpreter for running Windows Forms executables</li>
+    </ul>
+</div>
 
 @code {
+    private InteractiveForm _interactiveForm = new();
     private SampleDrawingForm _sampleForm = new();
 
     protected override void OnInitialized()
     {
+        // Position interactive form - TOP LEFT
+        _interactiveForm.Left = 50;
+        _interactiveForm.Top = 50;
+        _interactiveForm.Show();
+
+        // Position drawing sample form - BELOW the interactive form
+        _sampleForm.Left = 50;
+        _sampleForm.Top = 600; // Below the first form (50 + 500 height + 50 gap)
+        _sampleForm.Width = 600;
+        _sampleForm.Height = 500;
         _sampleForm.Show();
     }
 }
+
 
