@@ -45,10 +45,10 @@ public class InteractiveForm : Form
         g.DrawString("↕️ Drag the title bar to move", "Arial", 14, instructionBrush, 10, 70);
         g.DrawString("↔️ Drag corners/edges to resize", "Arial", 14, instructionBrush, 10, 90);
 
-        // Draw all clicked points as circles
+        //// Draw all clicked points as circles
         using var circleBrush = new SolidBrush(Color.FromArgb(100, 74, 144, 226));
         using var circlePen = new Pen(Color.FromArgb(74, 144, 226), 2);
-        foreach (var point in _clickPoints)
+        foreach(var point in _clickPoints)
         {
             g.FillEllipse(circleBrush, point.X - 15, point.Y - 15, 30, 30);
             g.DrawEllipse(circlePen, point.X - 15, point.Y - 15, 30, 30);
@@ -56,7 +56,7 @@ public class InteractiveForm : Form
 
         // Draw current mouse position
         using var crosshairPen = new Pen(Color.Red, 1);
-        if (_currentMousePos.X > 0 || _currentMousePos.Y > 0)
+        if(_currentMousePos.X > 0 || _currentMousePos.Y > 0)
         {
             g.DrawLine(crosshairPen, _currentMousePos.X - 10, _currentMousePos.Y, _currentMousePos.X + 10, _currentMousePos.Y);
             g.DrawLine(crosshairPen, _currentMousePos.X, _currentMousePos.Y - 10, _currentMousePos.X, _currentMousePos.Y + 10);

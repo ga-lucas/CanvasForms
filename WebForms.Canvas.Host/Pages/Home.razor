@@ -15,6 +15,7 @@
 <div style="margin: 20px 0; position: relative; height: 1200px; min-height: 1200px;">
     <FormRenderer Form="@_interactiveForm" />
     <FormRenderer Form="@_sampleForm" />
+    <FormRenderer Form="@_sampleForm2" />
 </div>
 
 <div style="margin-top: 20px;">
@@ -60,12 +61,15 @@
 @code {
     private InteractiveForm _interactiveForm = new();
     private SampleDrawingForm _sampleForm = new();
+    private SampleDrawingForm _sampleForm2 = new();
 
     protected override void OnInitialized()
     {
         // Position interactive form - TOP LEFT
         _interactiveForm.Left = 50;
         _interactiveForm.Top = 50;
+        _interactiveForm.Width = 500;
+        _interactiveForm.Height = 400;
         _interactiveForm.Show();
 
         // Position drawing sample form - BELOW the interactive form
@@ -74,6 +78,13 @@
         _sampleForm.Width = 600;
         _sampleForm.Height = 500;
         _sampleForm.Show();
+		// Position drawing sample form - BELOW the interactive form
+		_sampleForm2.Left = 800;
+		_sampleForm2.Top = 600; // Below the first form (50 + 500 height + 50 gap)
+		_sampleForm2.Width = 600;
+		_sampleForm2.Height = 500;
+		_sampleForm2.Show();
+
     }
 }
 

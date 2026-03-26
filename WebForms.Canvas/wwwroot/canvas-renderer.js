@@ -10,26 +10,33 @@ window.renderCanvas = (canvas, commands) => {
 };
 
 // Global mouse handlers for drag/resize operations
-let currentFormRenderer = null;
+let activeFormRenderer = null; // The form currently being dragged/resized
 
-window.registerGlobalMouseHandlers = (dotNetRef) => {
-    currentFormRenderer = dotNetRef;
-
-    // Only register once
-    if (!window.globalMouseHandlersRegistered) {
-        window.globalMouseHandlersRegistered = true;
-
-        document.addEventListener('mousemove', (e) => {
-            if (currentFormRenderer) {
-                currentFormRenderer.invokeMethodAsync('OnGlobalMouseMove', e.clientX, e.clientY);
-            }
-        });
-
-        document.addEventListener('mouseup', (e) => {
-            if (currentFormRenderer) {
-                currentFormRenderer.invokeMethodAsync('OnGlobalMouseUp');
-            }
-        });
-    }
+window.setActiveFormRenderer = (dotNetRef) => {
+    activeFormRenderer = dotNetRef;
+    console.log('Active form set:', dotNetRef ? 'active' : 'cleared');
 };
+
+window.clearActiveFormRenderer = () => {
+    activeFormRenderer = null;
+    console.log('Active form cleared');
+};
+
+// Register global handlers only once
+if (!window.globalMouseHandlersRegistered) {
+    window.globalMouseHandlersRegistered = true;
+
+    document.addEventListener('mousemove', (e) => {
+        if (activeFormRenderer) {
+            activeFormRenderer.invokeMethodAsync('OnGlobalMouseMove', e.clientX, e.clientY);
+        }
+    });
+
+    document.addEventListener('mouseup', (e) => {
+        if (activeFormRenderer) {
+            activeFormRenderer.invokeMethodAsync('OnGlobalMouseUp');
+            activeFormRenderer = null; // Clear after mouseup
+        }
+    });
+}
 

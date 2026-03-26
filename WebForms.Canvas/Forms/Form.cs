@@ -5,6 +5,7 @@ namespace WebForms.Canvas.Forms;
 public class Form : Control
 {
     private static int _nextZIndex = 1;
+    private const int TitleBarHeight = 32; // Height of the title bar
 
     public string Text { get; set; } = "Form";
     public bool AllowResize { get; set; } = true;
@@ -20,6 +21,10 @@ public class Form : Control
 
     // Z-order for stacking
     public int ZIndex { get; set; } = 0;
+
+    // Client area dimensions (excluding title bar)
+    public int ClientWidth => Width;
+    public int ClientHeight => Math.Max(0, Height - TitleBarHeight);
 
     public Form()
     {
@@ -37,7 +42,7 @@ public class Form : Control
 
     public Graphics CreateGraphics()
     {
-        return new Graphics(Width, Height);
+        return new Graphics(ClientWidth, ClientHeight);
     }
 
     public void Show()
