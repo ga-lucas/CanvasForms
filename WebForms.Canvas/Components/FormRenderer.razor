@@ -32,7 +32,8 @@
                    display: block; 
                    outline: none;
                    cursor: @GetCanvasCursor();
-                   user-select: none;">
+                   user-select: none;
+                   box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
     </canvas>
 }
 
@@ -74,8 +75,10 @@
     private double _lastTouchX = 0;
     private double _lastTouchY = 0;
 
-    // Hover state for close button
+    // Hover state for close button and cursor
     private bool _closeButtonHover = false;
+    private int _lastMouseX = 0;
+    private int _lastMouseY = 0;
 
     private enum ResizeDirection
     {
@@ -106,20 +109,19 @@
     {
         if (!_initialized || Form == null) return;
 
-        await JSRuntime.InvokeVoidAsync("renderFormCanvas", _canvasRef, new
-        {
-            Width = Form.Width,
-            Height = Form.Height,
-            Title = Form.Text,
-            BackColor = Form.BackColor.ToHexString(),
-            ClientX = BorderWidth,
-            ClientY = TitleBarHeight + BorderWidth,
-            ClientWidth = Form.Width - (BorderWidth * 2),
-            ClientHeight = Form.Height - TitleBarHeight - (BorderWidth * 2),
-            CloseButtonHover = _closeButtonHover
-        });
+        // First, render the form chrome (title bar, border, close button)
+        await JSRuntime.InvokeVoidAsync("renderFormCanvas", _canvasRef, 
+            Form.Width,
+            Form.Height,
+            Form.Text,
+            Form.BackColor.ToHexString(),
+            BorderWidth,
+            TitleBarHeight + BorderWidth,
+            Form.Width - (BorderWidth * 2),
+            Form.Height - TitleBarHeight - (BorderWidth * 2),
+            _closeButtonHover);
 
-        // Create graphics for client area
+        // Create graphics for client area (size excludes chrome)
         using var graphics = new Graphics(
             Form.Width - (BorderWidth * 2), 
             Form.Height - TitleBarHeight - (BorderWidth * 2)
@@ -128,7 +130,7 @@
         // Clear client area with background color
         graphics.Clear(Form.BackColor);
 
-        // Trigger Paint event
+        // Trigger Paint event to let user code draw
         var paintArgs = new PaintEventArgs(
             graphics, 
             new Rectangle(0, 0, 
@@ -137,7 +139,7 @@
         );
         Form.OnPaint(paintArgs);
 
-        // Execute drawing commands in client area
+        // Execute drawing commands in client area (translated and clipped)
         var commands = graphics.GetCommands();
         var jsCommands = string.Join("\n", commands.Select(c => c.ToJavaScript()));
 
@@ -202,6 +204,28 @@
     {
         if (_isDragging) return "move";
         if (_isResizing) return GetResizeCursor(_resizeDirection);
+
+        // Check if mouse is over resize handles
+        if (Form != null && Form.AllowResize)
+        {
+            var resizeDir = GetResizeDirection(_lastMouseX, _lastMouseY);
+            if (resizeDir != ResizeDirection.None)
+            {
+                return GetResizeCursor(resizeDir);
+            }
+        }
+
+        // Check if mouse is over title bar (draggable area)
+        if (Form != null && Form.AllowMove && _lastMouseY < TitleBarHeight + BorderWidth && _lastMouseY >= BorderWidth)
+        {
+            // Not over close button
+            var closeButtonRect = GetCloseButtonRect();
+            if (!IsPointInRect(_lastMouseX, _lastMouseY, closeButtonRect))
+            {
+                return "move";
+            }
+        }
+
         return "default";
     }
 
@@ -517,6 +541,12 @@
         var x = (int)e.OffsetX;
         var y = (int)e.OffsetY;
 
+        // Track mouse position for cursor updates
+        var oldX = _lastMouseX;
+        var oldY = _lastMouseY;
+        _lastMouseX = x;
+        _lastMouseY = y;
+
         // Check close button hover
         var closeButtonRect = GetCloseButtonRect();
         var wasHovering = _closeButtonHover;
@@ -525,6 +555,36 @@
         if (wasHovering != _closeButtonHover)
         {
             await RenderForm();
+        }
+
+        // Check if we need to update cursor (moved into/out of resize or title bar area)
+        var needsCursorUpdate = false;
+
+        // Check if we crossed into/out of resize handle area
+        if (Form.AllowResize)
+        {
+            var oldResizeDir = GetResizeDirection(oldX, oldY);
+            var newResizeDir = GetResizeDirection(x, y);
+            if (oldResizeDir != newResizeDir)
+            {
+                needsCursorUpdate = true;
+            }
+        }
+
+        // Check if we crossed into/out of title bar
+        if (Form.AllowMove)
+        {
+            var wasInTitleBar = oldY < TitleBarHeight + BorderWidth && oldY >= BorderWidth;
+            var isInTitleBar = y < TitleBarHeight + BorderWidth && y >= BorderWidth;
+            if (wasInTitleBar != isInTitleBar)
+            {
+                needsCursorUpdate = true;
+            }
+        }
+
+        if (needsCursorUpdate)
+        {
+            StateHasChanged();
         }
 
         // Handle mouse move in client area
@@ -555,7 +615,10 @@
     {
         if (Form == null) return;
         _closeButtonHover = false;
+        _lastMouseX = -1;
+        _lastMouseY = -1;
         Form.OnMouseLeave(EventArgs.Empty);
+        StateHasChanged(); // Update cursor to default
     }
 
     private void HandleClick(BlazorMouseEventArgs e)
