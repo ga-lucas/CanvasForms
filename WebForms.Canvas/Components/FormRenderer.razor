@@ -6,100 +6,35 @@
 @inject IJSRuntime JSRuntime
 @implements IDisposable
 
-<div class="winforms-container"
-     style="position: absolute; 
-            left: @(Form?.Left ?? 50)px;
-            top: @(Form?.Top ?? 50)px; 
-            z-index: @(Form?.ZIndex ?? 0);
-            display: @(Form?.Visible == true ? "inline-block" : "none"); 
-            box-shadow: 0 0 10px rgba(0,0,0,0.2);
-            border: 2px solid rgba(74, 144, 226, 0.3);
-            user-select: none;">
-    @if (Form != null && Form.Visible)
-    {
-        <!-- Top edge and corner resize handles positioned at container level -->
-        @if (Form.AllowResize)
-        {
-            <div @onmousedown="e => StartResize(e, ResizeDirection.Top)" 
-                 @onmousedown:preventDefault
-                 style="position: absolute; left: 12px; top: -4px; width: calc(100% - 24px); height: 8px; cursor: n-resize; z-index: 20;"></div>
-            <div @onmousedown="e => StartResize(e, ResizeDirection.TopLeft)" 
-                 @onmousedown:preventDefault
-                 style="position: absolute; left: -4px; top: -4px; width: 16px; height: 36px; cursor: nw-resize; background: rgba(74, 144, 226, 0.5); z-index: 25;"></div>
-            <div @onmousedown="e => StartResize(e, ResizeDirection.TopRight)" 
-                 @onmousedown:preventDefault
-                 style="position: absolute; right: -4px; top: -4px; width: 16px; height: 36px; cursor: ne-resize; background: rgba(74, 144, 226, 0.5); z-index: 25;"></div>
-        }
-
-        <div class="form-titlebar" 
-             @onmousedown="StartDrag"
-             @onmousedown:preventDefault
-             style="background: linear-gradient(to bottom, #4a90e2, #357abd); 
-                    color: white; 
-                    padding: 8px; 
-                    font-size: 14px; 
-                    font-family: 'Segoe UI', Arial, sans-serif; 
-                    cursor: @(Form.AllowMove ? "move" : "default");">
-            @Form.Text
-            <button @onclick="CloseForm" 
-                    @onclick:stopPropagation
-                    style="float: right; 
-                           background: transparent; 
-                           border: none;
-                           color: white; 
-                           cursor: pointer;
-                           font-size: 18px; 
-                           line-height: 1;">×</button>
-        </div>
-        <div style="position: relative;">
-            <canvas @ref="_canvasRef" 
-                    @onmousedown="HandleMouseDown"
-                    @onmouseup="HandleMouseUp"
-                    @onmousemove="HandleMouseMove"
-                    @onmouseleave="HandleMouseLeave"
-                    @onmouseenter="HandleMouseEnter"
-                    @onclick="HandleClick"
-                    @ondblclick="HandleDoubleClick"
-                    @ontouchstart="HandleTouchStart"
-                    @ontouchmove="HandleTouchMove"
-                    @ontouchend="HandleTouchEnd"
-                    tabindex="0"
-                    @onkeydown="HandleKeyDown"
-                    @onkeyup="HandleKeyUp"
-                    @onkeypress="HandleKeyPress"
-                    width="@Form.ClientWidth" 
-                    height="@Form.ClientHeight"
-                    style="display: block; 
-                           background: @Form.BackColor.ToHexString();
-                           outline: none;
-                           cursor: @GetCanvasCursor();">
-            </canvas>
-
-            @if (Form.AllowResize)
-            {
-                <!-- Edge resize handles -->
-                <div @onmousedown="e => StartResize(e, ResizeDirection.Left)" 
-                     @onmousedown:preventDefault
-                     style="position: absolute; left: -4px; top: 0; width: 8px; height: 100%; cursor: w-resize; z-index: 15;"></div>
-                <div @onmousedown="e => StartResize(e, ResizeDirection.Right)" 
-                     @onmousedown:preventDefault
-                     style="position: absolute; right: -4px; top: 0; width: 8px; height: 100%; cursor: e-resize; z-index: 15;"></div>
-                <!-- Top handle and top corners moved to container level above -->
-                <div @onmousedown="e => StartResize(e, ResizeDirection.Bottom)" 
-                     @onmousedown:preventDefault
-                     style="position: absolute; left: 0; bottom: -4px; width: 100%; height: 8px; cursor: s-resize; z-index: 15;"></div>
-
-                <!-- Bottom corner resize handles -->
-                <div @onmousedown="e => StartResize(e, ResizeDirection.BottomLeft)"
-                     @onmousedown:preventDefault
-                     style="position: absolute; left: -4px; bottom: -4px; width: 16px; height: 16px; cursor: sw-resize; background: rgba(74, 144, 226, 0.5); z-index: 20;"></div>
-                <div @onmousedown="e => StartResize(e, ResizeDirection.BottomRight)" 
-                     @onmousedown:preventDefault
-                     style="position: absolute; right: -4px; bottom: -4px; width: 16px; height: 16px; cursor: se-resize; background: rgba(74, 144, 226, 0.5); z-index: 20;"></div>
-            }
-        </div>
-    }
-</div>
+@if (Form != null && Form.Visible)
+{
+    <canvas @ref="_canvasRef" 
+            @onmousedown="HandleMouseDown"
+            @onmouseup="HandleMouseUp"
+            @onmousemove="HandleMouseMove"
+            @onmouseleave="HandleMouseLeave"
+            @onmouseenter="HandleMouseEnter"
+            @onclick="HandleClick"
+            @ondblclick="HandleDoubleClick"
+            @ontouchstart="HandleTouchStart"
+            @ontouchmove="HandleTouchMove"
+            @ontouchend="HandleTouchEnd"
+            tabindex="0"
+            @onkeydown="HandleKeyDown"
+            @onkeyup="HandleKeyUp"
+            @onkeypress="HandleKeyPress"
+            width="@Form.Width" 
+            height="@Form.Height"
+            style="position: absolute; 
+                   left: @(Form.Left)px;
+                   top: @(Form.Top)px; 
+                   z-index: @(Form.ZIndex);
+                   display: block; 
+                   outline: none;
+                   cursor: @GetCanvasCursor();
+                   user-select: none;">
+    </canvas>
+}
 
 @code {
     [Parameter]
@@ -108,6 +43,13 @@
     private ElementReference _canvasRef;
     private bool _initialized = false;
     private DotNetObjectReference<FormRenderer>? _dotNetRef;
+
+    // Form chrome dimensions
+    private const int TitleBarHeight = 32;
+    private const int BorderWidth = 2;
+    private const int ResizeHandleSize = 8;
+    private const int CloseButtonSize = 20;
+    private const int CloseButtonMargin = 6;
 
     // Dragging state
     private bool _isDragging = false;
@@ -132,6 +74,9 @@
     private double _lastTouchX = 0;
     private double _lastTouchY = 0;
 
+    // Hover state for close button
+    private bool _closeButtonHover = false;
+
     private enum ResizeDirection
     {
         None,
@@ -153,7 +98,6 @@
             Form.RequestRender = RenderForm;
             await RenderForm();
 
-            // Store reference for later use (no registration needed anymore)
             _dotNetRef = DotNetObjectReference.Create(this);
         }
     }
@@ -162,20 +106,45 @@
     {
         if (!_initialized || Form == null) return;
 
-        using var graphics = new Graphics(Form.ClientWidth, Form.ClientHeight);
+        await JSRuntime.InvokeVoidAsync("renderFormCanvas", _canvasRef, new
+        {
+            Width = Form.Width,
+            Height = Form.Height,
+            Title = Form.Text,
+            BackColor = Form.BackColor.ToHexString(),
+            ClientX = BorderWidth,
+            ClientY = TitleBarHeight + BorderWidth,
+            ClientWidth = Form.Width - (BorderWidth * 2),
+            ClientHeight = Form.Height - TitleBarHeight - (BorderWidth * 2),
+            CloseButtonHover = _closeButtonHover
+        });
 
-        // Clear with background color
+        // Create graphics for client area
+        using var graphics = new Graphics(
+            Form.Width - (BorderWidth * 2), 
+            Form.Height - TitleBarHeight - (BorderWidth * 2)
+        );
+
+        // Clear client area with background color
         graphics.Clear(Form.BackColor);
 
         // Trigger Paint event
-        var paintArgs = new PaintEventArgs(graphics, new Rectangle(0, 0, Form.ClientWidth, Form.ClientHeight));
+        var paintArgs = new PaintEventArgs(
+            graphics, 
+            new Rectangle(0, 0, 
+                Form.Width - (BorderWidth * 2), 
+                Form.Height - TitleBarHeight - (BorderWidth * 2))
+        );
         Form.OnPaint(paintArgs);
 
-        // Execute drawing commands
+        // Execute drawing commands in client area
         var commands = graphics.GetCommands();
         var jsCommands = string.Join("\n", commands.Select(c => c.ToJavaScript()));
 
-        await JSRuntime.InvokeVoidAsync("renderCanvas", _canvasRef, jsCommands);
+        await JSRuntime.InvokeVoidAsync("renderClientArea", _canvasRef, 
+            BorderWidth, 
+            TitleBarHeight + BorderWidth, 
+            jsCommands);
     }
 
     // Bring form to front when clicked (synchronous version for drag/resize)
@@ -186,9 +155,66 @@
         var oldZIndex = Form.ZIndex;
         Form.BringToFront();
 
-        // Log to console (fire-and-forget, doesn't block)
         _ = JSRuntime.InvokeVoidAsync("console.log", 
             $"BringToFront: '{Form.Text}' z-index {oldZIndex} → {Form.ZIndex}");
+    }
+
+    // Hit-testing helpers
+    private Rectangle GetCloseButtonRect()
+    {
+        if (Form == null) return new Rectangle(0, 0, 0, 0);
+
+        var x = Form.Width - CloseButtonSize - CloseButtonMargin;
+        var y = (TitleBarHeight - CloseButtonSize) / 2 + BorderWidth;
+        return new Rectangle(x, y, CloseButtonSize, CloseButtonSize);
+    }
+
+    private bool IsPointInRect(int x, int y, Rectangle rect)
+    {
+        return x >= rect.X && x < rect.X + rect.Width &&
+               y >= rect.Y && y < rect.Y + rect.Height;
+    }
+
+    private ResizeDirection GetResizeDirection(int x, int y)
+    {
+        if (Form == null || !Form.AllowResize) return ResizeDirection.None;
+
+        var handleSize = ResizeHandleSize;
+        var width = Form.Width;
+        var height = Form.Height;
+
+        // Check corners first (they have priority)
+        if (x < handleSize && y < handleSize) return ResizeDirection.TopLeft;
+        if (x >= width - handleSize && y < handleSize) return ResizeDirection.TopRight;
+        if (x < handleSize && y >= height - handleSize) return ResizeDirection.BottomLeft;
+        if (x >= width - handleSize && y >= height - handleSize) return ResizeDirection.BottomRight;
+
+        // Check edges
+        if (x < handleSize) return ResizeDirection.Left;
+        if (x >= width - handleSize) return ResizeDirection.Right;
+        if (y < handleSize) return ResizeDirection.Top;
+        if (y >= height - handleSize) return ResizeDirection.Bottom;
+
+        return ResizeDirection.None;
+    }
+
+    private string GetCanvasCursor()
+    {
+        if (_isDragging) return "move";
+        if (_isResizing) return GetResizeCursor(_resizeDirection);
+        return "default";
+    }
+
+    private string GetResizeCursor(ResizeDirection direction)
+    {
+        return direction switch
+        {
+            ResizeDirection.Left or ResizeDirection.Right => "ew-resize",
+            ResizeDirection.Top or ResizeDirection.Bottom => "ns-resize",
+            ResizeDirection.TopLeft or ResizeDirection.BottomRight => "nwse-resize",
+            ResizeDirection.TopRight or ResizeDirection.BottomLeft => "nesw-resize",
+            _ => "default"
+        };
     }
 
     // Dragging
@@ -196,10 +222,8 @@
     {
         if (Form == null || !Form.AllowMove || _dotNetRef == null) return;
 
-        // Bring to front when starting to drag (sync to avoid race conditions)
         BringToFrontSync();
 
-        // Set this form as the active one for global mouse handlers
         await JSRuntime.InvokeVoidAsync("setActiveFormRenderer", _dotNetRef);
 
         _isDragging = true;
@@ -207,6 +231,28 @@
         _dragStartY = e.ClientY;
         _formStartLeft = Form.Left;
         _formStartTop = Form.Top;
+
+        StateHasChanged();
+    }
+
+    private async Task StartResize(BlazorMouseEventArgs e, ResizeDirection direction)
+    {
+        if (Form == null || !Form.AllowResize || _dotNetRef == null) return;
+
+        BringToFrontSync();
+
+        await JSRuntime.InvokeVoidAsync("setActiveFormRenderer", _dotNetRef);
+
+        _isResizing = true;
+        _resizeDirection = direction;
+        _resizeStartX = e.ClientX;
+        _resizeStartY = e.ClientY;
+        _formStartWidth = Form.Width;
+        _formStartHeight = Form.Height;
+        _formStartLeft = Form.Left;
+        _formStartTop = Form.Top;
+
+        StateHasChanged();
     }
 
     [JSInvokable]
@@ -227,24 +273,18 @@
             var deltaX = (int)(clientX - _resizeStartX);
             var deltaY = (int)(clientY - _resizeStartY);
 
-            // Calculate all new values first, then apply them atomically
-            // This prevents intermediate renders that cause jumping
-
             switch (_resizeDirection)
             {
                 case ResizeDirection.Left:
                     {
                         var newWidth = _formStartWidth - deltaX;
-                        // Clamp to constraints - use ClientWidth minimum
-                        var minWidth = Math.Max(Form.MinimumWidth, Form.ClientWidth);
+                        var minWidth = Math.Max(Form.MinimumWidth, 100);
                         newWidth = Math.Max(minWidth, newWidth);
                         if (Form.MaximumWidth > 0) newWidth = Math.Min(Form.MaximumWidth, newWidth);
 
-                        // Calculate how much the width actually changed (accounting for constraints)
                         var actualDelta = _formStartWidth - newWidth;
                         var newLeft = _formStartLeft + actualDelta;
 
-                        // Update both atomically - right edge stays fixed
                         Form.Width = newWidth;
                         Form.Left = newLeft;
                     }
@@ -252,7 +292,7 @@
 
                 case ResizeDirection.Right:
                     {
-                        var minWidth = Math.Max(Form.MinimumWidth, Form.ClientWidth);
+                        var minWidth = Math.Max(Form.MinimumWidth, 100);
                         var newWidth = Math.Max(minWidth, _formStartWidth + deltaX);
                         if (Form.MaximumWidth > 0) newWidth = Math.Min(newWidth, Form.MaximumWidth);
                         Form.Width = newWidth;
@@ -262,15 +302,13 @@
                 case ResizeDirection.Top:
                     {
                         var newHeight = _formStartHeight - deltaY;
-                        // Clamp to constraints
-                        newHeight = Math.Max(Form.MinimumHeight, newHeight);
+                        var minHeight = Math.Max(Form.MinimumHeight, TitleBarHeight + 50);
+                        newHeight = Math.Max(minHeight, newHeight);
                         if (Form.MaximumHeight > 0) newHeight = Math.Min(Form.MaximumHeight, newHeight);
 
-                        // Calculate how much the height actually changed (accounting for constraints)
                         var actualDelta = _formStartHeight - newHeight;
                         var newTop = _formStartTop + actualDelta;
 
-                        // Update both atomically - bottom edge stays fixed
                         Form.Height = newHeight;
                         Form.Top = newTop;
                     }
@@ -278,7 +316,8 @@
 
                 case ResizeDirection.Bottom:
                     {
-                        var newHeight = Math.Max(Form.MinimumHeight, _formStartHeight + deltaY);
+                        var minHeight = Math.Max(Form.MinimumHeight, TitleBarHeight + 50);
+                        var newHeight = Math.Max(minHeight, _formStartHeight + deltaY);
                         if (Form.MaximumHeight > 0) newHeight = Math.Min(newHeight, Form.MaximumHeight);
                         Form.Height = newHeight;
                     }
@@ -286,21 +325,18 @@
 
                 case ResizeDirection.TopLeft:
                     {
-                        // Handle width/left
                         var newWidth = _formStartWidth - deltaX;
-                        newWidth = Math.Max(Form.MinimumWidth, newWidth);
+                        newWidth = Math.Max(Math.Max(Form.MinimumWidth, 100), newWidth);
                         if (Form.MaximumWidth > 0) newWidth = Math.Min(Form.MaximumWidth, newWidth);
                         var actualDeltaX = _formStartWidth - newWidth;
                         var newLeft = _formStartLeft + actualDeltaX;
 
-                        // Handle height/top
                         var newHeight = _formStartHeight - deltaY;
-                        newHeight = Math.Max(Form.MinimumHeight, newHeight);
+                        newHeight = Math.Max(Math.Max(Form.MinimumHeight, TitleBarHeight + 50), newHeight);
                         if (Form.MaximumHeight > 0) newHeight = Math.Min(Form.MaximumHeight, newHeight);
                         var actualDeltaY = _formStartHeight - newHeight;
                         var newTop = _formStartTop + actualDeltaY;
 
-                        // Apply all at once
                         Form.Width = newWidth;
                         Form.Left = newLeft;
                         Form.Height = newHeight;
@@ -310,13 +346,11 @@
 
                 case ResizeDirection.TopRight:
                     {
-                        // Handle width (right edge moves)
-                        var newWidth = Math.Max(Form.MinimumWidth, _formStartWidth + deltaX);
+                        var newWidth = Math.Max(Math.Max(Form.MinimumWidth, 100), _formStartWidth + deltaX);
                         if (Form.MaximumWidth > 0) newWidth = Math.Min(newWidth, Form.MaximumWidth);
 
-                        // Handle height/top (bottom edge fixed)
                         var newHeight = _formStartHeight - deltaY;
-                        newHeight = Math.Max(Form.MinimumHeight, newHeight);
+                        newHeight = Math.Max(Math.Max(Form.MinimumHeight, TitleBarHeight + 50), newHeight);
                         if (Form.MaximumHeight > 0) newHeight = Math.Min(Form.MaximumHeight, newHeight);
                         var actualDeltaY = _formStartHeight - newHeight;
                         var newTop = _formStartTop + actualDeltaY;
@@ -329,15 +363,13 @@
 
                 case ResizeDirection.BottomLeft:
                     {
-                        // Handle width/left (right edge fixed)
                         var newWidth = _formStartWidth - deltaX;
-                        newWidth = Math.Max(Form.MinimumWidth, newWidth);
+                        newWidth = Math.Max(Math.Max(Form.MinimumWidth, 100), newWidth);
                         if (Form.MaximumWidth > 0) newWidth = Math.Min(Form.MaximumWidth, newWidth);
                         var actualDeltaX = _formStartWidth - newWidth;
                         var newLeft = _formStartLeft + actualDeltaX;
 
-                        // Handle height (top edge fixed)
-                        var newHeight = Math.Max(Form.MinimumHeight, _formStartHeight + deltaY);
+                        var newHeight = Math.Max(Math.Max(Form.MinimumHeight, TitleBarHeight + 50), _formStartHeight + deltaY);
                         if (Form.MaximumHeight > 0) newHeight = Math.Min(newHeight, Form.MaximumHeight);
 
                         Form.Width = newWidth;
@@ -348,8 +380,8 @@
 
                 case ResizeDirection.BottomRight:
                     {
-                        var newWidth = Math.Max(Form.MinimumWidth, _formStartWidth + deltaX);
-                        var newHeight = Math.Max(Form.MinimumHeight, _formStartHeight + deltaY);
+                        var newWidth = Math.Max(Math.Max(Form.MinimumWidth, 100), _formStartWidth + deltaX);
+                        var newHeight = Math.Max(Math.Max(Form.MinimumHeight, TitleBarHeight + 50), _formStartHeight + deltaY);
                         if (Form.MaximumWidth > 0) newWidth = Math.Min(newWidth, Form.MaximumWidth);
                         if (Form.MaximumHeight > 0) newHeight = Math.Min(newHeight, Form.MaximumHeight);
 
@@ -359,21 +391,18 @@
                     break;
             }
 
-            // Throttle redraws to ~60 FPS for performance
             var now = DateTime.UtcNow;
             var timeSinceLastRender = (now - _lastResizeRender).TotalMilliseconds;
 
             if (timeSinceLastRender >= ResizeRenderThrottleMs)
             {
                 _lastResizeRender = now;
-                // Ensure all property updates are complete before rendering
                 await Task.Yield();
                 StateHasChanged();
                 await RenderForm();
             }
             else
             {
-                // Just update the UI, render will happen on next throttle interval or mouseup
                 await Task.Yield();
                 StateHasChanged();
             }
@@ -390,86 +419,130 @@
         _isResizing = false;
         _resizeDirection = ResizeDirection.None;
 
-        // Final render after resize to ensure content is fully drawn
         if (wasResizing)
         {
             await RenderForm();
         }
 
-        // Force re-render after drag/resize to update z-index display
         if (wasResizing || wasDragging)
         {
             StateHasChanged();
         }
     }
 
-    private async void StartResize(BlazorMouseEventArgs e, ResizeDirection direction)
-    {
-        if (Form == null || !Form.AllowResize || _dotNetRef == null) return;
-
-        // Bring to front when starting to resize (sync to avoid race conditions)
-        BringToFrontSync();
-
-        // Set this form as the active one for global mouse handlers
-        await JSRuntime.InvokeVoidAsync("setActiveFormRenderer", _dotNetRef);
-
-        _isResizing = true;
-        _resizeDirection = direction;
-        _resizeStartX = e.ClientX;
-        _resizeStartY = e.ClientY;
-        _formStartWidth = Form.Width;
-        _formStartHeight = Form.Height;
-        _formStartLeft = Form.Left;   // ← CRITICAL FIX!
-        _formStartTop = Form.Top;     // ← CRITICAL FIX!
-    }
-
-    private string GetCanvasCursor()
-    {
-        return "default";
-    }
-
     // Mouse events on canvas
-    private void HandleMouseDown(BlazorMouseEventArgs e)
+    private async void HandleMouseDown(BlazorMouseEventArgs e)
     {
         if (Form == null) return;
 
-        // Bring to front when clicking on canvas (sync version)
+        var x = (int)e.OffsetX;
+        var y = (int)e.OffsetY;
+
+        // Check close button
+        var closeButtonRect = GetCloseButtonRect();
+        if (IsPointInRect(x, y, closeButtonRect))
+        {
+            CloseForm();
+            return;
+        }
+
+        // Check resize handles
+        if (Form.AllowResize)
+        {
+            var resizeDir = GetResizeDirection(x, y);
+            if (resizeDir != ResizeDirection.None)
+            {
+                await StartResize(e, resizeDir);
+                return;
+            }
+        }
+
+        // Check title bar for dragging
+        if (Form.AllowMove && y < TitleBarHeight + BorderWidth)
+        {
+            StartDrag(e);
+            return;
+        }
+
+        // Handle mouse down in client area
         BringToFrontSync();
+        var clientX = x - BorderWidth;
+        var clientY = y - TitleBarHeight - BorderWidth;
 
-        var args = new Forms.MouseEventArgs(
-            GetMouseButton(e.Button),
-            1,
-            (int)e.OffsetX,
-            (int)e.OffsetY
-        );
-        Form.OnMouseDown(args);
+        if (clientX >= 0 && clientY >= 0 && 
+            clientX < Form.Width - (BorderWidth * 2) && 
+            clientY < Form.Height - TitleBarHeight - (BorderWidth * 2))
+        {
+            var args = new Forms.MouseEventArgs(
+                GetMouseButton(e.Button),
+                1,
+                clientX,
+                clientY
+            );
+            Form.OnMouseDown(args);
+        }
 
-        // Re-render to update z-index display
         StateHasChanged();
     }
 
     private void HandleMouseUp(BlazorMouseEventArgs e)
     {
         if (Form == null) return;
-        var args = new Forms.MouseEventArgs(
-            GetMouseButton(e.Button),
-            1,
-            (int)e.OffsetX,
-            (int)e.OffsetY
-        );
-        Form.OnMouseUp(args);
+
+        var x = (int)e.OffsetX;
+        var y = (int)e.OffsetY;
+
+        // Handle mouse up in client area
+        var clientX = x - BorderWidth;
+        var clientY = y - TitleBarHeight - BorderWidth;
+
+        if (clientX >= 0 && clientY >= 0 && 
+            clientX < Form.Width - (BorderWidth * 2) && 
+            clientY < Form.Height - TitleBarHeight - (BorderWidth * 2))
+        {
+            var args = new Forms.MouseEventArgs(
+                GetMouseButton(e.Button),
+                1,
+                clientX,
+                clientY
+            );
+            Form.OnMouseUp(args);
+        }
     }
 
-    private void HandleMouseMove(BlazorMouseEventArgs e)
+    private async void HandleMouseMove(BlazorMouseEventArgs e)
     {
         if (Form == null) return;
-        var args = new Forms.MouseEventArgs(
-            MouseButtons.None,
-            0,
-            (int)e.OffsetX,
-            (int)e.OffsetY
-        );
-        Form.OnMouseMove(args);
+
+        var x = (int)e.OffsetX;
+        var y = (int)e.OffsetY;
+
+        // Check close button hover
+        var closeButtonRect = GetCloseButtonRect();
+        var wasHovering = _closeButtonHover;
+        _closeButtonHover = IsPointInRect(x, y, closeButtonRect);
+
+        if (wasHovering != _closeButtonHover)
+        {
+            await RenderForm();
+        }
+
+        // Handle mouse move in client area
+        var clientX = x - BorderWidth;
+        var clientY = y - TitleBarHeight - BorderWidth;
+
+        if (clientX >= 0 && clientY >= 0 && 
+            clientX < Form.Width - (BorderWidth * 2) && 
+            clientY < Form.Height - TitleBarHeight - (BorderWidth * 2))
+        {
+            var args = new Forms.MouseEventArgs(
+                MouseButtons.None,
+                0,
+                clientX,
+                clientY
+            );
+            Form.OnMouseMove(args);
+        }
     }
 
     private void HandleMouseEnter(BlazorMouseEventArgs e)
@@ -481,35 +554,62 @@
     private void HandleMouseLeave(BlazorMouseEventArgs e)
     {
         if (Form == null) return;
+        _closeButtonHover = false;
         Form.OnMouseLeave(EventArgs.Empty);
     }
 
     private void HandleClick(BlazorMouseEventArgs e)
     {
         if (Form == null) return;
-        var args = new Forms.MouseEventArgs(
-            GetMouseButton(e.Button),
-            1,
-            (int)e.OffsetX,
-            (int)e.OffsetY
-        );
-        Form.OnMouseClick(args);
+
+        var x = (int)e.OffsetX;
+        var y = (int)e.OffsetY;
+
+        // Handle click in client area
+        var clientX = x - BorderWidth;
+        var clientY = y - TitleBarHeight - BorderWidth;
+
+        if (clientX >= 0 && clientY >= 0 && 
+            clientX < Form.Width - (BorderWidth * 2) && 
+            clientY < Form.Height - TitleBarHeight - (BorderWidth * 2))
+        {
+            var args = new Forms.MouseEventArgs(
+                GetMouseButton(e.Button),
+                1,
+                clientX,
+                clientY
+            );
+            Form.OnMouseClick(args);
+        }
     }
 
     private void HandleDoubleClick(BlazorMouseEventArgs e)
     {
         if (Form == null) return;
-        var args = new Forms.MouseEventArgs(
-            GetMouseButton(e.Button),
-            2,
-            (int)e.OffsetX,
-            (int)e.OffsetY
-        );
-        Form.OnMouseDoubleClick(args);
+
+        var x = (int)e.OffsetX;
+        var y = (int)e.OffsetY;
+
+        // Handle double click in client area
+        var clientX = x - BorderWidth;
+        var clientY = y - TitleBarHeight - BorderWidth;
+
+        if (clientX >= 0 && clientY >= 0 && 
+            clientX < Form.Width - (BorderWidth * 2) && 
+            clientY < Form.Height - TitleBarHeight - (BorderWidth * 2))
+        {
+            var args = new Forms.MouseEventArgs(
+                GetMouseButton(e.Button),
+                2,
+                clientX,
+                clientY
+            );
+            Form.OnMouseDoubleClick(args);
+        }
     }
 
-    // Touch events
-    private void HandleTouchStart(BlazorTouchEventArgs e)
+    // Touch events - map to canvas coordinates
+    private async void HandleTouchStart(BlazorTouchEventArgs e)
     {
         if (Form == null || e.Touches.Length == 0) return;
 
@@ -517,40 +617,94 @@
         _lastTouchX = touch.ClientX;
         _lastTouchY = touch.ClientY;
 
-        var args = new Forms.MouseEventArgs(
-            MouseButtons.Left,
-            1,
-            (int)touch.ClientX,
-            (int)touch.ClientY
-        );
-        Form.OnMouseDown(args);
+        // Get canvas bounds for coordinate conversion
+        var canvasBounds = await JSRuntime.InvokeAsync<BoundingRect>("getCanvasBounds", _canvasRef);
+        var x = (int)(touch.ClientX - canvasBounds.Left);
+        var y = (int)(touch.ClientY - canvasBounds.Top);
+
+        // Check close button
+        var closeButtonRect = GetCloseButtonRect();
+        if (IsPointInRect(x, y, closeButtonRect))
+        {
+            CloseForm();
+            return;
+        }
+
+        // Check resize handles
+        if (Form.AllowResize)
+        {
+            var resizeDir = GetResizeDirection(x, y);
+            if (resizeDir != ResizeDirection.None)
+            {
+                // Touch resize not fully implemented - can be added later
+                return;
+            }
+        }
+
+        // Map to client coordinates
+        var clientX = x - BorderWidth;
+        var clientY = y - TitleBarHeight - BorderWidth;
+
+        if (clientX >= 0 && clientY >= 0 && 
+            clientX < Form.Width - (BorderWidth * 2) && 
+            clientY < Form.Height - TitleBarHeight - (BorderWidth * 2))
+        {
+            var args = new Forms.MouseEventArgs(
+                MouseButtons.Left,
+                1,
+                clientX,
+                clientY
+            );
+            Form.OnMouseDown(args);
+        }
     }
 
-    private void HandleTouchMove(BlazorTouchEventArgs e)
+    private async void HandleTouchMove(BlazorTouchEventArgs e)
     {
         if (Form == null || e.Touches.Length == 0) return;
 
         var touch = e.Touches[0];
-        var args = new Forms.MouseEventArgs(
-            MouseButtons.None,
-            0,
-            (int)touch.ClientX,
-            (int)touch.ClientY
-        );
-        Form.OnMouseMove(args);
+        var canvasBounds = await JSRuntime.InvokeAsync<BoundingRect>("getCanvasBounds", _canvasRef);
+        var x = (int)(touch.ClientX - canvasBounds.Left);
+        var y = (int)(touch.ClientY - canvasBounds.Top);
+
+        var clientX = x - BorderWidth;
+        var clientY = y - TitleBarHeight - BorderWidth;
+
+        if (clientX >= 0 && clientY >= 0 && 
+            clientX < Form.Width - (BorderWidth * 2) && 
+            clientY < Form.Height - TitleBarHeight - (BorderWidth * 2))
+        {
+            var args = new Forms.MouseEventArgs(
+                MouseButtons.None,
+                0,
+                clientX,
+                clientY
+            );
+            Form.OnMouseMove(args);
+        }
     }
 
     private void HandleTouchEnd(BlazorTouchEventArgs e)
     {
         if (Form == null) return;
 
-        var args = new Forms.MouseEventArgs(
-            MouseButtons.Left,
-            1,
-            (int)_lastTouchX,
-            (int)_lastTouchY
-        );
-        Form.OnMouseUp(args);
+        // Use last touch position stored in HandleTouchStart
+        var clientX = (int)_lastTouchX - BorderWidth;
+        var clientY = (int)_lastTouchY - TitleBarHeight - BorderWidth;
+
+        if (clientX >= 0 && clientY >= 0 && 
+            clientX < Form.Width - (BorderWidth * 2) && 
+            clientY < Form.Height - TitleBarHeight - (BorderWidth * 2))
+        {
+            var args = new Forms.MouseEventArgs(
+                MouseButtons.Left,
+                1,
+                clientX,
+                clientY
+            );
+            Form.OnMouseUp(args);
+        }
     }
 
     // Keyboard events
@@ -678,6 +832,14 @@
             "F12" => Keys.F12,
             _ => Keys.None
         };
+    }
+
+    private class BoundingRect
+    {
+        public double Left { get; set; }
+        public double Top { get; set; }
+        public double Width { get; set; }
+        public double Height { get; set; }
     }
 
     public void Dispose()
