@@ -13,13 +13,37 @@ function getOffscreenCanvas(canvas) {
     const offscreen = offscreenBuffers.get(canvas);
 
     // Ensure offscreen canvas matches visible canvas size
+    // When resizing, this clears the canvas automatically
     if (offscreen.width !== canvas.width || offscreen.height !== canvas.height) {
+        // Resizing the canvas clears it automatically in most browsers
+        // But we force a complete reset for reliability
         offscreen.width = canvas.width;
         offscreen.height = canvas.height;
+
+        // Additional clearing strategy: get fresh context and clear explicitly
+        const ctx = offscreen.getContext('2d');
+        if (ctx) {
+            // Reset transform to ensure we're clearing everything
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Fill with white to ensure no artifacts (will be overwritten)
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
     }
 
     return offscreen;
 }
+
+// Clean up offscreen buffer when canvas is removed (called from Blazor)
+window.disposeCanvasBuffer = (canvas) => {
+    if (offscreenBuffers.has(canvas)) {
+        const offscreen = offscreenBuffers.get(canvas);
+        offscreen.width = 0;
+        offscreen.height = 0;
+        offscreenBuffers.delete(canvas);
+    }
+};
 
 // Render the entire form chrome (title bar, borders, close button) on canvas
 window.renderFormCanvas = (canvas, width, height, title, backColor, clientX, clientY, clientWidth, clientHeight, closeButtonHover) => {
@@ -35,8 +59,13 @@ window.renderFormCanvas = (canvas, width, height, title, backColor, clientX, cli
         return;
     }
 
-    // Clear entire offscreen canvas
-    ctx.clearRect(0, 0, width, height);
+    // CRITICAL: Multiple clearing strategies to work around browser canvas rendering bugs
+    // Strategy 1: Clear entire buffer
+    ctx.clearRect(0, 0, offscreen.width, offscreen.height);
+
+    // Strategy 2: Fill with solid color (more reliable than clearRect in some browsers)
+    ctx.fillStyle = backColor;
+    ctx.fillRect(0, 0, offscreen.width, offscreen.height);
 
     // Reset all canvas state
     ctx.save();
@@ -87,7 +116,7 @@ window.renderFormCanvas = (canvas, width, height, title, backColor, clientX, cli
     ctx.lineTo(closeButtonX + 5, closeButtonY + closeButtonSize - 5);
     ctx.stroke();
 
-    // Draw client area background
+    // Draw client area background (overdraw to ensure coverage)
     ctx.fillStyle = backColor;
     ctx.fillRect(clientX, clientY, clientWidth, clientHeight);
 
@@ -95,7 +124,13 @@ window.renderFormCanvas = (canvas, width, height, title, backColor, clientX, cli
 
     // Copy offscreen canvas to visible canvas in one operation (double buffering)
     const visibleCtx = canvas.getContext('2d');
-    visibleCtx.clearRect(0, 0, width, height);
+
+    // Clear visible canvas using multiple strategies for reliability
+    visibleCtx.clearRect(0, 0, canvas.width, canvas.height);
+    visibleCtx.fillStyle = backColor;
+    visibleCtx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Copy the offscreen buffer
     visibleCtx.drawImage(offscreen, 0, 0);
 };
 

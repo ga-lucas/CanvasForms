@@ -907,6 +907,19 @@
 
     public void Dispose()
     {
+        // Clean up offscreen buffer to free memory
+        if (_initialized)
+        {
+            try
+            {
+                JSRuntime.InvokeVoidAsync("disposeCanvasBuffer", _canvasRef);
+            }
+            catch
+            {
+                // Ignore errors during disposal
+            }
+        }
+
         _dotNetRef?.Dispose();
     }
 }
