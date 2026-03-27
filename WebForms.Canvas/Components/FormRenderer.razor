@@ -71,6 +71,9 @@
     private DateTime _lastResizeRender = DateTime.MinValue;
     private const int ResizeRenderThrottleMs = 16; // ~60 FPS
 
+    // Render queue for keyboard input
+    private bool _renderPending = false;
+
     // Touch state
     private double _lastTouchX = 0;
     private double _lastTouchY = 0;
@@ -98,7 +101,9 @@
         if (firstRender && Form != null)
         {
             _initialized = true;
-            Form.RequestRender = RenderForm;
+            // Set RequestRender and propagate to all children
+            var renderFunc = async () => await InvokeAsync(RenderForm);
+            Form.PropagateRequestRender(renderFunc);
             await RenderForm();
 
             _dotNetRef = DotNetObjectReference.Create(this);
@@ -109,44 +114,62 @@
     {
         if (!_initialized || Form == null) return;
 
-        // First, render the form chrome (title bar, border, close button)
-        await JSRuntime.InvokeVoidAsync("renderFormCanvas", _canvasRef, 
-            Form.Width,
-            Form.Height,
-            Form.Text,
-            Form.BackColor.ToHexString(),
-            BorderWidth,
-            TitleBarHeight + BorderWidth,
-            Form.Width - (BorderWidth * 2),
-            Form.Height - TitleBarHeight - (BorderWidth * 2),
-            _closeButtonHover);
+        // Prevent overlapping renders
+        if (_renderPending) return;
+        _renderPending = true;
 
-        // Create graphics for client area (size excludes chrome)
-        using var graphics = new Graphics(
-            Form.Width - (BorderWidth * 2), 
-            Form.Height - TitleBarHeight - (BorderWidth * 2)
-        );
+        try
+        {
+            // First, render the form chrome (title bar, border, close button)
+            await JSRuntime.InvokeVoidAsync("renderFormCanvas", _canvasRef, 
+                Form.Width,
+                Form.Height,
+                Form.Text,
+                Form.BackColor.ToHexString(),
+                BorderWidth,
+                TitleBarHeight + BorderWidth,
+                Form.Width - (BorderWidth * 2),
+                Form.Height - TitleBarHeight - (BorderWidth * 2),
+                _closeButtonHover);
 
-        // Clear client area with background color
-        graphics.Clear(Form.BackColor);
-
-        // Trigger Paint event to let user code draw
-        var paintArgs = new PaintEventArgs(
-            graphics, 
-            new Rectangle(0, 0, 
+            // Create graphics for client area (size excludes chrome)
+            using var graphics = new Graphics(
                 Form.Width - (BorderWidth * 2), 
-                Form.Height - TitleBarHeight - (BorderWidth * 2))
-        );
-        Form.OnPaint(paintArgs);
+                Form.Height - TitleBarHeight - (BorderWidth * 2)
+            );
 
-        // Execute drawing commands in client area (translated and clipped)
-        var commands = graphics.GetCommands();
-        var jsCommands = string.Join("\n", commands.Select(c => c.ToJavaScript()));
+            // Clear client area with background color
+            graphics.Clear(Form.BackColor);
 
-        await JSRuntime.InvokeVoidAsync("renderClientArea", _canvasRef, 
-            BorderWidth, 
-            TitleBarHeight + BorderWidth, 
-            jsCommands);
+            // Trigger Paint event to let user code draw
+            var paintArgs = new PaintEventArgs(
+                graphics, 
+                new Rectangle(0, 0, 
+                    Form.Width - (BorderWidth * 2), 
+                    Form.Height - TitleBarHeight - (BorderWidth * 2))
+            );
+            Form.OnPaint(paintArgs);
+
+            // Execute drawing commands in client area (translated and clipped)
+            var commands = graphics.GetCommands();
+            var jsCommands = string.Join("\n", commands.Select(c => c.ToJavaScript()));
+
+            await JSRuntime.InvokeVoidAsync("renderClientArea", _canvasRef, 
+                BorderWidth, 
+                TitleBarHeight + BorderWidth, 
+                jsCommands);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"RenderForm error: {ex.Message}");
+        }
+        finally
+        {
+            _renderPending = false;
+        }
+
+        // Ensure Blazor component updates on the UI thread
+        StateHasChanged();
     }
 
     // Bring form to front when clicked (synchronous version for drag/resize)

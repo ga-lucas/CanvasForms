@@ -45,6 +45,19 @@ window.disposeCanvasBuffer = (canvas) => {
     }
 };
 
+// Measure text width using canvas
+// fontFamily: font name like "Arial"
+// fontSize: font size in pixels
+// text: text to measure
+window.measureText = (fontFamily, fontSize, text) => {
+    // Create a temporary canvas for measuring
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.font = `${fontSize}px ${fontFamily}`;
+    const metrics = ctx.measureText(text);
+    return Math.ceil(metrics.width);
+};
+
 // Render the entire form chrome (title bar, borders, close button) on canvas
 window.renderFormCanvas = (canvas, width, height, title, backColor, clientX, clientY, clientWidth, clientHeight, closeButtonHover) => {
     // Use offscreen canvas for double buffering

@@ -44,6 +44,32 @@ public struct Color
         return $"#{R:X2}{G:X2}{B:X2}";
     }
 
+    // Equality
+    public bool Equals(Color other)
+    {
+        return A == other.A && R == other.R && G == other.G && B == other.B;
+    }
+
+    public override bool Equals(object? obj)
+    {
+        return obj is Color other && Equals(other);
+    }
+
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(A, R, G, B);
+    }
+
+    public static bool operator ==(Color left, Color right)
+    {
+        return left.Equals(right);
+    }
+
+    public static bool operator !=(Color left, Color right)
+    {
+        return !left.Equals(right);
+    }
+
     // Common colors
     public static Color Black => FromArgb(0, 0, 0);
     public static Color White => FromArgb(255, 255, 255);

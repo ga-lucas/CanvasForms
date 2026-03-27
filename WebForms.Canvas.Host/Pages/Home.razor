@@ -13,9 +13,10 @@
 </div>
 
 <div style="margin: 20px 0; position: relative; height: 1200px; min-height: 1200px;">
+    <FormRenderer Form="@_controlsDemoForm" />
     <FormRenderer Form="@_interactiveForm" />
     <FormRenderer Form="@_sampleForm" />
-    <FormRenderer Form="@_sampleForm2" />
+
 </div>
 
 <div style="margin-top: 20px;">
@@ -33,6 +34,12 @@
         <li>✅ <strong>Touch events support</strong></li>
         <li>✅ <strong>Form dragging (drag title bar to move)</strong></li>
         <li>✅ <strong>Form resizing (drag edges/corners)</strong></li>
+        <li>✅ <strong>Control hierarchy (parent/child controls)</strong></li>
+        <li>✅ <strong>Button control with hover/click states</strong></li>
+        <li>✅ <strong>Label control with text alignment</strong></li>
+        <li>✅ <strong>TextBox control with keyboard input</strong></li>
+        <li>✅ <strong>CheckBox control</strong></li>
+        <li>✅ <strong>RadioButton control with auto-grouping</strong></li>
     </ul>
 
     <h3>🎮 Try it out:</h3>
@@ -48,44 +55,47 @@
 
     <h3>⬜ Roadmap:</h3>
     <ul>
-        <li>⬜ Control hierarchy (buttons, labels, textboxes, etc.)</li>
+        <li>⬜ More controls (ListBox, ComboBox, PictureBox, etc.)</li>
         <li>⬜ Image support</li>
         <li>⬜ Path/polygon drawing</li>
-        <li>⬜ Transformations (rotate, scale, translate)</li>
-        <li>⬜ Focus management</li>
+        <li>⬜ Transformations (rotate, scale)</li>
+        <li>⬜ Focus management & tab order</li>
         <li>⬜ Clipboard operations</li>
         <li>⬜ IL interpreter for running Windows Forms executables</li>
     </ul>
 </div>
 
 @code {
-    private InteractiveForm _interactiveForm = new();
-    private SampleDrawingForm _sampleForm = new();
-    private SampleDrawingForm _sampleForm2 = new();
+	private ControlsDemoForm _controlsDemoForm = new();
+	private InteractiveForm _interactiveForm = new();
+	private SampleDrawingForm _sampleForm = new();
 
-    protected override void OnInitialized()
-    {
-        // Position interactive form - TOP LEFT
-        _interactiveForm.Left = 50;
-        _interactiveForm.Top = 50;
-        _interactiveForm.Width = 500;
-        _interactiveForm.Height = 400;
-        _interactiveForm.Show();
 
-        // Position drawing sample form - BELOW the interactive form
-        _sampleForm.Left = 50;
-        _sampleForm.Top = 600; // Below the first form (50 + 500 height + 50 gap)
-        _sampleForm.Width = 600;
-        _sampleForm.Height = 500;
-        _sampleForm.Show();
+	protected override void OnInitialized()
+	{
+		// Position controls demo form - TOP LEFT
+		_controlsDemoForm.Left = 50;
+		_controlsDemoForm.Top = 50;
+		_controlsDemoForm.Width = 400;
+		_controlsDemoForm.Height = 500;
+		_controlsDemoForm.Show();
+
+		// Position interactive form - TOP MIDDLE
+		_interactiveForm.Left = 500;
+		_interactiveForm.Top = 50;
+		_interactiveForm.Width = 500;
+		_interactiveForm.Height = 400;
+		_interactiveForm.Show();
+
 		// Position drawing sample form - BELOW the interactive form
-		_sampleForm2.Left = 800;
-		_sampleForm2.Top = 600; // Below the first form (50 + 500 height + 50 gap)
-		_sampleForm2.Width = 600;
-		_sampleForm2.Height = 500;
-		_sampleForm2.Show();
+		_sampleForm.Left = 50;
+		_sampleForm.Top = 600; // Below the first form (50 + 500 height + 50 gap)
+		_sampleForm.Width = 600;
+		_sampleForm.Height = 500;
+		_sampleForm.Show();
 
-    }
+
+	}
 }
 
 

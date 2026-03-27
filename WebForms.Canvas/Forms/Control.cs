@@ -4,11 +4,62 @@ namespace WebForms.Canvas.Forms;
 
 public abstract class Control
 {
+    private Control? _parent;
+    private readonly List<Control> _controls = new();
+    private string _text = string.Empty;
+
     public string Name { get; set; } = string.Empty;
-    public int Width { get; set; } = 300;
-    public int Height { get; set; } = 200;
+
+    public string Text
+    {
+        get => _text;
+        set
+        {
+            if (_text != value)
+            {
+                _text = value;
+                Invalidate();
+            }
+        }
+    }
+
+    public int Left { get; set; }
+    public int Top { get; set; }
+    public int Width { get; set; } = 100;
+    public int Height { get; set; } = 20;
     public Color BackColor { get; set; } = Color.White;
+    public Color ForeColor { get; set; } = Color.Black;
     public bool Visible { get; set; } = true;
+    public bool Enabled { get; set; } = true;
+    public object? Tag { get; set; }
+
+    // Location and Size helpers
+    public Point Location
+    {
+        get => new Point(Left, Top);
+        set { Left = value.X; Top = value.Y; }
+    }
+
+    public Size Size
+    {
+        get => new Size(Width, Height);
+        set { Width = value.Width; Height = value.Height; }
+    }
+
+    public Rectangle Bounds
+    {
+        get => new Rectangle(Left, Top, Width, Height);
+        set { Left = value.X; Top = value.Y; Width = value.Width; Height = value.Height; }
+    }
+
+    // Parent/child relationships
+    public Control? Parent
+    {
+        get => _parent;
+        internal set => _parent = value;
+    }
+
+    public ControlCollection Controls => new ControlCollection(this, _controls);
 
     // Paint events
     public event PaintEventHandler? Paint;
@@ -84,8 +135,65 @@ public abstract class Control
 
     public void Invalidate()
     {
-        RequestRender?.Invoke();
+        // Async fire-and-forget - render will happen asynchronously
+        var task = RequestRender?.Invoke();
     }
 
     internal Func<Task>? RequestRender { get; set; }
+
+    // Propagate RequestRender to all children
+    internal void PropagateRequestRender(Func<Task>? requestRender)
+    {
+        RequestRender = requestRender;
+        foreach (var child in _controls)
+        {
+            child.PropagateRequestRender(requestRender);
+        }
+    }
+}
+
+// Control collection for managing child controls
+public class ControlCollection
+{
+    private readonly Control _owner;
+    private readonly List<Control> _list;
+
+    internal ControlCollection(Control owner, List<Control> list)
+    {
+        _owner = owner;
+        _list = list;
+    }
+
+    public int Count => _list.Count;
+
+    public Control this[int index] => _list[index];
+
+    public void Add(Control control)
+    {
+        control.Parent = _owner;
+        control.RequestRender = _owner.RequestRender;
+        _list.Add(control);
+        _owner.Invalidate();
+    }
+
+    public void Remove(Control control)
+    {
+        if (_list.Remove(control))
+        {
+            control.Parent = null;
+            _owner.Invalidate();
+        }
+    }
+
+    public void Clear()
+    {
+        foreach (var control in _list)
+        {
+            control.Parent = null;
+        }
+        _list.Clear();
+        _owner.Invalidate();
+    }
+
+    public IEnumerator<Control> GetEnumerator() => _list.GetEnumerator();
 }

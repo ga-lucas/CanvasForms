@@ -5,11 +5,19 @@ public class Graphics : IDisposable
     private readonly List<DrawingCommand> _commands = new();
     private readonly int _width;
     private readonly int _height;
+    private int _translateX = 0;
+    private int _translateY = 0;
 
     public Graphics(int width, int height)
     {
         _width = width;
         _height = height;
+    }
+
+    public void TranslateTransform(int dx, int dy)
+    {
+        _translateX += dx;
+        _translateY += dy;
     }
 
     public void Clear(Color color)
@@ -20,7 +28,7 @@ public class Graphics : IDisposable
 
     public void DrawLine(Pen pen, int x1, int y1, int x2, int y2)
     {
-        _commands.Add(new DrawLineCommand(pen, x1, y1, x2, y2));
+        _commands.Add(new DrawLineCommand(pen, x1 + _translateX, y1 + _translateY, x2 + _translateX, y2 + _translateY));
     }
 
     public void DrawLine(Pen pen, Point pt1, Point pt2)
@@ -30,7 +38,7 @@ public class Graphics : IDisposable
 
     public void DrawRectangle(Pen pen, int x, int y, int width, int height)
     {
-        _commands.Add(new DrawRectangleCommand(pen, x, y, width, height));
+        _commands.Add(new DrawRectangleCommand(pen, x + _translateX, y + _translateY, width, height));
     }
 
     public void DrawRectangle(Pen pen, Rectangle rect)
@@ -40,7 +48,7 @@ public class Graphics : IDisposable
 
     public void FillRectangle(Brush brush, int x, int y, int width, int height)
     {
-        _commands.Add(new FillRectangleCommand(brush, x, y, width, height));
+        _commands.Add(new FillRectangleCommand(brush, x + _translateX, y + _translateY, width, height));
     }
 
     public void FillRectangle(Brush brush, Rectangle rect)
@@ -50,7 +58,7 @@ public class Graphics : IDisposable
 
     public void DrawEllipse(Pen pen, int x, int y, int width, int height)
     {
-        _commands.Add(new DrawEllipseCommand(pen, x, y, width, height));
+        _commands.Add(new DrawEllipseCommand(pen, x + _translateX, y + _translateY, width, height));
     }
 
     public void DrawEllipse(Pen pen, Rectangle rect)
@@ -60,7 +68,7 @@ public class Graphics : IDisposable
 
     public void FillEllipse(Brush brush, int x, int y, int width, int height)
     {
-        _commands.Add(new FillEllipseCommand(brush, x, y, width, height));
+        _commands.Add(new FillEllipseCommand(brush, x + _translateX, y + _translateY, width, height));
     }
 
     public void FillEllipse(Brush brush, Rectangle rect)
@@ -70,12 +78,18 @@ public class Graphics : IDisposable
 
     public void DrawString(string text, string fontFamily, int fontSize, Brush brush, int x, int y)
     {
-        _commands.Add(new DrawStringCommand(text, fontFamily, fontSize, brush, x, y));
+        _commands.Add(new DrawStringCommand(text, fontFamily, fontSize, brush, x + _translateX, y + _translateY));
     }
 
     public void DrawString(string text, string fontFamily, int fontSize, Brush brush, Point point)
     {
         DrawString(text, fontFamily, fontSize, brush, point.X, point.Y);
+    }
+
+    // Convenience overload for Color
+    public void DrawString(string text, int x, int y, Color color)
+    {
+        DrawString(text, "Arial", 12, new SolidBrush(color), x, y);
     }
 
     public IEnumerable<DrawingCommand> GetCommands() => _commands;

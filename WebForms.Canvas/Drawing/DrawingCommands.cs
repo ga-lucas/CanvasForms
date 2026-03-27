@@ -187,6 +187,7 @@ public class DrawStringCommand : DrawingCommand
     {
         var sb = new StringBuilder();
         sb.AppendLine($"ctx.font = '{FontSize}px {FontFamily}';");
+        sb.AppendLine("ctx.textBaseline = 'top';"); // Use top baseline for consistent positioning
         if (Brush is SolidBrush solidBrush)
         {
             sb.AppendLine($"ctx.fillStyle = '{solidBrush.Color.ToRgbaString()}';");
