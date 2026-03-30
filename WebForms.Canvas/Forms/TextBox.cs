@@ -15,29 +15,10 @@ public class TextBox : Control
         BackColor = Color.White;
         ForeColor = Color.Black;
         Text = string.Empty;
+        Font = new Font("Arial", 12);
     }
 
-    // Better text width estimation (closer to Arial 12px)
-    private int EstimateTextWidth(string text)
-    {
-        if (string.IsNullOrEmpty(text)) return 0;
-
-        int width = 0;
-        foreach (char c in text)
-        {
-            if (c == ' ')
-                width += 3; // Space is narrow
-            else if (char.IsUpper(c))
-                width += 9; // Uppercase is wider
-            else if (c == 'i' || c == 'l' || c == 'I' || c == 't' || c == 'j')
-                width += 4; // Narrow characters
-            else if (c == 'm' || c == 'w' || c == 'M' || c == 'W')
-                width += 10; // Wide characters
-            else
-                width += 7; // Average character
-        }
-        return width;
-    }
+    public Font Font { get; set; }
 
     public int MaxLength { get; set; } = 32767;
     public bool ReadOnly { get; set; } = false;
@@ -113,61 +94,105 @@ public class TextBox : Control
 
         var displayText = GetDisplayText();
 
-        // Draw selection highlight if there's a selection
-        if (hasFocus && _selectionLength > 0 && !string.IsNullOrEmpty(displayText))
+        // Get text measurement service from parent form
+        var measureService = (Parent as Form)?.TextMeasurementService;
+
+        // Pre-measure text asynchronously to populate cache for next render
+        if (measureService != null && !string.IsNullOrEmpty(displayText))
         {
-            var textBeforeSelection = displayText.Substring(0, _selectionStart);
-            var selectedText = displayText.Substring(_selectionStart, 
-                Math.Min(_selectionLength, displayText.Length - _selectionStart));
-
-            var selStartX = 3 + EstimateTextWidth(textBeforeSelection);
-            var selWidth = EstimateTextWidth(selectedText);
-
-            g.FillRectangle(new SolidBrush(Color.FromArgb(0, 120, 215)), 
-                new Rectangle(selStartX, 3, selWidth, Height - 6));
-
-            // Draw selected text in white
-            g.DrawString(selectedText, selStartX, 3, Color.White);
+            _ = PreMeasureTextSegments(displayText, measureService);
         }
 
-        // Draw text
+        // Draw text using cached or estimated measurements
         if (!string.IsNullOrEmpty(displayText))
         {
             var textColor = Enabled ? ForeColor : Color.FromArgb(109, 109, 109);
 
-            // Draw text before selection
-            if (_selectionStart > 0)
+            if (_selectionLength > 0 && hasFocus && measureService != null)
             {
-                var beforeSelection = displayText.Substring(0, Math.Min(_selectionStart, displayText.Length));
-                g.DrawString(beforeSelection, 3, 3, textColor);
-            }
+                // We have a selection - draw in three parts with measurement
 
-            // Draw text after selection
-            if (_selectionStart + _selectionLength < displayText.Length)
-            {
-                var afterStart = _selectionStart + _selectionLength;
-                var afterSelection = displayText.Substring(afterStart);
-                var textBeforeAfter = displayText.Substring(0, afterStart);
-                var afterX = 3 + EstimateTextWidth(textBeforeAfter);
-                g.DrawString(afterSelection, afterX, 3, textColor);
-            }
+                // Measure text before selection (use cache if available)
+                var textBeforeSelection = displayText.Substring(0, _selectionStart);
+                var beforeWidth = GetCachedOrEstimatedWidth(textBeforeSelection, measureService);
 
-            // If no selection, draw all text
-            if (_selectionLength == 0)
+                // 1. Text before selection
+                if (_selectionStart > 0)
+                {
+                    g.DrawString(textBeforeSelection, Font, textColor, 3, 3);
+                }
+
+                // 2. Selected text with highlight
+                var selectedText = displayText.Substring(_selectionStart, 
+                    Math.Min(_selectionLength, displayText.Length - _selectionStart));
+                var selectedWidth = GetCachedOrEstimatedWidth(selectedText, measureService);
+
+                var selStartX = 3 + beforeWidth;
+
+                // Draw highlight background
+                g.FillRectangle(new SolidBrush(Color.FromArgb(0, 120, 215)), 
+                    new Rectangle(selStartX, 3, selectedWidth, Height - 6));
+
+                // Draw selected text on top
+                g.DrawString(selectedText, Font, Color.White, selStartX, 3);
+
+                // 3. Text after selection
+                if (_selectionStart + _selectionLength < displayText.Length)
+                {
+                    var afterStart = _selectionStart + _selectionLength;
+                    var afterSelection = displayText.Substring(afterStart);
+                    var afterX = selStartX + selectedWidth;
+                    g.DrawString(afterSelection, Font, textColor, afterX, 3);
+                }
+            }
+            else
             {
-                g.DrawString(displayText, 3, 3, textColor);
+                // No selection - draw all text at once
+                g.DrawString(displayText, Font, textColor, 3, 3);
             }
         }
 
         // Draw static caret if focused and no selection
-        if (hasFocus && Enabled && _selectionLength == 0)
+        if (hasFocus && Enabled && _selectionLength == 0 && measureService != null)
         {
-            var textBeforeCaret = displayText.Substring(0, Math.Min(_caretPosition, displayText.Length));
-            var caretX = 3 + EstimateTextWidth(textBeforeCaret);
-            g.DrawLine(new Pen(Color.Black), caretX, 3, caretX, Height - 6);
+            var textBeforeCaret = string.IsNullOrEmpty(displayText) ? "" : 
+                displayText.Substring(0, Math.Min(_caretPosition, displayText.Length));
+            var caretX = 3 + GetCachedOrEstimatedWidth(textBeforeCaret, measureService);
+            g.DrawLine(new Pen(Color.Black, 1), caretX, 3, caretX, Height - 6);
         }
 
         base.OnPaint(e);
+    }
+
+    // Get width from cache or estimate if not available
+    private int GetCachedOrEstimatedWidth(string text, TextMeasurementService measureService)
+    {
+        if (string.IsNullOrEmpty(text))
+            return 0;
+
+        // Try to get from cache first, otherwise use estimation
+        return measureService.MeasureTextEstimate(text, Font.Family, (int)Font.Size);
+    }
+
+    // Pre-measure all text segments asynchronously to populate cache
+    private async Task PreMeasureTextSegments(string text, TextMeasurementService measureService)
+    {
+        try
+        {
+            // Measure the full text
+            await measureService.MeasureTextAsync(text, Font.Family, (int)Font.Size);
+
+            // Also measure substrings for better caret positioning
+            for (int i = 1; i < text.Length; i++)
+            {
+                var substring = text.Substring(0, i);
+                await measureService.MeasureTextAsync(substring, Font.Family, (int)Font.Size);
+            }
+        }
+        catch
+        {
+            // Ignore errors in background measurement
+        }
     }
 
     private string GetDisplayText()
@@ -181,20 +206,76 @@ public class TextBox : Control
 
     protected internal override void OnMouseDown(MouseEventArgs e)
     {
-        if (Enabled)
+        if (!Enabled)
         {
-            // Calculate caret position from click
-            var clickX = e.X - 3;
-            var newPosition = Math.Max(0, Math.Min(Text.Length, clickX / 7));
-
-            _caretPosition = newPosition;
-
-            // Clear selection on single click
-            _selectionStart = newPosition;
-            _selectionLength = 0;
-
-            Invalidate();
+            base.OnMouseDown(e);
+            return;
         }
+
+        var displayText = GetDisplayText();
+        var measureService = (Parent as Form)?.TextMeasurementService;
+
+        // Calculate caret position asynchronously using real JavaScript measurement
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                if (measureService != null && !string.IsNullOrEmpty(displayText))
+                {
+                    var clickX = e.X - 3;
+                    var newPosition = 0;
+
+                    // Use actual JavaScript measurement for pixel-perfect positioning
+                    for (int i = 0; i <= displayText.Length; i++)
+                    {
+                        var textUpToPosition = displayText.Substring(0, i);
+                        var widthUpToPosition = await measureService.MeasureTextAsync(textUpToPosition, Font.Family, (int)Font.Size);
+
+                        if (i < displayText.Length)
+                        {
+                            var textUpToNext = displayText.Substring(0, i + 1);
+                            var widthUpToNext = await measureService.MeasureTextAsync(textUpToNext, Font.Family, (int)Font.Size);
+                            var midpoint = (widthUpToPosition + widthUpToNext) / 2;
+
+                            if (clickX < midpoint)
+                            {
+                                newPosition = i;
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            newPosition = displayText.Length;
+                        }
+                    }
+
+                    _caretPosition = newPosition;
+                    _selectionStart = newPosition;
+                    _selectionLength = 0;
+                    Invalidate();
+                }
+                else
+                {
+                    // Fallback when service unavailable
+                    var clickX = e.X - 3;
+                    _caretPosition = Math.Max(0, Math.Min(displayText.Length, clickX / 7));
+                    _selectionStart = _caretPosition;
+                    _selectionLength = 0;
+                    Invalidate();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"TextBox measurement error: {ex.Message}");
+                // Fallback on error
+                var clickX = e.X - 3;
+                _caretPosition = Math.Max(0, Math.Min(displayText.Length, clickX / 7));
+                _selectionStart = _caretPosition;
+                _selectionLength = 0;
+                Invalidate();
+            }
+        });
+
         base.OnMouseDown(e);
     }
 
@@ -472,5 +553,6 @@ public class TextBox : Control
     protected virtual void OnTextChanged(EventArgs e)
     {
         TextChanged?.Invoke(this, e);
+        PreMeasureText(); // Pre-measure for better cursor positioning
     }
 }

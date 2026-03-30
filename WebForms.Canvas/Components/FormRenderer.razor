@@ -101,6 +101,10 @@
         if (firstRender && Form != null)
         {
             _initialized = true;
+
+            // Initialize text measurement service
+            Form.TextMeasurementService = new TextMeasurementService(JSRuntime);
+
             // Set RequestRender and propagate to all children
             var renderFunc = async () => await InvokeAsync(RenderForm);
             Form.PropagateRequestRender(renderFunc);

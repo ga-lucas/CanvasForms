@@ -32,6 +32,9 @@ public class Form : Control
         }
     }
 
+    // Text measurement service for accurate text rendering
+    public TextMeasurementService? TextMeasurementService { get; set; }
+
     // Client area dimensions (excluding title bar)
     public int ClientWidth => Width;
     public int ClientHeight => Math.Max(0, Height - TitleBarHeight);

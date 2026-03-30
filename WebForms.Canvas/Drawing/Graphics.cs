@@ -92,6 +92,18 @@ public class Graphics : IDisposable
         DrawString(text, "Arial", 12, new SolidBrush(color), x, y);
     }
 
+    // Overload with Font
+    public void DrawString(string text, Font font, Brush brush, int x, int y)
+    {
+        DrawString(text, font.Family, (int)font.Size, brush, x, y);
+    }
+
+    // Overload with Font and Color
+    public void DrawString(string text, Font font, Color color, int x, int y)
+    {
+        DrawString(text, font.Family, (int)font.Size, new SolidBrush(color), x, y);
+    }
+
     public IEnumerable<DrawingCommand> GetCommands() => _commands;
 
     public void Dispose()
