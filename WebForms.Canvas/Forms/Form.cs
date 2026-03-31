@@ -7,6 +7,8 @@ public class Form : Control
     private static int _nextZIndex = 1;
     private const int TitleBarHeight = 32; // Height of the title bar
     private Control? _focusedControl;
+    private FormWindowState _windowState = FormWindowState.Normal;
+    private Rectangle _normalBounds; // Store bounds before minimize/maximize
 
     public bool AllowResize { get; set; } = true;
     public bool AllowMove { get; set; } = true;
@@ -17,6 +19,29 @@ public class Form : Control
 
     // Z-order for stacking
     public int ZIndex { get; set; } = 0;
+
+    // Window state
+    public FormWindowState WindowState
+    {
+        get => _windowState;
+        set
+        {
+            if (_windowState != value)
+            {
+                _windowState = value;
+                OnWindowStateChanged(EventArgs.Empty);
+                Invalidate();
+            }
+        }
+    }
+
+    // Event fired when window state changes
+    public event EventHandler? WindowStateChanged;
+
+    protected virtual void OnWindowStateChanged(EventArgs e)
+    {
+        WindowStateChanged?.Invoke(this, e);
+    }
 
     // Focused control for keyboard input
     public Control? FocusedControl
@@ -221,4 +246,71 @@ public class Form : Control
             base.OnKeyPress(e);
         }
     }
+
+    // Window state management methods
+    public void Minimize()
+    {
+        if (_windowState != FormWindowState.Minimized)
+        {
+            // Save current bounds
+            _normalBounds = new Rectangle(Left, Top, Width, Height);
+            WindowState = FormWindowState.Minimized;
+        }
+    }
+
+    public void Maximize(int desktopWidth, int desktopHeight, int taskbarHeight)
+    {
+        if (_windowState != FormWindowState.Maximized)
+        {
+            // Save current bounds if not already minimized
+            if (_windowState == FormWindowState.Normal)
+            {
+                _normalBounds = new Rectangle(Left, Top, Width, Height);
+            }
+
+            // Set to maximized state (fill desktop except taskbar)
+            Left = 0;
+            Top = taskbarHeight;
+            Width = desktopWidth;
+            Height = desktopHeight - taskbarHeight;
+            WindowState = FormWindowState.Maximized;
+        }
+    }
+
+    public void Restore()
+    {
+        if (_windowState != FormWindowState.Normal)
+        {
+            // Restore to normal bounds
+            if (_normalBounds.Width > 0 && _normalBounds.Height > 0)
+            {
+                Left = _normalBounds.X;
+                Top = _normalBounds.Y;
+                Width = _normalBounds.Width;
+                Height = _normalBounds.Height;
+            }
+            WindowState = FormWindowState.Normal;
+        }
+    }
+}
+
+/// <summary>
+/// Specifies how a form window is displayed
+/// </summary>
+public enum FormWindowState
+{
+    /// <summary>
+    /// A normal sized window
+    /// </summary>
+    Normal,
+
+    /// <summary>
+    /// A minimized window (hidden, shown only in taskbar)
+    /// </summary>
+    Minimized,
+
+    /// <summary>
+    /// A maximized window (fills the desktop)
+    /// </summary>
+    Maximized
 }

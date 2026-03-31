@@ -79,6 +79,60 @@ window.measureTextBatch = (fontFamily, fontSize, texts) => {
     return results;
 };
 
+// Image cache for performance
+const imageCache = new Map();
+
+// Async image loading and drawing helper
+window.drawImageAsync = async (ctx, imageUrl, x, y, width, height) => {
+    try {
+        let img = imageCache.get(imageUrl);
+
+        if (!img) {
+            // Create and load image
+            img = new Image();
+
+            // Create promise for image loading
+            const loadPromise = new Promise((resolve, reject) => {
+                img.onload = () => resolve(img);
+                img.onerror = () => reject(new Error(`Failed to load image: ${imageUrl}`));
+            });
+
+            img.src = imageUrl;
+
+            // Cache the promise, not the image, so concurrent requests share the same load
+            imageCache.set(imageUrl, loadPromise);
+
+            // Wait for image to load
+            img = await loadPromise;
+
+            // Now cache the loaded image
+            imageCache.set(imageUrl, img);
+        } else if (img instanceof Promise) {
+            // Image is currently loading, wait for it
+            img = await img;
+        }
+
+        // Draw the image
+        ctx.drawImage(img, x, y, width, height);
+    } catch (error) {
+        console.error('Error drawing image:', error);
+        // Draw placeholder rectangle on error
+        ctx.fillStyle = '#f0f0f0';
+        ctx.fillRect(x, y, width, height);
+        ctx.strokeStyle = '#ccc';
+        ctx.strokeRect(x, y, width, height);
+
+        // Draw X to indicate error
+        ctx.strokeStyle = '#999';
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + width, y + height);
+        ctx.moveTo(x + width, y);
+        ctx.lineTo(x, y + height);
+        ctx.stroke();
+    }
+};
+
 // Render the entire form chrome (title bar, borders, close button) on canvas
 window.renderFormCanvas = (canvas, width, height, title, backColor, clientX, clientY, clientWidth, clientHeight, closeButtonHover) => {
     // Use offscreen canvas for double buffering
@@ -169,7 +223,7 @@ window.renderFormCanvas = (canvas, width, height, title, backColor, clientX, cli
 };
 
 // Render user drawing commands in the client area
-window.renderClientArea = (canvas, offsetX, offsetY, commands) => {
+window.renderClientArea = async (canvas, offsetX, offsetY, commands) => {
     // Get the offscreen canvas (already has the chrome rendered)
     const offscreen = getOffscreenCanvas(canvas);
     const ctx = offscreen.getContext('2d', { 
@@ -195,10 +249,11 @@ window.renderClientArea = (canvas, offsetX, offsetY, commands) => {
     ctx.rect(0, 0, clientWidth, clientHeight);
     ctx.clip();
 
-    // Execute user drawing commands on offscreen canvas
+    // Execute user drawing commands on offscreen canvas (now async to support images)
     try {
         if (commands && commands.trim().length > 0) {
-            eval(commands);
+            // Use async eval to support await in drawing commands
+            await eval(`(async () => { ${commands} })()`);
         }
     } catch (error) {
         console.error('Error rendering client area:', error);

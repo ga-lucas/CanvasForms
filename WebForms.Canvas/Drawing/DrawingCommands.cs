@@ -253,3 +253,29 @@ public class SetClipCommand : DrawingCommand
         return sb.ToString();
     }
 }
+
+public class DrawImageCommand : DrawingCommand
+{
+    public string ImageUrl { get; }
+    public int X { get; }
+    public int Y { get; }
+    public int Width { get; }
+    public int Height { get; }
+
+    public DrawImageCommand(string imageUrl, int x, int y, int width, int height)
+    {
+        ImageUrl = imageUrl;
+        X = x;
+        Y = y;
+        Width = width;
+        Height = height;
+    }
+
+    public override string ToJavaScript()
+    {
+        var sb = new StringBuilder();
+        // Use async image loading with a cache
+        sb.AppendLine($"await drawImageAsync(ctx, '{ImageUrl.Replace("'", "\\'")}', {X}, {Y}, {Width}, {Height});");
+        return sb.ToString();
+    }
+}

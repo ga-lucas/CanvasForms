@@ -130,6 +130,17 @@ public class Graphics : IDisposable
         DrawString(text, font.Family, (int)font.Size, new SolidBrush(color), x, y);
     }
 
+    // Draw image
+    public void DrawImage(string imageUrl, int x, int y, int width, int height)
+    {
+        _commands.Add(new DrawImageCommand(imageUrl, x + _translateX, y + _translateY, width, height));
+    }
+
+    public void DrawImage(string imageUrl, Rectangle rect)
+    {
+        DrawImage(imageUrl, rect.X, rect.Y, rect.Width, rect.Height);
+    }
+
     public IEnumerable<DrawingCommand> GetCommands() => _commands;
 
     public void Dispose()

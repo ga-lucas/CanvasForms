@@ -15,12 +15,13 @@ public class ControlsDemoForm : Form
     private RadioButton? _radio1;
     private RadioButton? _radio2;
     private RadioButton? _radio3;
+    private PictureBox? _pictureBox;
 
     public ControlsDemoForm()
     {
         Text = "Controls Demo";
         Width = 400;
-        Height = 500;
+        Height = 550;
         BackColor = Color.FromArgb(240, 240, 240);
 
         InitializeControls();
@@ -180,6 +181,40 @@ public class ControlsDemoForm : Form
             ForeColor = Color.FromArgb(0, 128, 0)
         };
         Controls.Add(statusLabel);
+
+        // PictureBox Section
+        var pictureLabel = new Label
+        {
+            Text = "PictureBox:",
+            Left = 10,
+            Top = 370,
+            Width = 100,
+            Height = 20,
+            ForeColor = Color.Black
+        };
+        Controls.Add(pictureLabel);
+
+        _pictureBox = new PictureBox
+        {
+            Left = 10,
+            Top = 395,
+            Width = 150,
+            Height = 100,
+            ImageUrl = "https://via.placeholder.com/150x100", // Placeholder image
+            SizeMode = PictureBoxSizeMode.StretchImage
+        };
+        Controls.Add(_pictureBox);
+
+        var pictureInfo = new Label
+        {
+            Text = "Image loaded from server URL",
+            Left = 170,
+            Top = 395,
+            Width = 210,
+            Height = 40,
+            ForeColor = Color.FromArgb(64, 64, 64)
+        };
+        Controls.Add(pictureInfo);
     }
 
     private void OnTextBoxChanged(object? sender, EventArgs e)
