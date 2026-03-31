@@ -2,16 +2,10 @@
 @using WebForms.Canvas.Components
 @inject IJSRuntime JSRuntime
 
-<div class="desktop-container" style="position: relative; width: 100%; height: @(Height)px; background-color: #008080; overflow: hidden;">
+<div class="desktop-container" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100vw; height: 100vh; background-color: #008080; overflow: hidden;">
 
     <!-- Taskbar at top -->
     <div class="taskbar" style="position: absolute; top: 0; left: 0; right: 0; height: @(TaskbarHeight)px; background: linear-gradient(180deg, #f0f0f0 0%, #d0d0d0 100%); border-bottom: 1px solid #a0a0a0; z-index: 10000; display: flex; align-items: center; padding: 0 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-
-        <!-- Start button -->
-        <div class="start-button" style="background: linear-gradient(180deg, #3a8dd9 0%, #2773b5 100%); color: white; padding: 4px 16px; border-radius: 3px; margin-right: 8px; cursor: pointer; font-weight: bold; font-size: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.2);"
-             @onclick="ToggleStartMenu">
-            Start
-        </div>
 
         <!-- Window buttons -->
         @foreach (var form in Forms.OrderBy(f => f.CreatedAt))
@@ -49,34 +43,7 @@
             <FormRenderer Form="@form" />
         }
     </div>
-
-    <!-- Start menu (if shown) -->
-    @if (_showStartMenu)
-    {
-        <div class="start-menu" style="position: absolute; left: 8px; top: @(TaskbarHeight + 2)px; width: 250px; background: white; border: 1px solid #a0a0a0; box-shadow: 3px 3px 8px rgba(0,0,0,0.3); z-index: 10001; border-radius: 0 0 4px 4px;">
-            <div style="padding: 12px; background: linear-gradient(180deg, #f0f0f0 0%, #e0e0e0 100%); border-bottom: 1px solid #c0c0c0;">
-                <strong>Windows Forms Desktop</strong>
-            </div>
-            <div style="padding: 8px;">
-                <div class="menu-item" style="padding: 8px; cursor: pointer; border-radius: 2px;"
-                     @onclick="() => CreateNewForm()">
-                    📄 New Form
-                </div>
-                <div style="height: 1px; background: #d0d0d0; margin: 4px 0;"></div>
-                <div class="menu-item" style="padding: 8px; cursor: pointer; border-radius: 2px;"
-                     @onclick="CloseAllForms">
-                    ❌ Close All Windows
-                </div>
-            </div>
-        </div>
-    }
 </div>
-
-<style>
-    .menu-item:hover {
-        background-color: #e3f2fd;
-    }
-</style>
 
 @code {
     [Parameter]
@@ -92,15 +59,17 @@
     public EventCallback<Form> OnFormCreated { get; set; }
 
     private Form? _activeForm;
-    private bool _showStartMenu = false;
 
     protected override void OnParametersSet()
     {
-        // Subscribe to window state changes for all forms
+        // Subscribe to window state changes and form closed events for all forms
         foreach (var form in Forms)
         {
             form.WindowStateChanged -= OnFormWindowStateChanged;
             form.WindowStateChanged += OnFormWindowStateChanged;
+
+            form.FormClosed -= OnFormClosed;
+            form.FormClosed += OnFormClosed;
         }
 
         // Set active form to the topmost visible form
@@ -117,6 +86,29 @@
         StateHasChanged();
     }
 
+    private void OnFormClosed(object? sender, EventArgs e)
+    {
+        if (sender is Form closedForm)
+        {
+            // Unsubscribe from events
+            closedForm.WindowStateChanged -= OnFormWindowStateChanged;
+            closedForm.FormClosed -= OnFormClosed;
+
+            // Remove from forms list
+            Forms.Remove(closedForm);
+
+            // Update active form if the closed form was active
+            if (_activeForm == closedForm)
+            {
+                _activeForm = Forms.Where(f => f.WindowState != FormWindowState.Minimized)
+                                   .OrderByDescending(f => f.ZIndex)
+                                   .FirstOrDefault();
+            }
+
+            StateHasChanged();
+        }
+    }
+
     private void ActivateForm(Form form)
     {
         if (form.WindowState == FormWindowState.Minimized)
@@ -128,46 +120,6 @@
         // Bring to front
         form.BringToFront();
         _activeForm = form;
-        _showStartMenu = false;
-        StateHasChanged();
-    }
-
-    private void ToggleStartMenu()
-    {
-        _showStartMenu = !_showStartMenu;
-        StateHasChanged();
-    }
-
-    private async Task CreateNewForm()
-    {
-        var newForm = new Form
-        {
-            Text = $"New Form {Forms.Count + 1}",
-            Left = 100 + (Forms.Count * 30),
-            Top = TaskbarHeight + 50 + (Forms.Count * 30),
-            Width = 400,
-            Height = 300
-        };
-
-        Forms.Add(newForm);
-        _activeForm = newForm;
-        _showStartMenu = false;
-
-        if (OnFormCreated.HasDelegate)
-        {
-            await OnFormCreated.InvokeAsync(newForm);
-        }
-
-        StateHasChanged();
-    }
-
-    private void CloseAllForms()
-    {
-        foreach (var form in Forms.ToList())
-        {
-            form.Close();
-        }
-        _showStartMenu = false;
         StateHasChanged();
     }
 }

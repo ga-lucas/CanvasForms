@@ -46,6 +46,14 @@ public class Form : Control
         WindowStateChanged?.Invoke(this, e);
     }
 
+    // Event fired when form is closed
+    public event EventHandler? FormClosed;
+
+    protected virtual void OnFormClosed(EventArgs e)
+    {
+        FormClosed?.Invoke(this, e);
+    }
+
     // Focused control for keyboard input
     public Control? FocusedControl
     {
@@ -98,6 +106,7 @@ public class Form : Control
     public void Close()
     {
         Visible = false;
+        OnFormClosed(EventArgs.Empty);
     }
 
     protected internal override void OnPaint(PaintEventArgs e)
