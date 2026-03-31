@@ -23,10 +23,101 @@ public abstract class Control
         }
     }
 
-    public int Left { get; set; }
-    public int Top { get; set; }
-    public int Width { get; set; } = 100;
-    public int Height { get; set; } = 20;
+    private int _left;
+    private int _top;
+    private int _width = 100;
+    private int _height = 20;
+    private DockStyle _dock = DockStyle.None;
+    private AnchorStyles _anchor = AnchorStyles.Top | AnchorStyles.Left;
+
+    // Original bounds before docking/anchoring (for anchor calculations)
+    internal int OriginalLeft;
+    internal int OriginalTop;
+    internal int OriginalWidth;
+    internal int OriginalHeight;
+    internal int OriginalParentWidth;
+    internal int OriginalParentHeight;
+    internal bool OriginalBoundsSet = false;
+
+    public int Left 
+    { 
+        get => _left;
+        set
+        {
+            if (_left != value)
+            {
+                _left = value;
+                Invalidate();
+            }
+        }
+    }
+
+    public int Top 
+    { 
+        get => _top;
+        set
+        {
+            if (_top != value)
+            {
+                _top = value;
+                Invalidate();
+            }
+        }
+    }
+
+    public int Width 
+    { 
+        get => _width;
+        set
+        {
+            if (_width != value)
+            {
+                _width = value;
+                Invalidate();
+            }
+        }
+    }
+
+    public int Height 
+    { 
+        get => _height;
+        set
+        {
+            if (_height != value)
+            {
+                _height = value;
+                Invalidate();
+            }
+        }
+    }
+
+    public DockStyle Dock
+    {
+        get => _dock;
+        set
+        {
+            if (_dock != value)
+            {
+                _dock = value;
+                _parent?.PerformLayout();
+                Invalidate();
+            }
+        }
+    }
+
+    public AnchorStyles Anchor
+    {
+        get => _anchor;
+        set
+        {
+            if (_anchor != value)
+            {
+                _anchor = value;
+                Invalidate();
+            }
+        }
+    }
+
     public Color BackColor { get; set; } = Color.White;
     public Color ForeColor { get; set; } = Color.Black;
     public bool Visible { get; set; } = true;
@@ -137,6 +228,137 @@ public abstract class Control
     {
         // Async fire-and-forget - render will happen asynchronously
         var task = RequestRender?.Invoke();
+    }
+
+    /// <summary>
+    /// Performs layout logic for docked and anchored controls
+    /// </summary>
+    public virtual void PerformLayout()
+    {
+        if (_controls.Count == 0) return;
+
+        // First, store original bounds for anchored controls
+        foreach (var control in _controls)
+        {
+            if (!control.OriginalBoundsSet && control.Dock == DockStyle.None)
+            {
+                control.OriginalLeft = control.Left;
+                control.OriginalTop = control.Top;
+                control.OriginalWidth = control.Width;
+                control.OriginalHeight = control.Height;
+                control.OriginalParentWidth = this.Width;
+                control.OriginalParentHeight = this.Height;
+                control.OriginalBoundsSet = true;
+            }
+        }
+
+        // Available client area
+        var clientRect = new Rectangle(0, 0, Width, Height);
+
+        // Process docked controls in order: Top, Bottom, Left, Right, then Fill
+        var dockedControls = _controls.Where(c => c.Visible && c.Dock != DockStyle.None).ToList();
+        var anchoredControls = _controls.Where(c => c.Visible && c.Dock == DockStyle.None).ToList();
+
+        // Apply docking in priority order
+        foreach (var dockStyle in new[] { DockStyle.Top, DockStyle.Bottom, DockStyle.Left, DockStyle.Right, DockStyle.Fill })
+        {
+            foreach (var control in dockedControls.Where(c => c.Dock == dockStyle))
+            {
+                switch (control.Dock)
+                {
+                    case DockStyle.Top:
+                        control.Left = clientRect.X;
+                        control.Top = clientRect.Y;
+                        control.Width = clientRect.Width;
+                        // Height stays as set by user
+                        clientRect.Y += control.Height;
+                        clientRect.Height -= control.Height;
+                        break;
+
+                    case DockStyle.Bottom:
+                        control.Left = clientRect.X;
+                        control.Width = clientRect.Width;
+                        clientRect.Height -= control.Height;
+                        control.Top = clientRect.Y + clientRect.Height;
+                        break;
+
+                    case DockStyle.Left:
+                        control.Left = clientRect.X;
+                        control.Top = clientRect.Y;
+                        control.Height = clientRect.Height;
+                        // Width stays as set by user
+                        clientRect.X += control.Width;
+                        clientRect.Width -= control.Width;
+                        break;
+
+                    case DockStyle.Right:
+                        control.Top = clientRect.Y;
+                        control.Height = clientRect.Height;
+                        clientRect.Width -= control.Width;
+                        control.Left = clientRect.X + clientRect.Width;
+                        break;
+
+                    case DockStyle.Fill:
+                        control.Left = clientRect.X;
+                        control.Top = clientRect.Y;
+                        control.Width = clientRect.Width;
+                        control.Height = clientRect.Height;
+                        break;
+                }
+            }
+        }
+
+        // Apply anchoring to non-docked controls
+        foreach (var control in anchoredControls)
+        {
+            if (!control.OriginalBoundsSet) continue;
+
+            var anchor = control.Anchor;
+            var deltaWidth = Width - control.OriginalParentWidth;
+            var deltaHeight = Height - control.OriginalParentHeight;
+
+            // Calculate new position and size based on anchoring
+            var left = control.OriginalLeft;
+            var top = control.OriginalTop;
+            var width = control.OriginalWidth;
+            var height = control.OriginalHeight;
+
+            bool anchoredLeft = (anchor & AnchorStyles.Left) != 0;
+            bool anchoredRight = (anchor & AnchorStyles.Right) != 0;
+            bool anchoredTop = (anchor & AnchorStyles.Top) != 0;
+            bool anchoredBottom = (anchor & AnchorStyles.Bottom) != 0;
+
+            if (anchoredLeft && anchoredRight)
+            {
+                // Stretch horizontally
+                width = control.OriginalWidth + deltaWidth;
+            }
+            else if (anchoredRight && !anchoredLeft)
+            {
+                // Move with right edge
+                left = control.OriginalLeft + deltaWidth;
+            }
+            // else if only left is anchored (default), position stays the same
+
+            if (anchoredTop && anchoredBottom)
+            {
+                // Stretch vertically
+                height = control.OriginalHeight + deltaHeight;
+            }
+            else if (anchoredBottom && !anchoredTop)
+            {
+                // Move with bottom edge
+                top = control.OriginalTop + deltaHeight;
+            }
+            // else if only top is anchored (default), position stays the same
+
+            control.Left = left;
+            control.Top = top;
+            control.Width = width;
+            control.Height = height;
+        }
+
+        Invalidate();
     }
 
     internal Func<Task>? RequestRender { get; set; }

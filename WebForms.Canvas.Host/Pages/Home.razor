@@ -11,47 +11,26 @@
 @code {
 	private List<Form> _allForms = new();
 	private WelcomeForm _welcomeForm = new();
-	private ControlsDemoForm _controlsDemoForm = new();
-	private InteractiveForm _interactiveForm = new();
-	private SampleDrawingForm _sampleForm = new();
-	private int _desktopHeight = 1000; // Will be set to full viewport height
+	private int _desktopHeight = 1000;
 
 	protected override void OnInitialized()
 	{
-		// For now use a large default height - ideally we'd calculate actual viewport height
 		_desktopHeight = 1000;
 
-		// Position Welcome form - CENTER
-		_welcomeForm.Left = 100;
-		_welcomeForm.Top = 50;
+		// Only create and show the Welcome form initially
+		_welcomeForm.Left = 300;
+		_welcomeForm.Top = 100;
 		_welcomeForm.Width = 700;
-		_welcomeForm.Height = 600;
+		_welcomeForm.Height = 650;
+
+		// Set callback for Blazor re-rendering when forms change
+		_welcomeForm.OnContainerChanged = () => StateHasChanged();
+
+		// Give Welcome form access to the forms list so it can add new forms
+		_welcomeForm.SetParentFormList(_allForms);
+
 		_welcomeForm.Show();
 		_allForms.Add(_welcomeForm);
-
-		// Position controls demo form - LEFT
-		_controlsDemoForm.Left = 850;
-		_controlsDemoForm.Top = 50;
-		_controlsDemoForm.Width = 400;
-		_controlsDemoForm.Height = 550;
-		_controlsDemoForm.Show();
-		_allForms.Add(_controlsDemoForm);
-
-		// Position interactive form - BELOW welcome
-		_interactiveForm.Left = 100;
-		_interactiveForm.Top = 680;
-		_interactiveForm.Width = 500;
-		_interactiveForm.Height = 400;
-		_interactiveForm.Show();
-		_allForms.Add(_interactiveForm);
-
-		// Position drawing sample form - RIGHT
-		_sampleForm.Left = 650;
-		_sampleForm.Top = 680;
-		_sampleForm.Width = 600;
-		_sampleForm.Height = 400;
-		_sampleForm.Show();
-		_allForms.Add(_sampleForm);
 	}
 
 	private void OnFormCreated(Form form)

@@ -23,14 +23,16 @@ public class Label : Control
         // Draw background if not transparent
         if (BackColor != Color.Transparent)
         {
-            g.FillRectangle(new SolidBrush(BackColor), new Rectangle(0, 0, Width, Height));
+            using var bgBrush = new SolidBrush(BackColor);
+            g.FillRectangle(bgBrush, 0, 0, Width, Height);
         }
 
         // Draw text
         if (!string.IsNullOrEmpty(Text))
         {
             var (x, y) = GetTextPosition();
-            g.DrawString(Text, x, y, ForeColor);
+            using var textBrush = new SolidBrush(ForeColor);
+            g.DrawString(Text, "Arial", 12, textBrush, x, y);
         }
 
         base.OnPaint(e);

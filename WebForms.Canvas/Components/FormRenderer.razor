@@ -500,6 +500,8 @@
 
         if (wasResizing)
         {
+            // Trigger layout update after resize completes
+            Form?.PerformLayout();
             await RenderForm();
         }
 
@@ -913,6 +915,9 @@
         {
             Form.Maximize(1920, 1080, TitleBarHeight);
         }
+
+        // Trigger layout after window state change
+        Form.PerformLayout();
         StateHasChanged();
     }
 

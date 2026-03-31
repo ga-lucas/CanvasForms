@@ -54,6 +54,10 @@ public class Form : Control
         FormClosed?.Invoke(this, e);
     }
 
+    // Callback for notifying parent container of changes (e.g., new forms created)
+    // This is needed for Blazor to know when to re-render
+    public Action? OnContainerChanged { get; set; }
+
     // Focused control for keyboard input
     public Control? FocusedControl
     {
@@ -100,13 +104,20 @@ public class Form : Control
     public void Show()
     {
         Visible = true;
+        PerformLayout(); // Layout controls when form is shown
         Invalidate();
+
+        // Notify container that state changed (for Blazor re-rendering)
+        OnContainerChanged?.Invoke();
     }
 
     public void Close()
     {
         Visible = false;
         OnFormClosed(EventArgs.Empty);
+
+        // Notify container that state changed
+        OnContainerChanged?.Invoke();
     }
 
     protected internal override void OnPaint(PaintEventArgs e)

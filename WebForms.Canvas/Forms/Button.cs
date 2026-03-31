@@ -49,10 +49,12 @@ public class Button : Control
         }
 
         // Draw button background
-        g.FillRectangle(new SolidBrush(buttonColor), bounds);
+        using var bgBrush = new SolidBrush(buttonColor);
+        g.FillRectangle(bgBrush, bounds);
 
         // Draw border
-        g.DrawRectangle(new Pen(borderColor), bounds);
+        using var borderPen = new Pen(borderColor);
+        g.DrawRectangle(borderPen, bounds);
 
         // Draw text (centered)
         if (!string.IsNullOrEmpty(Text))
@@ -63,7 +65,8 @@ public class Button : Control
             var textX = (Width - (Text.Length * 7)) / 2;
             var textY = (Height - 14) / 2;
 
-            g.DrawString(Text, textX, textY, textColor);
+            using var textBrush = new SolidBrush(textColor);
+            g.DrawString(Text, "Arial", 12, textBrush, textX, textY);
         }
 
         base.OnPaint(e);
