@@ -7,11 +7,37 @@ public class Graphics : IDisposable
     private readonly int _height;
     private int _translateX = 0;
     private int _translateY = 0;
+    private readonly Stack<GraphicsState> _stateStack = new();
+    private Rectangle? _clipRect = null;
 
     public Graphics(int width, int height)
     {
         _width = width;
         _height = height;
+    }
+
+    public void Save()
+    {
+        _stateStack.Push(new GraphicsState(_translateX, _translateY, _clipRect));
+        _commands.Add(new SaveStateCommand());
+    }
+
+    public void Restore()
+    {
+        if (_stateStack.Count > 0)
+        {
+            var state = _stateStack.Pop();
+            _translateX = state.TranslateX;
+            _translateY = state.TranslateY;
+            _clipRect = state.ClipRect;
+            _commands.Add(new RestoreStateCommand());
+        }
+    }
+
+    public void SetClip(Rectangle rect)
+    {
+        _clipRect = rect;
+        _commands.Add(new SetClipCommand(rect));
     }
 
     public void TranslateTransform(int dx, int dy)
@@ -111,3 +137,6 @@ public class Graphics : IDisposable
         _commands.Clear();
     }
 }
+
+// Graphics state for save/restore
+internal record GraphicsState(int TranslateX, int TranslateY, Rectangle? ClipRect);

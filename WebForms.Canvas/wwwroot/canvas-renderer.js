@@ -58,6 +58,27 @@ window.measureText = (fontFamily, fontSize, text) => {
     return Math.ceil(metrics.width);
 };
 
+// Batch measure multiple text strings in a single call for better performance
+// fontFamily: font name like "Arial"
+// fontSize: font size in pixels
+// texts: array of text strings to measure
+// Returns: array of widths in same order as input
+window.measureTextBatch = (fontFamily, fontSize, texts) => {
+    // Create a temporary canvas for measuring (reuse for all measurements)
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.font = `${fontSize}px ${fontFamily}`;
+
+    // Measure all texts in one JS interop call
+    const results = [];
+    for (let i = 0; i < texts.length; i++) {
+        const metrics = ctx.measureText(texts[i]);
+        results.push(Math.ceil(metrics.width));
+    }
+
+    return results;
+};
+
 // Render the entire form chrome (title bar, borders, close button) on canvas
 window.renderFormCanvas = (canvas, width, height, title, backColor, clientX, clientY, clientWidth, clientHeight, closeButtonHover) => {
     // Use offscreen canvas for double buffering

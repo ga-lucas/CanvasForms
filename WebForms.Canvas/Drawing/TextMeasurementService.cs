@@ -50,6 +50,73 @@ public class TextMeasurementService
     }
 
     /// <summary>
+    /// Batch measure multiple text strings in a single JS interop call for better performance
+    /// </summary>
+    /// <param name="texts">Array of text strings to measure</param>
+    /// <param name="fontFamily">Font family name</param>
+    /// <param name="fontSize">Font size in pixels</param>
+    /// <returns>Dictionary mapping each text to its width</returns>
+    public async Task<Dictionary<string, int>> MeasureTextBatchAsync(string[] texts, string fontFamily, int fontSize)
+    {
+        if (texts == null || texts.Length == 0)
+            return new Dictionary<string, int>();
+
+        // Separate texts that need measurement from those already cached
+        var uncachedTexts = new List<string>();
+        var result = new Dictionary<string, int>();
+
+        foreach (var text in texts)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                result[text] = 0;
+                continue;
+            }
+
+            var key = $"{fontFamily}|{fontSize}|{text}";
+            if (_cache.TryGetValue(key, out var cachedWidth))
+            {
+                result[text] = cachedWidth;
+            }
+            else
+            {
+                uncachedTexts.Add(text);
+            }
+        }
+
+        // If all texts were cached, return immediately
+        if (uncachedTexts.Count == 0)
+            return result;
+
+        try
+        {
+            // Call JavaScript batch measurement function
+            var widths = await _jsRuntime.InvokeAsync<int[]>("measureTextBatch", fontFamily, fontSize, uncachedTexts.ToArray());
+
+            // Cache and add results
+            for (int i = 0; i < uncachedTexts.Count; i++)
+            {
+                var text = uncachedTexts[i];
+                var width = widths[i];
+                var key = $"{fontFamily}|{fontSize}|{text}";
+
+                _cache.TryAdd(key, width);
+                result[text] = width;
+            }
+        }
+        catch
+        {
+            // Fallback to estimation for uncached texts
+            foreach (var text in uncachedTexts)
+            {
+                result[text] = EstimateTextWidth(text, fontSize);
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
     /// Measure text width synchronously using estimation
     /// Used during render when async is not possible
     /// </summary>

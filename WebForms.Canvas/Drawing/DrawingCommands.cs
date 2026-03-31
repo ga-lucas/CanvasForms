@@ -218,3 +218,38 @@ public class ClearCommand : DrawingCommand
         return sb.ToString();
     }
 }
+
+public class SaveStateCommand : DrawingCommand
+{
+    public override string ToJavaScript()
+    {
+        return "ctx.save();";
+    }
+}
+
+public class RestoreStateCommand : DrawingCommand
+{
+    public override string ToJavaScript()
+    {
+        return "ctx.restore();";
+    }
+}
+
+public class SetClipCommand : DrawingCommand
+{
+    public Rectangle ClipRect { get; }
+
+    public SetClipCommand(Rectangle clipRect)
+    {
+        ClipRect = clipRect;
+    }
+
+    public override string ToJavaScript()
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("ctx.beginPath();");
+        sb.AppendLine($"ctx.rect({ClipRect.X}, {ClipRect.Y}, {ClipRect.Width}, {ClipRect.Height});");
+        sb.AppendLine("ctx.clip();");
+        return sb.ToString();
+    }
+}

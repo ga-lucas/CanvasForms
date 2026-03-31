@@ -7,6 +7,7 @@ public class TextBox : Control
     private int _caretPosition = 0;
     private int _selectionStart = 0;
     private int _selectionLength = 0;
+    private int _scrollOffset = 0; // Horizontal scroll offset in pixels
 
     public TextBox()
     {
@@ -103,52 +104,80 @@ public class TextBox : Control
             _ = PreMeasureTextSegments(displayText, measureService);
         }
 
-        // Draw text using cached or estimated measurements
-        if (!string.IsNullOrEmpty(displayText))
+        // Update scroll position to keep caret visible
+        if (measureService != null && !string.IsNullOrEmpty(displayText))
+        {
+            UpdateScrollPosition(displayText, measureService);
+        }
+        else
+        {
+            // No measurement service or no text - reset scroll
+            _scrollOffset = 0;
+        }
+
+        const int textPadding = 3;
+
+        // Draw text using cached or estimated measurements with scroll offset
+        if (!string.IsNullOrEmpty(displayText) && measureService != null)
         {
             var textColor = Enabled ? ForeColor : Color.FromArgb(109, 109, 109);
 
-            if (_selectionLength > 0 && hasFocus && measureService != null)
+            // Calculate visible portion of text based on scroll offset
+            var visibleStartIndex = 0;
+            var visibleEndIndex = displayText.Length;
+
+            // Find first visible character
+            for (int i = 0; i < displayText.Length; i++)
             {
-                // We have a selection - draw in three parts with measurement
+                var textUpToIndex = displayText.Substring(0, i);
+                var width = GetCachedOrEstimatedWidth(textUpToIndex, measureService);
 
-                // Measure text before selection (use cache if available)
-                var textBeforeSelection = displayText.Substring(0, _selectionStart);
-                var beforeWidth = GetCachedOrEstimatedWidth(textBeforeSelection, measureService);
-
-                // 1. Text before selection
-                if (_selectionStart > 0)
+                if (width >= _scrollOffset)
                 {
-                    g.DrawString(textBeforeSelection, Font, textColor, 3, 3);
-                }
-
-                // 2. Selected text with highlight
-                var selectedText = displayText.Substring(_selectionStart, 
-                    Math.Min(_selectionLength, displayText.Length - _selectionStart));
-                var selectedWidth = GetCachedOrEstimatedWidth(selectedText, measureService);
-
-                var selStartX = 3 + beforeWidth;
-
-                // Draw highlight background
-                g.FillRectangle(new SolidBrush(Color.FromArgb(0, 120, 215)), 
-                    new Rectangle(selStartX, 3, selectedWidth, Height - 6));
-
-                // Draw selected text on top
-                g.DrawString(selectedText, Font, Color.White, selStartX, 3);
-
-                // 3. Text after selection
-                if (_selectionStart + _selectionLength < displayText.Length)
-                {
-                    var afterStart = _selectionStart + _selectionLength;
-                    var afterSelection = displayText.Substring(afterStart);
-                    var afterX = selStartX + selectedWidth;
-                    g.DrawString(afterSelection, Font, textColor, afterX, 3);
+                    visibleStartIndex = i > 0 ? i - 1 : 0; // Include one character before for smoothness
+                    break;
                 }
             }
-            else
+
+            // Find last visible character
+            var maxVisibleWidth = _scrollOffset + (Width - textPadding * 2);
+            for (int i = visibleStartIndex; i <= displayText.Length; i++)
             {
-                // No selection - draw all text at once
-                g.DrawString(displayText, Font, textColor, 3, 3);
+                var textUpToIndex = displayText.Substring(0, i);
+                var width = GetCachedOrEstimatedWidth(textUpToIndex, measureService);
+
+                if (width > maxVisibleWidth)
+                {
+                    visibleEndIndex = i;
+                    break;
+                }
+            }
+
+            // Only draw visible portion
+            if (visibleStartIndex < visibleEndIndex)
+            {
+                if (_selectionLength > 0 && hasFocus)
+                {
+                    // Handle selection within visible range
+                    var visibleText = displayText.Substring(visibleStartIndex, visibleEndIndex - visibleStartIndex);
+                    var textBeforeVisible = displayText.Substring(0, visibleStartIndex);
+                    var widthBeforeVisible = GetCachedOrEstimatedWidth(textBeforeVisible, measureService);
+                    var visibleTextX = textPadding - _scrollOffset + widthBeforeVisible;
+
+                    // For now, draw the visible portion and handle selection
+                    // TODO: Properly handle selection highlighting in visible portion
+                    g.DrawString(visibleText, Font, textColor, visibleTextX, textPadding);
+                }
+                else
+                {
+                    // No selection - draw visible text portion
+                    var visibleText = displayText.Substring(visibleStartIndex, visibleEndIndex - visibleStartIndex);
+                    var textBeforeVisible = displayText.Substring(0, visibleStartIndex);
+                    var widthBeforeVisible = GetCachedOrEstimatedWidth(textBeforeVisible, measureService);
+                    var visibleTextX = textPadding - _scrollOffset + widthBeforeVisible;
+
+                    g.DrawString(visibleText, Font, textColor, visibleTextX, textPadding);
+                }
             }
         }
 
@@ -157,11 +186,60 @@ public class TextBox : Control
         {
             var textBeforeCaret = string.IsNullOrEmpty(displayText) ? "" : 
                 displayText.Substring(0, Math.Min(_caretPosition, displayText.Length));
-            var caretX = 3 + GetCachedOrEstimatedWidth(textBeforeCaret, measureService);
-            g.DrawLine(new Pen(Color.Black, 1), caretX, 3, caretX, Height - 6);
+            var caretX = textPadding - _scrollOffset + GetCachedOrEstimatedWidth(textBeforeCaret, measureService);
+
+            // Only draw caret if it's within visible bounds
+            if (caretX >= textPadding && caretX <= Width - textPadding)
+            {
+                g.DrawLine(new Pen(Color.Black, 1), caretX, textPadding, caretX, Height - (textPadding * 2));
+            }
         }
 
         base.OnPaint(e);
+    }
+
+    // Update scroll position to keep caret visible within text area
+    private void UpdateScrollPosition(string displayText, TextMeasurementService measureService)
+    {
+        const int textPadding = 3;
+        var textAreaWidth = Width - (textPadding * 2);
+
+        // If no text, reset scroll to 0
+        if (string.IsNullOrEmpty(displayText))
+        {
+            _scrollOffset = 0;
+            return;
+        }
+
+        // Calculate caret position in pixels
+        var textBeforeCaret = _caretPosition > 0 && _caretPosition <= displayText.Length
+            ? displayText.Substring(0, _caretPosition)
+            : "";
+        var caretPixelPosition = GetCachedOrEstimatedWidth(textBeforeCaret, measureService);
+
+        // Calculate visible caret position (accounting for scroll)
+        var visibleCaretPosition = caretPixelPosition - _scrollOffset;
+
+        // Adjust scroll if caret is beyond right edge
+        if (visibleCaretPosition > textAreaWidth - 5) // 5px margin
+        {
+            _scrollOffset = caretPixelPosition - textAreaWidth + 5;
+        }
+        // Adjust scroll if caret is beyond left edge
+        else if (visibleCaretPosition < 5) // 5px margin
+        {
+            _scrollOffset = Math.Max(0, caretPixelPosition - 5);
+        }
+
+        // Ensure scroll doesn't go negative
+        _scrollOffset = Math.Max(0, _scrollOffset);
+
+        // Optional: If text is shorter than visible area, reset scroll to 0
+        var totalTextWidth = GetCachedOrEstimatedWidth(displayText, measureService);
+        if (totalTextWidth <= textAreaWidth)
+        {
+            _scrollOffset = 0;
+        }
     }
 
     // Get width from cache or estimate if not available
@@ -179,15 +257,27 @@ public class TextBox : Control
     {
         try
         {
-            // Measure the full text
-            await measureService.MeasureTextAsync(text, Font.Family, (int)Font.Size);
+            // Build array of all substrings to measure (including full text)
+            var textsToMeasure = new List<string>(text.Length + 1);
 
-            // Also measure substrings for better caret positioning
+            // Add full text
+            textsToMeasure.Add(text);
+
+            // Add all substrings for caret positioning
             for (int i = 1; i < text.Length; i++)
             {
-                var substring = text.Substring(0, i);
-                await measureService.MeasureTextAsync(substring, Font.Family, (int)Font.Size);
+                textsToMeasure.Add(text.Substring(0, i));
             }
+
+            // Batch measure all texts in a single JS interop call
+            await measureService.MeasureTextBatchAsync(textsToMeasure.ToArray(), Font.Family, (int)Font.Size);
+
+            // Small delay to ensure previous render has completed
+            await Task.Delay(10);
+
+            // Trigger re-render now that accurate measurements are cached
+            // This will update cursor position from estimated to pixel-perfect
+            Invalidate();
         }
         catch
         {
@@ -222,7 +312,8 @@ public class TextBox : Control
             {
                 if (measureService != null && !string.IsNullOrEmpty(displayText))
                 {
-                    var clickX = e.X - 3;
+                    const int textPadding = 3;
+                    var clickX = e.X - textPadding + _scrollOffset; // Account for scroll offset
                     var newPosition = 0;
 
                     // Use actual JavaScript measurement for pixel-perfect positioning
@@ -257,7 +348,8 @@ public class TextBox : Control
                 else
                 {
                     // Fallback when service unavailable
-                    var clickX = e.X - 3;
+                    const int textPadding = 3;
+                    var clickX = e.X - textPadding + _scrollOffset;
                     _caretPosition = Math.Max(0, Math.Min(displayText.Length, clickX / 7));
                     _selectionStart = _caretPosition;
                     _selectionLength = 0;
@@ -268,7 +360,8 @@ public class TextBox : Control
             {
                 Console.WriteLine($"TextBox measurement error: {ex.Message}");
                 // Fallback on error
-                var clickX = e.X - 3;
+                const int textPadding = 3;
+                var clickX = e.X - textPadding + _scrollOffset;
                 _caretPosition = Math.Max(0, Math.Min(displayText.Length, clickX / 7));
                 _selectionStart = _caretPosition;
                 _selectionLength = 0;
@@ -554,5 +647,18 @@ public class TextBox : Control
     {
         TextChanged?.Invoke(this, e);
         PreMeasureText(); // Pre-measure for better cursor positioning
+    }
+
+    // Pre-measure text asynchronously when text changes to populate cache for cursor positioning
+    private void PreMeasureText()
+    {
+        var displayText = GetDisplayText();
+        var measureService = (Parent as Form)?.TextMeasurementService;
+
+        if (measureService != null && !string.IsNullOrEmpty(displayText))
+        {
+            // Start async measurement - don't use Task.Run, keep on UI context
+            _ = PreMeasureTextSegments(displayText, measureService);
+        }
     }
 }
