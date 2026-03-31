@@ -1,84 +1,101 @@
 ﻿@page "/"
 @using WebForms.Canvas.Components
 @using WebForms.Canvas.Samples
+@using WebForms.Canvas.Forms
 
 <PageTitle>Windows Forms Canvas Clone</PageTitle>
 
-<h1>Windows Forms Canvas Clone</h1>
+<div style="display: flex; flex-direction: column; height: 100vh; overflow: hidden;">
+	<!-- Header section -->
+	<div style="padding: 12px; background-color: #f5f5f5; border-bottom: 2px solid #ddd; flex-shrink: 0; overflow-y: auto; max-height: 40vh;">
+		<h1 style="margin: 0 0 8px 0; font-size: 24px;">Windows Forms Canvas Clone</h1>
+		<p style="margin: 0 0 8px 0;">HTML canvas-based implementation of Windows Forms with window management.</p>
 
-<p>This demonstrates an HTML canvas-based implementation of Windows Forms with interactive capabilities.</p>
+		<div class="alert alert-info" style="background-color: #e3f2fd; border: 1px solid #2196f3; border-radius: 4px; padding: 8px; margin: 8px 0;">
+			<strong>💡 Features:</strong> Use taskbar to switch windows • Click minimize/maximize buttons in title bar • Drag title bar to move • Drag edges to resize
+		</div>
+	</div>
 
-<div class="alert alert-info" style="background-color: #e3f2fd; border: 1px solid #2196f3; border-radius: 4px; padding: 12px; margin: 20px 0;">
-    <strong>💡 Tip:</strong> Click on any form to bring it to the front! Forms stack on top of each other.
+	<!-- Desktop takes remaining space -->
+	<div style="flex: 1; overflow: hidden; position: relative;">
+		<Desktop Forms="@_allForms" Height="@_desktopHeight" TaskbarHeight="32" OnFormCreated="OnFormCreated" />
+	</div>
 </div>
 
-<div style="margin: 20px 0; position: relative; height: 1200px; min-height: 1200px;">
-    <FormRenderer Form="@_controlsDemoForm" />
-    <FormRenderer Form="@_interactiveForm" />
-    <FormRenderer Form="@_sampleForm" />
-
-</div>
 
 <div style="margin-top: 20px;">
-    <h3>✅ Features Implemented:</h3>
-    <ul>
-        <li>✅ Basic drawing primitives (lines, rectangles, ellipses)</li>
-        <li>✅ Filled shapes support</li>
-        <li>✅ Pen and Brush abstractions</li>
-        <li>✅ Color management (RGBA support)</li>
-        <li>✅ Text rendering</li>
-        <li>✅ Graphics command buffering</li>
-        <li>✅ Paint event system</li>
-        <li>✅ <strong>Mouse events (click, double-click, move, down, up, enter, leave)</strong></li>
-        <li>✅ <strong>Keyboard events (keydown, keyup, keypress)</strong></li>
-        <li>✅ <strong>Touch events support</strong></li>
-        <li>✅ <strong>Form dragging (drag title bar to move)</strong></li>
-        <li>✅ <strong>Form resizing (drag edges/corners)</strong></li>
-        <li>✅ <strong>Control hierarchy (parent/child controls)</strong></li>
-        <li>✅ <strong>Button control with hover/click states</strong></li>
-        <li>✅ <strong>Label control with text alignment</strong></li>
-        <li>✅ <strong>TextBox control with keyboard input</strong></li>
-        <li>✅ <strong>CheckBox control</strong></li>
-        <li>✅ <strong>RadioButton control with auto-grouping</strong></li>
-    </ul>
+	<h3>✅ Features Implemented:</h3>
+	<ul>
+		<li>✅ Basic drawing primitives (lines, rectangles, ellipses)</li>
+		<li>✅ Filled shapes support</li>
+		<li>✅ Pen and Brush abstractions</li>
+		<li>✅ Color management (RGBA support)</li>
+		<li>✅ Text rendering</li>
+		<li>✅ Graphics command buffering</li>
+		<li>✅ Paint event system</li>
+		<li>✅ <strong>Mouse events (click, double-click, move, down, up, enter, leave)</strong></li>
+		<li>✅ <strong>Keyboard events (keydown, keyup, keypress)</strong></li>
+		<li>✅ <strong>Touch events support</strong></li>
+		<li>✅ <strong>Form dragging (drag title bar to move)</strong></li>
+		<li>✅ <strong>Form resizing (drag edges/corners)</strong></li>
+		<li>✅ <strong>Control hierarchy (parent/child controls)</strong></li>
+		<li>✅ <strong>Button control with hover/click states</strong></li>
+		<li>✅ <strong>Label control with text alignment</strong></li>
+		<li>✅ <strong>TextBox control with keyboard input & horizontal scrolling</strong></li>
+		<li>✅ <strong>CheckBox control</strong></li>
+		<li>✅ <strong>RadioButton control with auto-grouping</strong></li>
+		<li>✅ <strong>PictureBox control with image loading</strong></li>
+		<li>✅ <strong>🆕 Window Manager with Taskbar</strong></li>
+		<li>✅ <strong>🆕 Window minimizing/maximizing/restoring buttons</strong></li>
+		<li>✅ <strong>🆕 Window switching via taskbar (ordered by age)</strong></li>
+		<li>✅ <strong>🆕 Full viewport desktop (no scrolling)</strong></li>
+	</ul>
 
-    <h3>🎮 Try it out:</h3>
-    <ul>
-        <li><strong>Click any form:</strong> Click anywhere on a form to bring it to front</li>
-        <li><strong>Move forms:</strong> Click and drag the blue title bar</li>
-        <li><strong>Resize forms:</strong> Drag the right edge, bottom edge, or bottom-right corner</li>
-        <li><strong>Interact:</strong> Click on the interactive form's canvas to draw circles</li>
-        <li><strong>Type:</strong> Click on a form and press keys to see keyboard events</li>
-        <li><strong>Double-click:</strong> Double-click the interactive form to clear circles</li>
-        <li><strong>Press C:</strong> Press 'C' key on the interactive form to clear circles</li>
-    </ul>
+	<h3>🎮 Try it out:</h3>
+	<ul>
+		<li><strong>Minimize:</strong> Click the minimize button (—) in the title bar to minimize to taskbar</li>
+		<li><strong>Maximize:</strong> Click the maximize button (□) in the title bar to maximize window</li>
+		<li><strong>Taskbar:</strong> Click window buttons (ordered by creation time) to switch/restore windows</li>
+		<li><strong>Start Menu:</strong> Click the Start button to create new forms or close all windows</li>
+		<li><strong>Click any form:</strong> Click anywhere on a form to bring it to front</li>
+		<li><strong>Move forms:</strong> Click and drag the blue title bar</li>
+		<li><strong>Resize forms:</strong> Drag the right edge, bottom edge, or bottom-right corner</li>
+		<li><strong>Interact:</strong> Click on the interactive form's canvas to draw circles</li>
+		<li><strong>Type:</strong> Click on a textbox and type to see horizontal scrolling</li>
+	</ul>
 
-    <h3>⬜ Roadmap:</h3>
-    <ul>
-        <li>⬜ More controls (ListBox, ComboBox, PictureBox, etc.)</li>
-        <li>⬜ Image support</li>
-        <li>⬜ Path/polygon drawing</li>
-        <li>⬜ Transformations (rotate, scale)</li>
-        <li>⬜ Focus management & tab order</li>
-        <li>⬜ Clipboard operations</li>
-        <li>⬜ IL interpreter for running Windows Forms executables</li>
-    </ul>
+	<h3>⬜ Roadmap:</h3>
+	<ul>
+		<li>⬜ More controls (ListBox, ComboBox, MenuStrip, etc.)</li>
+		<li>⬜ Path/polygon drawing</li>
+		<li>⬜ Transformations (rotate, scale)</li>
+		<li>⬜ Focus management & tab order</li>
+		<li>⬜ Clipboard operations</li>
+		<li>⬜ Multi-monitor support</li>
+		<li>⬜ IL interpreter for running Windows Forms executables</li>
+	</ul>
 </div>
 
 @code {
+	private List<Form> _allForms = new();
 	private ControlsDemoForm _controlsDemoForm = new();
 	private InteractiveForm _interactiveForm = new();
 	private SampleDrawingForm _sampleForm = new();
+	private int _desktopHeight = 600; // Will be calculated dynamically
 
 
 	protected override void OnInitialized()
 	{
+		// Calculate desktop height (viewport height minus header)
+		_desktopHeight = 800; // Default, will be adjusted by JS if needed
+
 		// Position controls demo form - TOP LEFT
 		_controlsDemoForm.Left = 50;
 		_controlsDemoForm.Top = 50;
 		_controlsDemoForm.Width = 400;
-		_controlsDemoForm.Height = 500;
+		_controlsDemoForm.Height = 550;
 		_controlsDemoForm.Show();
+		_allForms.Add(_controlsDemoForm);
 
 		// Position interactive form - TOP MIDDLE
 		_interactiveForm.Left = 500;
@@ -86,15 +103,21 @@
 		_interactiveForm.Width = 500;
 		_interactiveForm.Height = 400;
 		_interactiveForm.Show();
+		_allForms.Add(_interactiveForm);
 
 		// Position drawing sample form - BELOW the interactive form
 		_sampleForm.Left = 50;
-		_sampleForm.Top = 600; // Below the first form (50 + 500 height + 50 gap)
+		_sampleForm.Top = 500; // Below the first form
 		_sampleForm.Width = 600;
 		_sampleForm.Height = 500;
 		_sampleForm.Show();
+		_allForms.Add(_sampleForm);
+	}
 
-
+	private void OnFormCreated(Form form)
+	{
+		// Handle any custom initialization for newly created forms
+		form.Show();
 	}
 }
 

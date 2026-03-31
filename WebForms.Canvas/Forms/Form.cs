@@ -10,6 +10,9 @@ public class Form : Control
     private FormWindowState _windowState = FormWindowState.Normal;
     private Rectangle _normalBounds; // Store bounds before minimize/maximize
 
+    // Creation timestamp for maintaining order
+    public DateTime CreatedAt { get; } = DateTime.Now;
+
     public bool AllowResize { get; set; } = true;
     public bool AllowMove { get; set; } = true;
     public int MinimumWidth { get; set; } = 100;

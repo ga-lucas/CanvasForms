@@ -134,7 +134,7 @@ window.drawImageAsync = async (ctx, imageUrl, x, y, width, height) => {
 };
 
 // Render the entire form chrome (title bar, borders, close button) on canvas
-window.renderFormCanvas = (canvas, width, height, title, backColor, clientX, clientY, clientWidth, clientHeight, closeButtonHover) => {
+window.renderFormCanvas = (canvas, width, height, title, backColor, clientX, clientY, clientWidth, clientHeight, closeButtonHover, minimizeButtonHover, maximizeButtonHover) => {
     // Use offscreen canvas for double buffering
     const offscreen = getOffscreenCanvas(canvas);
     const ctx = offscreen.getContext('2d', { 
@@ -180,28 +180,59 @@ window.renderFormCanvas = (canvas, width, height, title, backColor, clientX, cli
     ctx.textBaseline = 'middle';
     ctx.fillText(title, 10, titleBarHeight / 2 + borderWidth);
 
-    // Draw close button
-    const closeButtonSize = 20;
-    const closeButtonMargin = 6;
-    const closeButtonX = width - closeButtonSize - closeButtonMargin;
-    const closeButtonY = (titleBarHeight - closeButtonSize) / 2 + borderWidth;
+    // Button dimensions
+    const buttonSize = 20;
+    const buttonMargin = 6;
+    const buttonY = (titleBarHeight - buttonSize) / 2 + borderWidth;
 
-    // Close button background (changes on hover)
+    // Close button (rightmost)
+    const closeButtonX = width - buttonSize - buttonMargin;
     if (closeButtonHover) {
         ctx.fillStyle = 'rgba(255, 0, 0, 0.7)';
     } else {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
     }
-    ctx.fillRect(closeButtonX, closeButtonY, closeButtonSize, closeButtonSize);
+    ctx.fillRect(closeButtonX, buttonY, buttonSize, buttonSize);
 
     // Close button X
     ctx.strokeStyle = 'white';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(closeButtonX + 5, closeButtonY + 5);
-    ctx.lineTo(closeButtonX + closeButtonSize - 5, closeButtonY + closeButtonSize - 5);
-    ctx.moveTo(closeButtonX + closeButtonSize - 5, closeButtonY + 5);
-    ctx.lineTo(closeButtonX + 5, closeButtonY + closeButtonSize - 5);
+    ctx.moveTo(closeButtonX + 5, buttonY + 5);
+    ctx.lineTo(closeButtonX + buttonSize - 5, buttonY + buttonSize - 5);
+    ctx.moveTo(closeButtonX + buttonSize - 5, buttonY + 5);
+    ctx.lineTo(closeButtonX + 5, buttonY + buttonSize - 5);
+    ctx.stroke();
+
+    // Maximize button (second from right)
+    const maximizeButtonX = closeButtonX - buttonSize - 4;
+    if (maximizeButtonHover) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+    } else {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+    }
+    ctx.fillRect(maximizeButtonX, buttonY, buttonSize, buttonSize);
+
+    // Maximize button icon (square)
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(maximizeButtonX + 5, buttonY + 5, buttonSize - 10, buttonSize - 10);
+
+    // Minimize button (third from right)
+    const minimizeButtonX = maximizeButtonX - buttonSize - 4;
+    if (minimizeButtonHover) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+    } else {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+    }
+    ctx.fillRect(minimizeButtonX, buttonY, buttonSize, buttonSize);
+
+    // Minimize button icon (horizontal line)
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(minimizeButtonX + 5, buttonY + buttonSize / 2);
+    ctx.lineTo(minimizeButtonX + buttonSize - 5, buttonY + buttonSize / 2);
     ctx.stroke();
 
     // Draw client area background (overdraw to ensure coverage)

@@ -78,8 +78,10 @@
     private double _lastTouchX = 0;
     private double _lastTouchY = 0;
 
-    // Hover state for close button and cursor
+    // Hover state for window control buttons and cursor
     private bool _closeButtonHover = false;
+    private bool _minimizeButtonHover = false;
+    private bool _maximizeButtonHover = false;
     private int _lastMouseX = 0;
     private int _lastMouseY = 0;
 
@@ -124,7 +126,7 @@
 
         try
         {
-            // First, render the form chrome (title bar, border, close button)
+            // First, render the form chrome (title bar, border, window control buttons)
             await JSRuntime.InvokeVoidAsync("renderFormCanvas", _canvasRef, 
                 Form.Width,
                 Form.Height,
@@ -134,7 +136,9 @@
                 TitleBarHeight + BorderWidth,
                 Form.Width - (BorderWidth * 2),
                 Form.Height - TitleBarHeight - (BorderWidth * 2),
-                _closeButtonHover);
+                _closeButtonHover,
+                _minimizeButtonHover,
+                _maximizeButtonHover);
 
             // Create graphics for client area (size excludes chrome)
             using var graphics = new Graphics(
@@ -198,6 +202,26 @@
         return new Rectangle(x, y, CloseButtonSize, CloseButtonSize);
     }
 
+    private Rectangle GetMaximizeButtonRect()
+    {
+        if (Form == null) return new Rectangle(0, 0, 0, 0);
+
+        var closeButtonX = Form.Width - CloseButtonSize - CloseButtonMargin;
+        var x = closeButtonX - CloseButtonSize - 4;
+        var y = (TitleBarHeight - CloseButtonSize) / 2 + BorderWidth;
+        return new Rectangle(x, y, CloseButtonSize, CloseButtonSize);
+    }
+
+    private Rectangle GetMinimizeButtonRect()
+    {
+        if (Form == null) return new Rectangle(0, 0, 0, 0);
+
+        var maximizeButtonRect = GetMaximizeButtonRect();
+        var x = maximizeButtonRect.X - CloseButtonSize - 4;
+        var y = (TitleBarHeight - CloseButtonSize) / 2 + BorderWidth;
+        return new Rectangle(x, y, CloseButtonSize, CloseButtonSize);
+    }
+
     private bool IsPointInRect(int x, int y, Rectangle rect)
     {
         return x >= rect.X && x < rect.X + rect.Width &&
@@ -245,9 +269,13 @@
         // Check if mouse is over title bar (draggable area)
         if (Form != null && Form.AllowMove && _lastMouseY < TitleBarHeight + BorderWidth && _lastMouseY >= BorderWidth)
         {
-            // Not over close button
+            // Not over any window control buttons
             var closeButtonRect = GetCloseButtonRect();
-            if (!IsPointInRect(_lastMouseX, _lastMouseY, closeButtonRect))
+            var maximizeButtonRect = GetMaximizeButtonRect();
+            var minimizeButtonRect = GetMinimizeButtonRect();
+            if (!IsPointInRect(_lastMouseX, _lastMouseY, closeButtonRect) &&
+                !IsPointInRect(_lastMouseX, _lastMouseY, maximizeButtonRect) &&
+                !IsPointInRect(_lastMouseX, _lastMouseY, minimizeButtonRect))
             {
                 return "move";
             }
@@ -497,6 +525,22 @@
             return;
         }
 
+        // Check maximize button
+        var maximizeButtonRect = GetMaximizeButtonRect();
+        if (IsPointInRect(x, y, maximizeButtonRect))
+        {
+            ToggleMaximize();
+            return;
+        }
+
+        // Check minimize button
+        var minimizeButtonRect = GetMinimizeButtonRect();
+        if (IsPointInRect(x, y, minimizeButtonRect))
+        {
+            MinimizeForm();
+            return;
+        }
+
         // Check resize handles
         if (Form.AllowResize)
         {
@@ -574,12 +618,22 @@
         _lastMouseX = x;
         _lastMouseY = y;
 
-        // Check close button hover
+        // Check button hover states
         var closeButtonRect = GetCloseButtonRect();
-        var wasHovering = _closeButtonHover;
-        _closeButtonHover = IsPointInRect(x, y, closeButtonRect);
+        var maximizeButtonRect = GetMaximizeButtonRect();
+        var minimizeButtonRect = GetMinimizeButtonRect();
 
-        if (wasHovering != _closeButtonHover)
+        var wasCloseHovering = _closeButtonHover;
+        var wasMaximizeHovering = _maximizeButtonHover;
+        var wasMinimizeHovering = _minimizeButtonHover;
+
+        _closeButtonHover = IsPointInRect(x, y, closeButtonRect);
+        _maximizeButtonHover = IsPointInRect(x, y, maximizeButtonRect);
+        _minimizeButtonHover = IsPointInRect(x, y, minimizeButtonRect);
+
+        if (wasCloseHovering != _closeButtonHover || 
+            wasMaximizeHovering != _maximizeButtonHover ||
+            wasMinimizeHovering != _minimizeButtonHover)
         {
             await RenderForm();
         }
@@ -836,6 +890,29 @@
     private void CloseForm()
     {
         Form?.Close();
+        StateHasChanged();
+    }
+
+    private void MinimizeForm()
+    {
+        Form?.Minimize();
+        StateHasChanged();
+    }
+
+    private void ToggleMaximize()
+    {
+        if (Form == null) return;
+
+        // TODO: Get actual desktop dimensions
+        // For now, use large values - should be passed from Desktop component
+        if (Form.WindowState == FormWindowState.Maximized)
+        {
+            Form.Restore();
+        }
+        else
+        {
+            Form.Maximize(1920, 1080, TitleBarHeight);
+        }
         StateHasChanged();
     }
 
