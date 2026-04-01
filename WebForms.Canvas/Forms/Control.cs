@@ -577,6 +577,16 @@ public abstract class Control
 
     protected internal virtual void OnKeyDown(KeyEventArgs e)
     {
+        // Handle Tab key for focus navigation
+        if (e.KeyCode == Keys.Tab && !e.Handled)
+        {
+            if (ProcessTabKey(!e.Shift))
+            {
+                e.Handled = true;
+                return;
+            }
+        }
+
         KeyDown?.Invoke(this, e);
     }
 
@@ -725,11 +735,16 @@ public abstract class Control
 
             foreach (var control in sortedControls)
             {
-                controls.Add(control);
-
+                // If nested navigation is enabled and the control has children,
+                // recurse into children instead of adding the container itself
                 if (nested && control.HasChildren)
                 {
                     AddControlsRecursive(control);
+                }
+                else
+                {
+                    // Add leaf controls (controls without children)
+                    controls.Add(control);
                 }
             }
         }
