@@ -96,6 +96,20 @@ public class PictureBox : Control
         }
     }
 
+    /// <summary>
+    /// Called when the control is added to a parent
+    /// </summary>
+    protected override void OnParentChanged(EventArgs e)
+    {
+        base.OnParentChanged(e);
+
+        // Trigger preload if we have an image URL but haven't loaded yet
+        if (!string.IsNullOrEmpty(_imageUrl) && !_imageLoaded)
+        {
+            _ = PreloadImageAsync();
+        }
+    }
+
     protected internal override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics;

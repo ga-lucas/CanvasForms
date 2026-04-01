@@ -507,7 +507,27 @@ public abstract class Control
     public Control? Parent
     {
         get => _parent;
-        internal set => _parent = value;
+        internal set
+        {
+            if (_parent != value)
+            {
+                _parent = value;
+                OnParentChanged(EventArgs.Empty);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Raised when the control's Parent property value changes
+    /// </summary>
+    public event EventHandler? ParentChanged;
+
+    /// <summary>
+    /// Called when the Parent property changes
+    /// </summary>
+    protected virtual void OnParentChanged(EventArgs e)
+    {
+        ParentChanged?.Invoke(this, e);
     }
 
     public ControlCollection Controls => new ControlCollection(this, _controls);

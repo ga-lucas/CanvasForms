@@ -7,6 +7,9 @@ const activeRenders = new WeakMap();
 // Cache for loaded images
 const imageCache = new Map();
 
+// Cache for failed image URLs (don't retry)
+const failedImages = new Set();
+
 // Preload an image into cache without drawing
 window.preloadImage = async function(imageUrl) {
     if (!imageUrl || imageUrl.trim() === '') {
@@ -16,8 +19,7 @@ window.preloadImage = async function(imageUrl) {
 
     // Check if already cached
     if (imageCache.has(imageUrl)) {
-        console.log('Image already cached:', imageUrl);
-        return;
+        return; // Silently skip if already cached
     }
 
     try {
@@ -35,7 +37,6 @@ window.preloadImage = async function(imageUrl) {
 
         // Cache the loaded image
         imageCache.set(imageUrl, img);
-        console.log('Image preloaded and cached:', imageUrl);
     } catch (error) {
         console.warn('Image preload failed:', error.message);
     }
@@ -45,6 +46,23 @@ window.preloadImage = async function(imageUrl) {
 window.drawImageAsync = async function(ctx, imageUrl, x, y, width, height) {
     if (!imageUrl || imageUrl.trim() === '') {
         console.warn('drawImageAsync: Empty image URL');
+        return;
+    }
+
+    // Check if this image has failed before - don't retry
+    if (failedImages.has(imageUrl)) {
+        // Draw cached placeholder for failed image
+        ctx.save();
+        ctx.fillStyle = '#f0f0f0';
+        ctx.fillRect(x, y, width, height);
+        ctx.strokeStyle = '#cccccc';
+        ctx.strokeRect(x, y, width, height);
+        ctx.fillStyle = '#999999';
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('Image not found', x + width/2, y + height/2);
+        ctx.restore();
         return;
     }
 
@@ -75,6 +93,10 @@ window.drawImageAsync = async function(ctx, imageUrl, x, y, width, height) {
                 imageCache.set(imageUrl, img);
             } catch (error) {
                 console.warn('Image load failed:', error.message);
+
+                // Mark as failed so we don't retry
+                failedImages.add(imageUrl);
+
                 // Draw placeholder rectangle instead
                 ctx.save();
                 ctx.fillStyle = '#f0f0f0';
@@ -139,8 +161,8 @@ function getOffscreenCanvas(canvas, allowResize = true) {
 
     // Resize buffer to match canvas if allowed and sizes differ
     if (allowResize && (offscreen.width !== canvas.width || offscreen.height !== canvas.height)) {
-        console.log('Resizing offscreen buffer:', offscreen.width, 'x', offscreen.height, 
-            '→', canvas.width, 'x', canvas.height);
+        //console.log('Resizing offscreen buffer:', offscreen.width, 'x', offscreen.height, 
+        //    '→', canvas.width, 'x', canvas.height);
         offscreen.width = canvas.width;
         offscreen.height = canvas.height;
     }
@@ -384,11 +406,9 @@ window.renderClientArea = async (canvas, offsetX, offsetY, commands) => {
     // Execute user drawing commands on offscreen canvas (now async to support images)
     try {
         if (commands && commands.trim().length > 0) {
-            console.log('Executing drawing commands...');
             // Create an async function with ctx in scope and execute it
             const asyncFunc = new Function('ctx', `return (async () => { ${commands} })();`);
             await asyncFunc(ctx);
-            console.log('Drawing commands completed successfully');
         }
     } catch (error) {
         console.error('Error rendering client area:', error);
@@ -443,12 +463,10 @@ let activeFormRenderer = null;
 
 window.setActiveFormRenderer = (dotNetRef) => {
     activeFormRenderer = dotNetRef;
-    console.log('Active form set:', dotNetRef ? 'active' : 'cleared');
 };
 
 window.clearActiveFormRenderer = () => {
     activeFormRenderer = null;
-    console.log('Active form cleared');
 };
 
 // Register global handlers only once
