@@ -23,6 +23,13 @@ public class RadioButton : Control
     {
         var g = e.Graphics;
 
+        // Draw background if not transparent
+        if (BackColor != Color.Transparent)
+        {
+            using var bgBrush = new SolidBrush(BackColor);
+            g.FillRectangle(bgBrush, 0, 0, Width, Height);
+        }
+
         // Draw radio button circle (13x13)
         const int circleSize = 13;
         var circleBounds = new Rectangle(0, (Height - circleSize) / 2, circleSize, circleSize);
@@ -48,6 +55,15 @@ public class RadioButton : Control
         {
             var textColor = Enabled ? ForeColor : Color.FromArgb(109, 109, 109);
             g.DrawString(Text, circleSize + 4, (Height - 14) / 2, textColor);
+        }
+
+        // Draw focus rectangle if focused
+        if (Focused && Enabled)
+        {
+            var textWidth = string.IsNullOrEmpty(Text) ? 0 : Text.Length * 7;
+            var focusRect = new Rectangle(0, 0, circleSize + 4 + textWidth + 2, Height);
+            using var focusPen = new Pen(Color.Black);
+            g.DrawRectangle(focusPen, focusRect);
         }
 
         base.OnPaint(e);
@@ -100,5 +116,17 @@ public class RadioButton : Control
     protected virtual void OnCheckedChanged(EventArgs e)
     {
         CheckedChanged?.Invoke(this, e);
+    }
+
+    protected internal override void OnGotFocus(EventArgs e)
+    {
+        Invalidate();
+        base.OnGotFocus(e);
+    }
+
+    protected internal override void OnLostFocus(EventArgs e)
+    {
+        Invalidate();
+        base.OnLostFocus(e);
     }
 }

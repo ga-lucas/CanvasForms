@@ -23,6 +23,13 @@ public class CheckBox : Control
     {
         var g = e.Graphics;
 
+        // Draw background if not transparent
+        if (BackColor != Color.Transparent)
+        {
+            using var bgBrush = new SolidBrush(BackColor);
+            g.FillRectangle(bgBrush, 0, 0, Width, Height);
+        }
+
         // Draw checkbox box (13x13 square)
         const int boxSize = 13;
         var boxBounds = new Rectangle(0, (Height - boxSize) / 2, boxSize, boxSize);
@@ -51,6 +58,15 @@ public class CheckBox : Control
         {
             var textColor = Enabled ? ForeColor : Color.FromArgb(109, 109, 109);
             g.DrawString(Text, boxSize + 4, (Height - 14) / 2, textColor);
+        }
+
+        // Draw focus rectangle if focused
+        if (Focused && Enabled)
+        {
+            var textWidth = string.IsNullOrEmpty(Text) ? 0 : Text.Length * 7;
+            var focusRect = new Rectangle(0, 0, boxSize + 4 + textWidth + 2, Height);
+            using var focusPen = new Pen(Color.Black);
+            g.DrawRectangle(focusPen, focusRect);
         }
 
         base.OnPaint(e);
@@ -90,5 +106,17 @@ public class CheckBox : Control
     protected virtual void OnCheckedChanged(EventArgs e)
     {
         CheckedChanged?.Invoke(this, e);
+    }
+
+    protected internal override void OnGotFocus(EventArgs e)
+    {
+        Invalidate();
+        base.OnGotFocus(e);
+    }
+
+    protected internal override void OnLostFocus(EventArgs e)
+    {
+        Invalidate();
+        base.OnLostFocus(e);
     }
 }

@@ -29,21 +29,25 @@ public class Button : Control
 
         if (!Enabled)
         {
+            // Disabled: use a grayed-out version of BackColor or default gray
             buttonColor = Color.FromArgb(240, 240, 240);
             borderColor = Color.FromArgb(173, 173, 173);
         }
         else if (_isPressed)
         {
-            buttonColor = Color.FromArgb(204, 228, 247);
+            // Pressed: darken the BackColor
+            buttonColor = DarkenColor(BackColor, 0.15f);
             borderColor = Color.FromArgb(0, 84, 153);
         }
         else if (_isHovered)
         {
-            buttonColor = Color.FromArgb(229, 241, 251);
+            // Hovered: lighten the BackColor
+            buttonColor = LightenColor(BackColor, 0.15f);
             borderColor = Color.FromArgb(0, 120, 215);
         }
         else
         {
+            // Normal state: use BackColor directly
             buttonColor = BackColor;
             borderColor = Color.FromArgb(173, 173, 173);
         }
@@ -67,6 +71,15 @@ public class Button : Control
 
             using var textBrush = new SolidBrush(textColor);
             g.DrawString(Text, "Arial", 12, textBrush, textX, textY);
+        }
+
+        // Draw focus rectangle if focused
+        if (Focused && Enabled)
+        {
+            var focusRect = new Rectangle(3, 3, Width - 6, Height - 6);
+            using var focusPen = new Pen(Color.Black);
+            // Note: Dotted style would be ideal but depends on Graphics implementation
+            g.DrawRectangle(focusPen, focusRect);
         }
 
         base.OnPaint(e);
@@ -123,5 +136,35 @@ public class Button : Control
     protected virtual void OnClick(EventArgs e)
     {
         Click?.Invoke(this, e);
+    }
+
+    protected internal override void OnGotFocus(EventArgs e)
+    {
+        Invalidate();
+        base.OnGotFocus(e);
+    }
+
+    protected internal override void OnLostFocus(EventArgs e)
+    {
+        Invalidate();
+        base.OnLostFocus(e);
+    }
+
+    private static Color LightenColor(Color color, float amount)
+    {
+        // Lighten by blending with white
+        var r = (int)(color.R + (255 - color.R) * amount);
+        var g = (int)(color.G + (255 - color.G) * amount);
+        var b = (int)(color.B + (255 - color.B) * amount);
+        return Color.FromArgb(r, g, b);
+    }
+
+    private static Color DarkenColor(Color color, float amount)
+    {
+        // Darken by reducing RGB values
+        var r = (int)(color.R * (1 - amount));
+        var g = (int)(color.G * (1 - amount));
+        var b = (int)(color.B * (1 - amount));
+        return Color.FromArgb(r, g, b);
     }
 }

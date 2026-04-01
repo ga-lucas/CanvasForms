@@ -63,6 +63,14 @@ public class PictureBox : Control
             g.DrawImage(_imageUrl, imageRect);
         }
 
+        // Draw focus rectangle if focused
+        if (Focused && Enabled)
+        {
+            var focusRect = new Rectangle(2, 2, Width - 4, Height - 4);
+            using var focusPen = new Pen(Color.Black);
+            g.DrawRectangle(focusPen, focusRect);
+        }
+
         base.OnPaint(e);
     }
 
@@ -92,6 +100,18 @@ public class PictureBox : Control
             default:
                 return new Rectangle(1, 1, Width - 2, Height - 2);
         }
+    }
+
+    protected internal override void OnGotFocus(EventArgs e)
+    {
+        Invalidate();
+        base.OnGotFocus(e);
+    }
+
+    protected internal override void OnLostFocus(EventArgs e)
+    {
+        Invalidate();
+        base.OnLostFocus(e);
     }
 }
 

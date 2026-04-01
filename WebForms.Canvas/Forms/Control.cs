@@ -529,6 +529,12 @@ public abstract class Control
     public event KeyEventHandler? KeyUp;
     public event KeyPressEventHandler? KeyPress;
 
+    // Focus events
+    public event EventHandler? GotFocus;
+    public event EventHandler? LostFocus;
+    public event EventHandler? Enter;
+    public event EventHandler? Leave;
+
     protected internal virtual void OnPaint(PaintEventArgs e)
     {
         Paint?.Invoke(this, e);
@@ -582,6 +588,183 @@ public abstract class Control
     protected internal virtual void OnKeyPress(KeyPressEventArgs e)
     {
         KeyPress?.Invoke(this, e);
+    }
+
+    protected internal virtual void OnGotFocus(EventArgs e)
+    {
+        GotFocus?.Invoke(this, e);
+    }
+
+    protected internal virtual void OnLostFocus(EventArgs e)
+    {
+        LostFocus?.Invoke(this, e);
+    }
+
+    protected internal virtual void OnEnter(EventArgs e)
+    {
+        Enter?.Invoke(this, e);
+    }
+
+    protected internal virtual void OnLeave(EventArgs e)
+    {
+        Leave?.Invoke(this, e);
+    }
+
+    /// <summary>
+    /// Sets input focus to the control
+    /// </summary>
+    /// <returns>true if focus was set successfully; otherwise, false</returns>
+    public bool Focus()
+    {
+        if (!CanFocus)
+            return false;
+
+        // Get the top-level control (form)
+        var topLevel = TopLevelControl;
+        if (topLevel == null)
+            topLevel = this;
+
+        // Remove focus from currently focused control
+        var currentlyFocused = FindFocusedControl(topLevel);
+        if (currentlyFocused != null && currentlyFocused != this)
+        {
+            currentlyFocused.Focused = false;
+            currentlyFocused.OnLostFocus(EventArgs.Empty);
+            currentlyFocused.OnLeave(EventArgs.Empty);
+        }
+
+        // Set focus to this control
+        Focused = true;
+        OnEnter(EventArgs.Empty);
+        OnGotFocus(EventArgs.Empty);
+
+        return true;
+    }
+
+    /// <summary>
+    /// Activates the control
+    /// </summary>
+    public void Select()
+    {
+        Focus();
+    }
+
+    /// <summary>
+    /// Selects the next control in tab order
+    /// </summary>
+    /// <param name="forward">true to move forward; false to move backward</param>
+    /// <returns>true if the next control was selected; otherwise, false</returns>
+    public bool SelectNextControl(Control? ctl, bool forward, bool tabStopOnly, bool nested, bool wrap)
+    {
+        if (ctl == null)
+            ctl = this;
+
+        var controls = GetTabOrderedControls(this, nested);
+
+        if (controls.Count == 0)
+            return false;
+
+        // Find current control index
+        int currentIndex = controls.IndexOf(ctl);
+
+        // If control not found, start from beginning
+        if (currentIndex == -1)
+            currentIndex = forward ? -1 : controls.Count;
+
+        // Search for next focusable control
+        int step = forward ? 1 : -1;
+        int index = currentIndex + step;
+        int attempts = 0;
+
+        while (attempts < controls.Count)
+        {
+            // Wrap around if needed
+            if (index >= controls.Count)
+            {
+                if (wrap)
+                    index = 0;
+                else
+                    return false;
+            }
+            else if (index < 0)
+            {
+                if (wrap)
+                    index = controls.Count - 1;
+                else
+                    return false;
+            }
+
+            var nextControl = controls[index];
+
+            // Check if control can receive focus
+            if ((!tabStopOnly || nextControl.TabStop) && nextControl.CanFocus)
+            {
+                return nextControl.Focus();
+            }
+
+            index += step;
+            attempts++;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Gets all controls in tab order
+    /// </summary>
+    private List<Control> GetTabOrderedControls(Control parent, bool nested)
+    {
+        var controls = new List<Control>();
+
+        void AddControlsRecursive(Control container)
+        {
+            var sortedControls = container._controls
+                .Where(c => c.Visible)
+                .OrderBy(c => c.TabIndex)
+                .ThenBy(c => container._controls.IndexOf(c));
+
+            foreach (var control in sortedControls)
+            {
+                controls.Add(control);
+
+                if (nested && control.HasChildren)
+                {
+                    AddControlsRecursive(control);
+                }
+            }
+        }
+
+        AddControlsRecursive(parent);
+        return controls;
+    }
+
+    /// <summary>
+    /// Finds the currently focused control in the hierarchy
+    /// </summary>
+    private static Control? FindFocusedControl(Control root)
+    {
+        if (root.Focused)
+            return root;
+
+        foreach (var child in root._controls)
+        {
+            var focused = FindFocusedControl(child);
+            if (focused != null)
+                return focused;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Processes a Tab key press for focus navigation
+    /// </summary>
+    /// <param name="forward">true for Tab, false for Shift+Tab</param>
+    /// <returns>true if the key was processed; otherwise, false</returns>
+    protected virtual bool ProcessTabKey(bool forward)
+    {
+        var topLevel = TopLevelControl ?? this;
+        return topLevel.SelectNextControl(this, forward, tabStopOnly: true, nested: true, wrap: true);
     }
 
     public void Invalidate()
@@ -735,7 +918,7 @@ public abstract class Control
 }
 
 // Control collection for managing child controls
-public class ControlCollection
+public class ControlCollection : IEnumerable<Control>
 {
     private readonly Control _owner;
     private readonly List<Control> _list;
@@ -778,4 +961,6 @@ public class ControlCollection
     }
 
     public IEnumerator<Control> GetEnumerator() => _list.GetEnumerator();
+
+    System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
 }

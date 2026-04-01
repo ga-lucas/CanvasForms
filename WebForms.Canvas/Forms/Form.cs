@@ -131,6 +131,12 @@ public class Form : Control
 
     protected internal override void OnPaint(PaintEventArgs e)
     {
+        var g = e.Graphics;
+
+        // Draw form background
+        using var bgBrush = new SolidBrush(BackColor);
+        g.FillRectangle(bgBrush, 0, 0, Width, Height);
+
         // Let user code handle Paint event first
         base.OnPaint(e);
 
@@ -138,9 +144,6 @@ public class Form : Control
         foreach (var control in Controls)
         {
             if (!control.Visible) continue;
-
-            // Save current graphics state
-            var g = e.Graphics;
 
             // Translate graphics to control position
             g.TranslateTransform(control.Left, control.Top);
