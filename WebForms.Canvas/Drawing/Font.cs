@@ -6,6 +6,9 @@ public class Font
     public float Size { get; set; }
     public FontStyle Style { get; set; }
 
+    // Approximate height based on size (typical ratio is 1.2-1.5x the size)
+    public int Height => (int)(Size * 1.3f);
+
     public Font(string family, float size, FontStyle style = FontStyle.Regular)
     {
         Family = family;

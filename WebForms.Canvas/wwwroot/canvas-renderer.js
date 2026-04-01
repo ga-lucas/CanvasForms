@@ -1,8 +1,95 @@
 // Cache for offscreen canvases (one per visible canvas for double buffering)
 const offscreenBuffers = new WeakMap();
 
+// Cache for loaded images
+const imageCache = new Map();
+
+// Async image loading with error handling and caching
+window.drawImageAsync = async function(ctx, imageUrl, x, y, width, height) {
+    if (!imageUrl || imageUrl.trim() === '') {
+        console.warn('drawImageAsync: Empty image URL');
+        return;
+    }
+
+    try {
+        // Check cache first
+        let img = imageCache.get(imageUrl);
+
+        if (!img) {
+            // Create new image
+            img = new Image();
+            img.crossOrigin = 'anonymous'; // Handle CORS if needed
+
+            // Wait for image to load
+            const loadPromise = new Promise((resolve, reject) => {
+                img.onload = () => resolve(img);
+                img.onerror = () => reject(new Error(`Failed to load image: ${imageUrl}`));
+
+                // Timeout after 10 seconds
+                setTimeout(() => reject(new Error(`Image load timeout: ${imageUrl}`)), 10000);
+            });
+
+            img.src = imageUrl;
+
+            try {
+                await loadPromise;
+                // Cache successfully loaded image
+                imageCache.set(imageUrl, img);
+            } catch (error) {
+                console.warn('Image load failed:', error.message);
+                // Draw placeholder rectangle instead
+                ctx.save();
+                ctx.fillStyle = '#f0f0f0';
+                ctx.fillRect(x, y, width, height);
+                ctx.strokeStyle = '#cccccc';
+                ctx.strokeRect(x, y, width, height);
+                ctx.fillStyle = '#999999';
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('Image not found', x + width/2, y + height/2);
+                ctx.restore();
+                return;
+            }
+        }
+
+        // Draw the loaded image
+        if (img.complete && img.naturalWidth > 0) {
+            ctx.drawImage(img, x, y, width, height);
+        } else {
+            // Image in cache but not loaded properly - draw placeholder
+            ctx.save();
+            ctx.fillStyle = '#f0f0f0';
+            ctx.fillRect(x, y, width, height);
+            ctx.strokeStyle = '#cccccc';
+            ctx.strokeRect(x, y, width, height);
+            ctx.restore();
+        }
+    } catch (error) {
+        console.error('Error in drawImageAsync:', error);
+        // Draw error placeholder
+        ctx.save();
+        ctx.fillStyle = '#ffe0e0';
+        ctx.fillRect(x, y, width, height);
+        ctx.strokeStyle = '#ff0000';
+        ctx.strokeRect(x, y, width, height);
+        ctx.fillStyle = '#cc0000';
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('Error loading image', x + width/2, y + height/2);
+        ctx.restore();
+    }
+}
+
 // Get or create offscreen canvas for double buffering
 function getOffscreenCanvas(canvas) {
+    // Safety check: return null if canvas is null or not valid
+    if (!canvas || !canvas.width || !canvas.height) {
+        console.warn('getOffscreenCanvas called with invalid canvas:', canvas);
+        return null;
+    }
+
     if (!offscreenBuffers.has(canvas)) {
         const offscreen = document.createElement('canvas');
         offscreen.width = canvas.width;
@@ -45,6 +132,12 @@ window.disposeCanvasBuffer = (canvas) => {
     }
 };
 
+// Clear image cache (useful for development/debugging)
+window.clearImageCache = () => {
+    imageCache.clear();
+    console.log('Image cache cleared');
+};
+
 // Measure text width using canvas
 // fontFamily: font name like "Arial"
 // fontSize: font size in pixels
@@ -64,79 +157,51 @@ window.measureText = (fontFamily, fontSize, text) => {
 // texts: array of text strings to measure
 // Returns: array of widths in same order as input
 window.measureTextBatch = (fontFamily, fontSize, texts) => {
-    // Create a temporary canvas for measuring (reuse for all measurements)
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    ctx.font = `${fontSize}px ${fontFamily}`;
-
-    // Measure all texts in one JS interop call
-    const results = [];
-    for (let i = 0; i < texts.length; i++) {
-        const metrics = ctx.measureText(texts[i]);
-        results.push(Math.ceil(metrics.width));
-    }
-
-    return results;
-};
-
-// Image cache for performance
-const imageCache = new Map();
-
-// Async image loading and drawing helper
-window.drawImageAsync = async (ctx, imageUrl, x, y, width, height) => {
     try {
-        let img = imageCache.get(imageUrl);
-
-        if (!img) {
-            // Create and load image
-            img = new Image();
-
-            // Create promise for image loading
-            const loadPromise = new Promise((resolve, reject) => {
-                img.onload = () => resolve(img);
-                img.onerror = () => reject(new Error(`Failed to load image: ${imageUrl}`));
-            });
-
-            img.src = imageUrl;
-
-            // Cache the promise, not the image, so concurrent requests share the same load
-            imageCache.set(imageUrl, loadPromise);
-
-            // Wait for image to load
-            img = await loadPromise;
-
-            // Now cache the loaded image
-            imageCache.set(imageUrl, img);
-        } else if (img instanceof Promise) {
-            // Image is currently loading, wait for it
-            img = await img;
+        if (!texts || !Array.isArray(texts) || texts.length === 0) {
+            return [];
         }
 
-        // Draw the image
-        ctx.drawImage(img, x, y, width, height);
-    } catch (error) {
-        console.error('Error drawing image:', error);
-        // Draw placeholder rectangle on error
-        ctx.fillStyle = '#f0f0f0';
-        ctx.fillRect(x, y, width, height);
-        ctx.strokeStyle = '#ccc';
-        ctx.strokeRect(x, y, width, height);
+        // Create a temporary canvas for measuring (reuse for all measurements)
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+            console.error('Failed to get 2D context for text measurement');
+            return texts.map(() => 0);
+        }
 
-        // Draw X to indicate error
-        ctx.strokeStyle = '#999';
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(x + width, y + height);
-        ctx.moveTo(x + width, y);
-        ctx.lineTo(x, y + height);
-        ctx.stroke();
+        ctx.font = `${fontSize}px ${fontFamily}`;
+
+        // Measure all texts in one JS interop call
+        const results = [];
+        for (let i = 0; i < texts.length; i++) {
+            const metrics = ctx.measureText(texts[i]);
+            results.push(Math.ceil(metrics.width));
+        }
+
+        return results;
+    } catch (error) {
+        console.error('Error in measureTextBatch:', error);
+        // Return zero widths as fallback
+        return texts ? texts.map(() => 0) : [];
     }
 };
 
-// Render the entire form chrome (title bar, borders, close button) on canvas
-window.renderFormCanvas = (canvas, width, height, title, backColor, clientX, clientY, clientWidth, clientHeight, closeButtonHover, minimizeButtonHover, maximizeButtonHover) => {
+    // Render the entire form chrome (title bar, borders, close button) on canvas
+    window.renderFormCanvas = (canvas, width, height, title, backColor, clientX, clientY, clientWidth, clientHeight, closeButtonHover, minimizeButtonHover, maximizeButtonHover) => {
+        // Safety check for null canvas
+        if (!canvas || !canvas.width || !canvas.height) {
+            console.warn('renderFormCanvas: Invalid canvas element');
+        return;
+    }
+
     // Use offscreen canvas for double buffering
     const offscreen = getOffscreenCanvas(canvas);
+    if (!offscreen) {
+        console.warn('renderFormCanvas: Failed to get offscreen canvas');
+        return;
+    }
+
     const ctx = offscreen.getContext('2d', { 
         alpha: false,  // No transparency needed, improves performance
         desynchronized: true  // Hint for better performance
@@ -255,8 +320,19 @@ window.renderFormCanvas = (canvas, width, height, title, backColor, clientX, cli
 
 // Render user drawing commands in the client area
 window.renderClientArea = async (canvas, offsetX, offsetY, commands) => {
+    // Safety check for null canvas
+    if (!canvas || !canvas.width || !canvas.height) {
+        console.warn('renderClientArea: Invalid canvas element');
+        return;
+    }
+
     // Get the offscreen canvas (already has the chrome rendered)
     const offscreen = getOffscreenCanvas(canvas);
+    if (!offscreen) {
+        console.warn('renderClientArea: Failed to get offscreen canvas');
+        return;
+    }
+
     const ctx = offscreen.getContext('2d', { 
         alpha: false,
         desynchronized: true
@@ -283,11 +359,19 @@ window.renderClientArea = async (canvas, offsetX, offsetY, commands) => {
     // Execute user drawing commands on offscreen canvas (now async to support images)
     try {
         if (commands && commands.trim().length > 0) {
-            // Use async eval to support await in drawing commands
-            await eval(`(async () => { ${commands} })()`);
+            console.log('Executing drawing commands...');
+            // Create an async function with ctx in scope and execute it
+            const asyncFunc = new Function('ctx', `return (async () => { ${commands} })();`);
+            await asyncFunc(ctx);
+            console.log('Drawing commands completed successfully');
         }
     } catch (error) {
         console.error('Error rendering client area:', error);
+        console.error('Failed commands:', commands);
+        // Draw error indicator
+        ctx.fillStyle = 'red';
+        ctx.font = '12px Arial';
+        ctx.fillText('Render Error: ' + error.message, 10, 20);
     }
 
     // Restore context state

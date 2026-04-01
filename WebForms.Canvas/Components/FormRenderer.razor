@@ -118,7 +118,8 @@
 
     private async Task RenderForm()
     {
-        if (!_initialized || Form == null) return;
+        // Don't render if not initialized, form is null, or form is not visible
+        if (!_initialized || Form == null || !Form.Visible) return;
 
         // Prevent overlapping renders
         if (_renderPending) return;

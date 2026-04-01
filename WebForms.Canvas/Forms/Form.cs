@@ -54,6 +54,14 @@ public class Form : Control
         FormClosed?.Invoke(this, e);
     }
 
+    // Event fired when form is activated (brought to front)
+    public event EventHandler? Activated;
+
+    protected virtual void OnActivated(EventArgs e)
+    {
+        Activated?.Invoke(this, e);
+    }
+
     // Callback for notifying parent container of changes (e.g., new forms created)
     // This is needed for Blazor to know when to re-render
     public Action? OnContainerChanged { get; set; }
@@ -93,6 +101,7 @@ public class Form : Control
     public void BringToFront()
     {
         ZIndex = _nextZIndex++;
+        OnActivated(EventArgs.Empty);
         Invalidate();
     }
 

@@ -14,11 +14,12 @@
             var isMinimized = form.WindowState == FormWindowState.Minimized;
 
             <div class="window-button" 
-                 style="background: @(isActive ? "linear-gradient(180deg, #ffffff 0%, #e0e0e0 100%)" : "linear-gradient(180deg, #f5f5f5 0%, #d5d5d5 100%)"); 
-                        border: 1px solid @(isActive ? "#5a9dd9" : "#a0a0a0"); 
+                 style="background: @(isActive ? "linear-gradient(180deg, #e3f2fd 0%, #bbdefb 100%)" : "linear-gradient(180deg, #f5f5f5 0%, #d5d5d5 100%)"); 
+                        border: 1px solid @(isActive ? "#2196f3" : "#a0a0a0");
+                        border-bottom: @(isActive ? "3px solid #1976d2" : "1px solid #a0a0a0");
                         padding: 4px 12px; 
                         margin-right: 4px; 
-                        border-radius: 3px; 
+                        border-radius: 3px 3px 0 0; 
                         cursor: pointer; 
                         min-width: 120px; 
                         max-width: 200px;
@@ -26,9 +27,12 @@
                         overflow: hidden; 
                         text-overflow: ellipsis;
                         font-size: 13px;
-                        color: @(isMinimized ? "#808080" : "#000000");
+                        color: @(isMinimized ? "#808080" : (isActive ? "#1565c0" : "#000000"));
+                        font-weight: @(isActive ? "600" : "normal");
                         font-style: @(isMinimized ? "italic" : "normal");
-                        box-shadow: @(isActive ? "inset 0 1px 2px rgba(0,0,0,0.1)" : "0 1px 2px rgba(0,0,0,0.1)");"
+                        box-shadow: @(isActive ? "0 -2px 4px rgba(33, 150, 243, 0.3), inset 0 1px 0 rgba(255,255,255,0.5)" : "0 1px 2px rgba(0,0,0,0.1)");
+                        transform: @(isActive ? "translateY(-2px)" : "none");
+                        transition: all 0.2s ease;"
                  @onclick="() => ActivateForm(form)"
                  title="@form.Text">
                 @form.Text
@@ -40,7 +44,7 @@
     <div class="desktop-area" style="position: absolute; top: @(TaskbarHeight)px; left: 0; right: 0; bottom: 0;">
         @foreach (var form in Forms.Where(f => f.WindowState != FormWindowState.Minimized))
         {
-            <FormRenderer Form="@form" />
+            <FormRenderer @key="form" Form="@form" />
         }
     </div>
 </div>
@@ -70,6 +74,9 @@
 
             form.FormClosed -= OnFormClosed;
             form.FormClosed += OnFormClosed;
+
+            form.Activated -= OnFormActivated;
+            form.Activated += OnFormActivated;
         }
 
         // Set active form to the topmost visible form
@@ -86,6 +93,15 @@
         StateHasChanged();
     }
 
+    private void OnFormActivated(object? sender, EventArgs e)
+    {
+        if (sender is Form activatedForm)
+        {
+            _activeForm = activatedForm;
+            StateHasChanged();
+        }
+    }
+
     private void OnFormClosed(object? sender, EventArgs e)
     {
         if (sender is Form closedForm)
@@ -93,6 +109,7 @@
             // Unsubscribe from events
             closedForm.WindowStateChanged -= OnFormWindowStateChanged;
             closedForm.FormClosed -= OnFormClosed;
+            closedForm.Activated -= OnFormActivated;
 
             // Remove from forms list
             Forms.Remove(closedForm);

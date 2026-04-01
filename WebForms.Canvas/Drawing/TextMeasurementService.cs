@@ -93,6 +93,12 @@ public class TextMeasurementService
             // Call JavaScript batch measurement function
             var widths = await _jsRuntime.InvokeAsync<int[]>("measureTextBatch", fontFamily, fontSize, uncachedTexts.ToArray());
 
+            // Check if widths is null or wrong length
+            if (widths == null || widths.Length != uncachedTexts.Count)
+            {
+                throw new InvalidOperationException("Invalid response from measureTextBatch");
+            }
+
             // Cache and add results
             for (int i = 0; i < uncachedTexts.Count; i++)
             {
@@ -104,8 +110,11 @@ public class TextMeasurementService
                 result[text] = width;
             }
         }
-        catch
+        catch (Exception ex)
         {
+            // Log the error for debugging
+            Console.WriteLine($"TextMeasurement error: {ex.Message}");
+
             // Fallback to estimation for uncached texts
             foreach (var text in uncachedTexts)
             {

@@ -14,6 +14,12 @@ public struct Size
     public static Size Empty => new(0, 0);
 
     public bool IsEmpty => Width == 0 && Height == 0;
+
+    public static bool operator ==(Size left, Size right) => left.Width == right.Width && left.Height == right.Height;
+    public static bool operator !=(Size left, Size right) => !(left == right);
+
+    public override bool Equals(object? obj) => obj is Size size && this == size;
+    public override int GetHashCode() => HashCode.Combine(Width, Height);
 }
 
 public struct SizeF

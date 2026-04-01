@@ -160,7 +160,14 @@ public class WelcomeForm : Form
     {
         System.Diagnostics.Debug.WriteLine("Docking Demo button clicked!");
 
-        // Lazy initialization - create form on first click
+        // Check if form was closed/removed from list
+        if (_dockingDemoForm != null && _parentFormList != null && !_parentFormList.Contains(_dockingDemoForm))
+        {
+            System.Diagnostics.Debug.WriteLine("Form was removed, clearing reference");
+            _dockingDemoForm = null;
+        }
+
+        // Create new instance if needed
         if (_dockingDemoForm == null)
         {
             System.Diagnostics.Debug.WriteLine("Creating new DockingDemoForm");
@@ -170,26 +177,22 @@ public class WelcomeForm : Form
                 Top = 50,
                 Width = 600,
                 Height = 500,
-                Visible = false, // Start hidden
-                OnContainerChanged = this.OnContainerChanged // Pass through the callback
+                OnContainerChanged = this.OnContainerChanged
             };
             _parentFormList?.Add(_dockingDemoForm);
-            System.Diagnostics.Debug.WriteLine($"Added to list. Total forms: {_parentFormList?.Count}");
+            _dockingDemoForm.Show(); // Show will set Visible=true and call OnContainerChanged
+            _dockingDemoForm.BringToFront();
+            System.Diagnostics.Debug.WriteLine($"Created and shown. Total forms: {_parentFormList?.Count}");
         }
-
-        if (!_dockingDemoForm.Visible)
+        else if (!_dockingDemoForm.Visible)
         {
-            System.Diagnostics.Debug.WriteLine("Showing DockingDemoForm");
+            System.Diagnostics.Debug.WriteLine("Re-showing existing form");
             _dockingDemoForm.Show();
             _dockingDemoForm.BringToFront();
-
-            // Notify parent that forms changed
-            System.Diagnostics.Debug.WriteLine("Notifying parent of change");
-            _onFormsChanged?.Invoke();
         }
         else
         {
-            System.Diagnostics.Debug.WriteLine("Bringing DockingDemoForm to front");
+            System.Diagnostics.Debug.WriteLine("Bringing existing form to front");
             _dockingDemoForm.BringToFront();
         }
     }
@@ -198,7 +201,14 @@ public class WelcomeForm : Form
     {
         System.Diagnostics.Debug.WriteLine("Controls Demo button clicked!");
 
-        // Lazy initialization
+        // Check if form was closed/removed from list
+        if (_controlsDemoForm != null && _parentFormList != null && !_parentFormList.Contains(_controlsDemoForm))
+        {
+            System.Diagnostics.Debug.WriteLine("Form was removed, clearing reference");
+            _controlsDemoForm = null;
+        }
+
+        // Create new instance if needed
         if (_controlsDemoForm == null)
         {
             System.Diagnostics.Debug.WriteLine("Creating new ControlsDemoForm");
@@ -208,20 +218,22 @@ public class WelcomeForm : Form
                 Top = 50,
                 Width = 400,
                 Height = 550,
-                Visible = false // Start hidden
+                OnContainerChanged = this.OnContainerChanged
             };
             _parentFormList?.Add(_controlsDemoForm);
+            _controlsDemoForm.Show();
+            _controlsDemoForm.BringToFront();
+            System.Diagnostics.Debug.WriteLine($"Created and shown. Total forms: {_parentFormList?.Count}");
         }
-
-        if (!_controlsDemoForm.Visible)
+        else if (!_controlsDemoForm.Visible)
         {
-            System.Diagnostics.Debug.WriteLine("Showing ControlsDemoForm");
+            System.Diagnostics.Debug.WriteLine("Re-showing existing form");
             _controlsDemoForm.Show();
             _controlsDemoForm.BringToFront();
         }
         else
         {
-            System.Diagnostics.Debug.WriteLine("Bringing ControlsDemoForm to front");
+            System.Diagnostics.Debug.WriteLine("Bringing existing form to front");
             _controlsDemoForm.BringToFront();
         }
     }
@@ -230,7 +242,14 @@ public class WelcomeForm : Form
     {
         System.Diagnostics.Debug.WriteLine("Interactive button clicked!");
 
-        // Lazy initialization
+        // Check if form was closed/removed from list
+        if (_interactiveForm != null && _parentFormList != null && !_parentFormList.Contains(_interactiveForm))
+        {
+            System.Diagnostics.Debug.WriteLine("Form was removed, clearing reference");
+            _interactiveForm = null;
+        }
+
+        // Create new instance if needed
         if (_interactiveForm == null)
         {
             System.Diagnostics.Debug.WriteLine("Creating new InteractiveForm");
@@ -240,20 +259,22 @@ public class WelcomeForm : Form
                 Top = 580,
                 Width = 500,
                 Height = 400,
-                Visible = false // Start hidden
+                OnContainerChanged = this.OnContainerChanged
             };
             _parentFormList?.Add(_interactiveForm);
+            _interactiveForm.Show();
+            _interactiveForm.BringToFront();
+            System.Diagnostics.Debug.WriteLine($"Created and shown. Total forms: {_parentFormList?.Count}");
         }
-
-        if (!_interactiveForm.Visible)
+        else if (!_interactiveForm.Visible)
         {
-            System.Diagnostics.Debug.WriteLine("Showing InteractiveForm");
+            System.Diagnostics.Debug.WriteLine("Re-showing existing form");
             _interactiveForm.Show();
             _interactiveForm.BringToFront();
         }
         else
         {
-            System.Diagnostics.Debug.WriteLine("Bringing InteractiveForm to front");
+            System.Diagnostics.Debug.WriteLine("Bringing existing form to front");
             _interactiveForm.BringToFront();
         }
     }
@@ -262,7 +283,14 @@ public class WelcomeForm : Form
     {
         System.Diagnostics.Debug.WriteLine("Drawing Sample button clicked!");
 
-        // Lazy initialization
+        // Check if form was closed/removed from list
+        if (_sampleDrawingForm != null && _parentFormList != null && !_parentFormList.Contains(_sampleDrawingForm))
+        {
+            System.Diagnostics.Debug.WriteLine("Form was removed, clearing reference");
+            _sampleDrawingForm = null;
+        }
+
+        // Create new instance if needed
         if (_sampleDrawingForm == null)
         {
             System.Diagnostics.Debug.WriteLine("Creating new SampleDrawingForm");
@@ -272,20 +300,22 @@ public class WelcomeForm : Form
                 Top = 580,
                 Width = 600,
                 Height = 400,
-                Visible = false // Start hidden
+                OnContainerChanged = this.OnContainerChanged
             };
             _parentFormList?.Add(_sampleDrawingForm);
+            _sampleDrawingForm.Show();
+            _sampleDrawingForm.BringToFront();
+            System.Diagnostics.Debug.WriteLine($"Created and shown. Total forms: {_parentFormList?.Count}");
         }
-
-        if (!_sampleDrawingForm.Visible)
+        else if (!_sampleDrawingForm.Visible)
         {
-            System.Diagnostics.Debug.WriteLine("Showing SampleDrawingForm");
+            System.Diagnostics.Debug.WriteLine("Re-showing existing form");
             _sampleDrawingForm.Show();
             _sampleDrawingForm.BringToFront();
         }
         else
         {
-            System.Diagnostics.Debug.WriteLine("Bringing SampleDrawingForm to front");
+            System.Diagnostics.Debug.WriteLine("Bringing existing form to front");
             _sampleDrawingForm.BringToFront();
         }
     }

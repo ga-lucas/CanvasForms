@@ -32,6 +32,8 @@ public struct Rectangle
 
     public static Rectangle Empty => new(0, 0, 0, 0);
 
+    public bool IsEmpty => Width == 0 && Height == 0;
+
     public bool Contains(Point point)
     {
         return point.X >= X && point.X < X + Width &&
@@ -43,6 +45,15 @@ public struct Rectangle
         return x >= X && x < X + Width &&
                y >= Y && y < Y + Height;
     }
+
+    public static bool operator ==(Rectangle left, Rectangle right) =>
+        left.X == right.X && left.Y == right.Y && left.Width == right.Width && left.Height == right.Height;
+
+    public static bool operator !=(Rectangle left, Rectangle right) => !(left == right);
+
+    public override bool Equals(object? obj) => obj is Rectangle rect && this == rect;
+
+    public override int GetHashCode() => HashCode.Combine(X, Y, Width, Height);
 }
 
 public struct RectangleF

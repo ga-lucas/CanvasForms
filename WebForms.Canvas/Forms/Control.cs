@@ -124,6 +124,366 @@ public abstract class Control
     public bool Enabled { get; set; } = true;
     public object? Tag { get; set; }
 
+    // Calculated position properties
+    public int Right => Left + Width;
+    public int Bottom => Top + Height;
+
+    // Client area properties
+    public Rectangle ClientRectangle => new Rectangle(0, 0, Width, Height);
+    public Size ClientSize
+    {
+        get => new Size(Width, Height);
+        set { Width = value.Width; Height = value.Height; }
+    }
+
+    public Rectangle DisplayRectangle => ClientRectangle;
+
+    // Font properties
+    private Font? _font;
+    public Font Font
+    {
+        get => _font ?? DefaultFont;
+        set
+        {
+            if (_font != value)
+            {
+                _font = value;
+                Invalidate();
+            }
+        }
+    }
+
+    public int FontHeight => Font.Height;
+
+    // Size constraints
+    private Size _minimumSize = Size.Empty;
+    private Size _maximumSize = Size.Empty;
+    private Size _margin = new Size(3, 3);
+    private Size _padding = Size.Empty;
+
+    public Size MinimumSize
+    {
+        get => _minimumSize;
+        set
+        {
+            if (_minimumSize != value)
+            {
+                _minimumSize = value;
+                Invalidate();
+            }
+        }
+    }
+
+    public Size MaximumSize
+    {
+        get => _maximumSize;
+        set
+        {
+            if (_maximumSize != value)
+            {
+                _maximumSize = value;
+                Invalidate();
+            }
+        }
+    }
+
+    public Size Margin
+    {
+        get => _margin;
+        set
+        {
+            if (_margin != value)
+            {
+                _margin = value;
+                Invalidate();
+            }
+        }
+    }
+
+    public Size Padding
+    {
+        get => _padding;
+        set
+        {
+            if (_padding != value)
+            {
+                _padding = value;
+                Invalidate();
+            }
+        }
+    }
+
+    // Tab and focus properties
+    private int _tabIndex = 0;
+    private bool _tabStop = true;
+
+    public int TabIndex
+    {
+        get => _tabIndex;
+        set
+        {
+            if (_tabIndex != value)
+            {
+                _tabIndex = value;
+            }
+        }
+    }
+
+    public bool TabStop
+    {
+        get => _tabStop;
+        set
+        {
+            if (_tabStop != value)
+            {
+                _tabStop = value;
+            }
+        }
+    }
+
+    public bool Focused { get; internal set; }
+    public bool CanFocus => Visible && Enabled && TabStop;
+    public bool CanSelect => CanFocus;
+    public bool ContainsFocus => Focused || _controls.Any(c => c.ContainsFocus);
+
+    // Child controls
+    public bool HasChildren => _controls.Count > 0;
+
+    // State properties
+    private bool _isDisposed = false;
+    public bool IsDisposed => _isDisposed;
+    public bool Disposing { get; private set; }
+
+    // Auto size and scroll
+    public bool AutoSize { get; set; } = false;
+    public Point AutoScrollOffset { get; set; } = Point.Empty;
+
+    // Background image
+    private Image? _backgroundImage;
+    private ImageLayout _backgroundImageLayout = ImageLayout.Tile;
+
+    public Image? BackgroundImage
+    {
+        get => _backgroundImage;
+        set
+        {
+            if (_backgroundImage != value)
+            {
+                _backgroundImage = value;
+                Invalidate();
+            }
+        }
+    }
+
+    public ImageLayout BackgroundImageLayout
+    {
+        get => _backgroundImageLayout;
+        set
+        {
+            if (_backgroundImageLayout != value)
+            {
+                _backgroundImageLayout = value;
+                Invalidate();
+            }
+        }
+    }
+
+    // Validation
+    public bool CausesValidation { get; set; } = true;
+
+    // Drag and drop
+    public bool AllowDrop { get; set; } = false;
+
+    // Cursor
+    private Cursor? _cursor;
+    public Cursor Cursor
+    {
+        get => _cursor ?? DefaultCursor;
+        set
+        {
+            if (_cursor != value)
+            {
+                _cursor = value;
+            }
+        }
+    }
+
+    public bool UseWaitCursor { get; set; } = false;
+
+    // Right to left
+    public bool RightToLeft { get; set; } = false;
+
+    // Region
+    private Region? _region;
+    public Region? Region
+    {
+        get => _region;
+        set
+        {
+            if (_region != value)
+            {
+                _region = value;
+                Invalidate();
+            }
+        }
+    }
+
+    // Mirroring
+    public bool IsMirrored { get; protected set; } = false;
+
+    // Accessibility
+    private AccessibleObject? _accessibilityObject;
+    private string? _accessibleName;
+    private string? _accessibleDescription;
+    private string? _accessibleDefaultActionDescription;
+    private AccessibleRole _accessibleRole = AccessibleRole.Default;
+    private bool _isAccessible = false;
+
+    public AccessibleObject? AccessibilityObject
+    {
+        get => _accessibilityObject;
+    }
+
+    public string? AccessibleName
+    {
+        get => _accessibleName;
+        set => _accessibleName = value;
+    }
+
+    public string? AccessibleDescription
+    {
+        get => _accessibleDescription;
+        set => _accessibleDescription = value;
+    }
+
+    public string? AccessibleDefaultActionDescription
+    {
+        get => _accessibleDefaultActionDescription;
+        set => _accessibleDefaultActionDescription = value;
+    }
+
+    public AccessibleRole AccessibleRole
+    {
+        get => _accessibleRole;
+        set => _accessibleRole = value;
+    }
+
+    public bool IsAccessible
+    {
+        get => _isAccessible;
+        set => _isAccessible = value;
+    }
+
+    // Handle-related properties (stub implementations for canvas-based controls)
+    public IntPtr Handle { get; private set; } = IntPtr.Zero;
+    public bool IsHandleCreated => Handle != IntPtr.Zero;
+    public bool Created => IsHandleCreated;
+    public bool RecreatingHandle { get; private set; } = false;
+
+    // Mouse capture
+    public bool Capture { get; set; } = false;
+
+    // Painting optimizations
+    public bool DoubleBuffered { get; set; } = false;
+    public bool ResizeRedraw { get; set; } = false;
+
+    // DPI
+    private int _deviceDpi = 96;
+    public int DeviceDpi => _deviceDpi;
+
+    // Hierarchy
+    public Control? TopLevelControl
+    {
+        get
+        {
+            var control = this;
+            while (control.Parent != null)
+            {
+                control = control.Parent;
+            }
+            return control;
+        }
+    }
+
+    // Context menus (obsolete/stub)
+    [Obsolete("Use ContextMenuStrip instead")]
+    public object? ContextMenu { get; set; }
+    public object? ContextMenuStrip { get; set; }
+
+    // Data binding (stubs)
+    public object? BindingContext { get; set; }
+    public object? DataBindings { get; private set; }
+    public object? DataContext { get; set; }
+
+    // Site (for design-time support)
+    public object? Site { get; set; }
+    public bool IsAncestorSiteInDesignMode { get; protected set; } = false;
+
+    // IME support (stubs)
+    public ImeMode ImeMode { get; set; } = ImeMode.NoControl;
+    public ImeMode ImeModeBase
+    {
+        get => ImeMode;
+        set => ImeMode = value;
+    }
+    public bool CanEnableIme => false;
+    public ImeMode PropagatingImeMode => ImeMode;
+
+    // Layout
+    public object? LayoutEngine { get; protected set; }
+
+    // Static input state properties
+    public static Keys ModifierKeys { get; internal set; } = Keys.None;
+    public static MouseButtons MouseButtons { get; internal set; } = MouseButtons.None;
+    public static Point MousePosition { get; internal set; } = Point.Empty;
+
+    // Thread safety (stubs for canvas-based controls)
+    public bool InvokeRequired => false;
+    public static bool CheckForIllegalCrossThreadCalls { get; set; } = false;
+
+    // Events raising capability
+    public bool CanRaiseEvents => true;
+
+    // UI state
+    public bool ShowFocusCues => true;
+    public bool ShowKeyboardCues => true;
+    public bool ScaleChildren => true;
+
+    // Preferred size
+    public Size PreferredSize => GetPreferredSize(Size.Empty);
+
+    protected virtual Size GetPreferredSize(Size proposedSize)
+    {
+        return Size;
+    }
+
+    // Assembly info
+    public string ProductName => "WebForms Canvas";
+    public string ProductVersion => "1.0.0";
+    public string CompanyName => "WebForms Canvas";
+
+    // Create params (stub)
+    public virtual object? CreateParams => null;
+
+    // Obsolete properties
+    [Obsolete("This property is obsolete")]
+    public bool RenderRightToLeft => false;
+
+    [Obsolete("This property is not relevant for this class")]
+    public object? WindowTarget { get; set; }
+
+    // Default static properties
+    public static Color DefaultBackColor => Color.White;
+    public static Color DefaultForeColor => Color.Black;
+    public static Font DefaultFont => new Font("Segoe UI", 9);
+    public static Cursor DefaultCursor => Cursor.Default;
+    public static ImeMode DefaultImeMode => ImeMode.NoControl;
+    public static Size DefaultMargin => new Size(3, 3);
+    public static Size DefaultMaximumSize => Size.Empty;
+    public static Size DefaultMinimumSize => Size.Empty;
+    public static Size DefaultPadding => Size.Empty;
+    public virtual Size DefaultSize => new Size(100, 20);
+
     // Location and Size helpers
     public Point Location
     {
