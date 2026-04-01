@@ -236,7 +236,7 @@ window.measureTextBatch = (fontFamily, fontSize, texts) => {
 };
 
     // Render the entire form chrome (title bar, borders, close button) on canvas
-    window.renderFormCanvas = (canvas, width, height, title, backColor, clientX, clientY, clientWidth, clientHeight, closeButtonHover, minimizeButtonHover, maximizeButtonHover) => {
+    window.renderFormCanvas = (canvas, width, height, title, backColor, clientX, clientY, clientWidth, clientHeight, closeButtonHover, minimizeButtonHover, maximizeButtonHover, isMaximized) => {
         // Safety check for null canvas
         if (!canvas || !canvas.width || !canvas.height) {
             console.warn('renderFormCanvas: Invalid canvas element');
@@ -322,10 +322,19 @@ window.measureTextBatch = (fontFamily, fontSize, texts) => {
     }
     ctx.fillRect(maximizeButtonX, buttonY, buttonSize, buttonSize);
 
-    // Maximize button icon (square)
+    // Maximize/Restore button icon
     ctx.strokeStyle = 'white';
     ctx.lineWidth = 2;
-    ctx.strokeRect(maximizeButtonX + 5, buttonY + 5, buttonSize - 10, buttonSize - 10);
+    if (isMaximized) {
+        // Restore icon (two overlapping squares)
+        // Back square
+        ctx.strokeRect(maximizeButtonX + 7, buttonY + 5, buttonSize - 12, buttonSize - 12);
+        // Front square (offset)
+        ctx.strokeRect(maximizeButtonX + 5, buttonY + 7, buttonSize - 12, buttonSize - 12);
+    } else {
+        // Maximize icon (single square)
+        ctx.strokeRect(maximizeButtonX + 5, buttonY + 5, buttonSize - 10, buttonSize - 10);
+    }
 
     // Minimize button (third from right)
     const minimizeButtonX = maximizeButtonX - buttonSize - 4;
@@ -486,3 +495,37 @@ if (!window.globalMouseHandlersRegistered) {
         }
     });
 }
+
+// Viewport tracking for Desktop component
+let desktopComponent = null;
+
+window.setupViewportTracking = (dotNetRef) => {
+    desktopComponent = dotNetRef;
+
+    // Get initial viewport size
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    // Send initial size
+    if (desktopComponent) {
+        desktopComponent.invokeMethodAsync('OnViewportResize', width, height);
+    }
+
+    // Set up resize listener if not already set
+    if (!window.viewportResizeHandlerRegistered) {
+        window.viewportResizeHandlerRegistered = true;
+
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            // Debounce resize events
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                if (desktopComponent) {
+                    const width = window.innerWidth;
+                    const height = window.innerHeight;
+                    desktopComponent.invokeMethodAsync('OnViewportResize', width, height);
+                }
+            }, 100); // Wait 100ms after resize stops
+        });
+    }
+};

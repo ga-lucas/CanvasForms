@@ -1,6 +1,7 @@
 @using WebForms.Canvas.Forms
 @using WebForms.Canvas.Components
 @inject IJSRuntime JSRuntime
+@implements IDisposable
 
 <div class="desktop-container" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100vw; height: 100vh; background-color: #008080; overflow: hidden;">
 
@@ -44,7 +45,11 @@
     <div class="desktop-area" style="position: absolute; top: @(TaskbarHeight)px; left: 0; right: 0; bottom: 0;">
         @foreach (var form in Forms.Where(f => f.WindowState != FormWindowState.Minimized))
         {
-            <FormRenderer @key="form" Form="@form" />
+            <FormRenderer @key="form" 
+                          Form="@form" 
+                          ViewportWidth="@_viewportWidth" 
+                          ViewportHeight="@_viewportHeight"
+                          TaskbarHeight="@TaskbarHeight" />
         }
     </div>
 </div>
@@ -63,6 +68,41 @@
     public EventCallback<Form> OnFormCreated { get; set; }
 
     private Form? _activeForm;
+    private int _viewportWidth = 1920;
+    private int _viewportHeight = 1080;
+    private DotNetObjectReference<Desktop>? _dotNetRef;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+
+            // Get initial viewport size and set up resize listener
+            await JSRuntime.InvokeVoidAsync("setupViewportTracking", _dotNetRef);
+        }
+    }
+
+    [JSInvokable]
+    public void OnViewportResize(int width, int height)
+    {
+        var oldWidth = _viewportWidth;
+        var oldHeight = _viewportHeight;
+
+        _viewportWidth = width;
+        _viewportHeight = height;
+
+        // Ensure all visible forms have their title bars visible
+        if (oldWidth != width || oldHeight != height)
+        {
+            foreach (var form in Forms.Where(f => f.WindowState == FormWindowState.Normal && f.Visible))
+            {
+                form.EnsureTitleBarVisible(_viewportWidth, _viewportHeight, TaskbarHeight);
+            }
+
+            StateHasChanged();
+        }
+    }
 
     protected override void OnParametersSet()
     {
@@ -138,5 +178,10 @@
         form.BringToFront();
         _activeForm = form;
         StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        _dotNetRef?.Dispose();
     }
 }

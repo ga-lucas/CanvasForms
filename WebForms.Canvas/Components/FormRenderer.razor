@@ -141,7 +141,8 @@
                 Form.Height - TitleBarHeight - (BorderWidth * 2),
                 _closeButtonHover,
                 _minimizeButtonHover,
-                _maximizeButtonHover);
+                _maximizeButtonHover,
+                Form.WindowState == FormWindowState.Maximized);
 
             // Create graphics for client area (size excludes chrome)
             using var graphics = new Graphics(
@@ -305,6 +306,30 @@
         if (Form == null || !Form.AllowMove || _dotNetRef == null) return;
 
         BringToFrontSync();
+
+        // If window is maximized, restore it first (Windows-style behavior)
+        if (Form.WindowState == FormWindowState.Maximized)
+        {
+            // Calculate where the mouse is relative to the window width
+            var mouseXRatio = e.OffsetX / Form.Width;
+
+            // Restore the window
+            Form.Restore();
+
+            // Adjust the starting position so the mouse stays under the same relative position
+            // This makes the window "stick" to the cursor when dragging from maximized
+            _formStartLeft = (int)(e.ClientX - (Form.Width * mouseXRatio));
+            _formStartTop = 0; // Start at top of desktop area
+
+            // Set the form to the calculated position immediately
+            Form.Left = _formStartLeft;
+            Form.Top = _formStartTop;
+
+            // Force immediate Blazor state update and re-render
+            StateHasChanged();
+            await InvokeAsync(StateHasChanged);
+            await RenderForm();
+        }
 
         await JSRuntime.InvokeVoidAsync("setActiveFormRenderer", _dotNetRef);
 
@@ -500,6 +525,15 @@
         _isResizing = false;
         _resizeDirection = ResizeDirection.None;
 
+        if (wasResizing || wasDragging)
+        {
+            // Ensure title bar is visible after moving or resizing
+            if (Form != null && _dotNetRef != null)
+            {
+                await EnsureFormTitleBarVisible();
+            }
+        }
+
         if (wasResizing)
         {
             // Trigger layout update after resize completes
@@ -533,7 +567,7 @@
         var maximizeButtonRect = GetMaximizeButtonRect();
         if (IsPointInRect(x, y, maximizeButtonRect))
         {
-            ToggleMaximize();
+            await ToggleMaximize();
             return;
         }
 
@@ -731,12 +765,30 @@
         }
     }
 
-    private void HandleDoubleClick(BlazorMouseEventArgs e)
+    private async void HandleDoubleClick(BlazorMouseEventArgs e)
     {
         if (Form == null) return;
 
         var x = (int)e.OffsetX;
         var y = (int)e.OffsetY;
+
+        // Check if double-click is on title bar (excluding window control buttons)
+        if (y < TitleBarHeight + BorderWidth && y >= BorderWidth)
+        {
+            // Check if not clicking on window control buttons
+            var closeButtonRect = GetCloseButtonRect();
+            var maximizeButtonRect = GetMaximizeButtonRect();
+            var minimizeButtonRect = GetMinimizeButtonRect();
+
+            if (!IsPointInRect(x, y, closeButtonRect) &&
+                !IsPointInRect(x, y, maximizeButtonRect) &&
+                !IsPointInRect(x, y, minimizeButtonRect))
+            {
+                // Double-click on title bar - toggle maximize/restore
+                await ToggleMaximize();
+                return;
+            }
+        }
 
         // Handle double click in client area
         var clientX = x - BorderWidth;
@@ -903,24 +955,26 @@
         StateHasChanged();
     }
 
-    private void ToggleMaximize()
+    private async Task ToggleMaximize()
     {
         if (Form == null) return;
 
-        // TODO: Get actual desktop dimensions
-        // For now, use large values - should be passed from Desktop component
         if (Form.WindowState == FormWindowState.Maximized)
         {
             Form.Restore();
         }
         else
         {
-            Form.Maximize(1920, 1080, TitleBarHeight);
+            // Use actual viewport dimensions
+            Form.Maximize(ViewportWidth, ViewportHeight, TaskbarHeight);
         }
 
         // Trigger layout after window state change
         Form.PerformLayout();
+
+        // Force immediate re-render to update size and icon
         StateHasChanged();
+        await RenderForm();
     }
 
     // Helper methods
@@ -1014,6 +1068,39 @@
         public double Top { get; set; }
         public double Width { get; set; }
         public double Height { get; set; }
+    }
+
+    // Viewport tracking
+    [Parameter]
+    public int ViewportWidth { get; set; } = 1920;
+
+    [Parameter]
+    public int ViewportHeight { get; set; } = 1080;
+
+    [Parameter]
+    public int TaskbarHeight { get; set; } = 32;
+
+    /// <summary>
+    /// Ensures the form's title bar is visible within the viewport.
+    /// Called after moving, resizing, or viewport changes.
+    /// </summary>
+    private async Task EnsureFormTitleBarVisible()
+    {
+        if (Form == null) return;
+
+        Form.EnsureTitleBarVisible(ViewportWidth, ViewportHeight, TaskbarHeight);
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Called when viewport size changes (browser resize)
+    /// </summary>
+    [JSInvokable]
+    public async Task OnViewportChanged(int width, int height)
+    {
+        ViewportWidth = width;
+        ViewportHeight = height;
+        await EnsureFormTitleBarVisible();
     }
 
     public void Dispose()

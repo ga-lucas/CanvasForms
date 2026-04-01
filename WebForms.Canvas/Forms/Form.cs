@@ -304,8 +304,9 @@ public class Form : Control
             }
 
             // Set to maximized state (fill desktop except taskbar)
+            // Note: Left and Top are relative to desktop area (which is below taskbar)
             Left = 0;
-            Top = taskbarHeight;
+            Top = 0; // Desktop area starts at 0 (already accounting for taskbar)
             Width = desktopWidth;
             Height = desktopHeight - taskbarHeight;
             WindowState = FormWindowState.Maximized;
@@ -325,6 +326,61 @@ public class Form : Control
                 Height = _normalBounds.Height;
             }
             WindowState = FormWindowState.Normal;
+        }
+    }
+
+    /// <summary>
+    /// Ensures the form's title bar is visible within the specified viewport bounds.
+    /// If the title bar is not visible, the form is repositioned to make it visible.
+    /// </summary>
+    /// <param name="viewportWidth">Width of the available viewport</param>
+    /// <param name="viewportHeight">Height of the available viewport</param>
+    /// <param name="taskbarHeight">Height of the taskbar at the top</param>
+    public void EnsureTitleBarVisible(int viewportWidth, int viewportHeight, int taskbarHeight)
+    {
+        // Only apply to normal windows (not minimized or maximized)
+        if (_windowState != FormWindowState.Normal) return;
+
+        // Title bar is at the top of the form, so we need to ensure:
+        // 1. The top of the form is not above the desktop area (minimum is 0, which is just below taskbar)
+        // 2. The title bar doesn't extend below the bottom of the viewport
+        // 3. If the form is too wide, position it as far left as possible
+
+        // Ensure form is not above the desktop area (Top is relative to desktop, so minimum is 0)
+        if (Top < 0)
+        {
+            Top = 0;
+        }
+
+        // Ensure the title bar is visible at the bottom
+        // The form's Top position is relative to the desktop area (after taskbar)
+        // So if Top + taskbarHeight + TitleBarHeight > viewportHeight, the title bar is cut off
+        var maxTop = viewportHeight - taskbarHeight - TitleBarHeight;
+        if (Top > maxTop)
+        {
+            Top = maxTop;
+        }
+
+        // Ensure some of the left side is visible (at least 50 pixels to grab)
+        var minLeft = -(Width - 50);
+        if (Left < minLeft)
+        {
+            Left = minLeft;
+        }
+
+        // If form is too wide to fit, position as far left as possible
+        if (Width > viewportWidth)
+        {
+            Left = 0;
+        }
+        else
+        {
+            // Ensure form doesn't extend too far right (keep at least 50 pixels visible on the left)
+            var maxLeft = viewportWidth - 50;
+            if (Left > maxLeft)
+            {
+                Left = maxLeft;
+            }
         }
     }
 }
