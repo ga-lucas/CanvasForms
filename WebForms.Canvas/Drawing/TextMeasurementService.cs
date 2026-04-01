@@ -18,6 +18,11 @@ public class TextMeasurementService
     }
 
     /// <summary>
+    /// Gets the JSRuntime instance for advanced JS interop scenarios
+    /// </summary>
+    public IJSRuntime JSRuntime => _jsRuntime;
+
+    /// <summary>
     /// Measure text width in pixels using browser's canvas.measureText()
     /// </summary>
     public async Task<int> MeasureTextAsync(string text, string fontFamily, int fontSize)

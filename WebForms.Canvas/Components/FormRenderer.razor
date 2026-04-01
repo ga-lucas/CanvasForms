@@ -33,7 +33,9 @@
                    outline: none;
                    cursor: @GetCanvasCursor();
                    user-select: none;
-                   box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                   box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                   image-rendering: pixelated;
+                   will-change: @(_isResizing ? "width, height" : "auto");">
     </canvas>
 }
 
@@ -477,13 +479,12 @@
             if (timeSinceLastRender >= ResizeRenderThrottleMs)
             {
                 _lastResizeRender = now;
-                await Task.Yield();
                 StateHasChanged();
                 await RenderForm();
             }
             else
             {
-                await Task.Yield();
+                // Still update the canvas size, just don't render content yet
                 StateHasChanged();
             }
         }

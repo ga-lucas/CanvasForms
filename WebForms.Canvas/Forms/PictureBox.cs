@@ -1,4 +1,5 @@
 using WebForms.Canvas.Drawing;
+using Microsoft.JSInterop;
 
 namespace WebForms.Canvas.Forms;
 
@@ -6,6 +7,7 @@ public class PictureBox : Control
 {
     private string _imageUrl = string.Empty;
     private PictureBoxSizeMode _sizeMode = PictureBoxSizeMode.Normal;
+    private bool _imageLoaded = false;
 
     public PictureBox()
     {
@@ -25,9 +27,57 @@ public class PictureBox : Control
             if (_imageUrl != value)
             {
                 _imageUrl = value;
+                _imageLoaded = false; // Reset loaded flag when URL changes
+
+                // Preload image asynchronously if we have a URL
+                if (!string.IsNullOrEmpty(_imageUrl))
+                {
+                    _ = PreloadImageAsync();
+                }
+
                 Invalidate();
             }
         }
+    }
+
+    /// <summary>
+    /// Preload the image into the browser cache
+    /// </summary>
+    private async Task PreloadImageAsync()
+    {
+        if (string.IsNullOrEmpty(_imageUrl) || _imageLoaded)
+            return;
+
+        try
+        {
+            // Get the form's JS runtime for image preloading
+            var form = GetParentForm();
+            if (form?.TextMeasurementService?.JSRuntime != null)
+            {
+                await form.TextMeasurementService.JSRuntime.InvokeVoidAsync(
+                    "preloadImage", _imageUrl);
+                _imageLoaded = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to preload image {_imageUrl}: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Get the parent Form
+    /// </summary>
+    private Form? GetParentForm()
+    {
+        var parent = Parent;
+        while (parent != null)
+        {
+            if (parent is Form form)
+                return form;
+            parent = parent.Parent;
+        }
+        return null;
     }
 
     /// <summary>

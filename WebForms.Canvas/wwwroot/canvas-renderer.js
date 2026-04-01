@@ -1,8 +1,45 @@
 // Cache for offscreen canvases (one per visible canvas for double buffering)
 const offscreenBuffers = new WeakMap();
 
+// Prevent buffer resizing during active render
+const activeRenders = new WeakMap();
+
 // Cache for loaded images
 const imageCache = new Map();
+
+// Preload an image into cache without drawing
+window.preloadImage = async function(imageUrl) {
+    if (!imageUrl || imageUrl.trim() === '') {
+        console.warn('preloadImage: Empty image URL');
+        return;
+    }
+
+    // Check if already cached
+    if (imageCache.has(imageUrl)) {
+        console.log('Image already cached:', imageUrl);
+        return;
+    }
+
+    try {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+
+        const loadPromise = new Promise((resolve, reject) => {
+            img.onload = () => resolve(img);
+            img.onerror = () => reject(new Error(`Failed to preload image: ${imageUrl}`));
+            setTimeout(() => reject(new Error(`Image preload timeout: ${imageUrl}`)), 10000);
+        });
+
+        img.src = imageUrl;
+        await loadPromise;
+
+        // Cache the loaded image
+        imageCache.set(imageUrl, img);
+        console.log('Image preloaded and cached:', imageUrl);
+    } catch (error) {
+        console.warn('Image preload failed:', error.message);
+    }
+};
 
 // Async image loading with error handling and caching
 window.drawImageAsync = async function(ctx, imageUrl, x, y, width, height) {
@@ -16,7 +53,8 @@ window.drawImageAsync = async function(ctx, imageUrl, x, y, width, height) {
         let img = imageCache.get(imageUrl);
 
         if (!img) {
-            // Create new image
+            // Create new image (shouldn't happen if preload worked, but fallback)
+            console.log('Image not in cache, loading on-demand:', imageUrl);
             img = new Image();
             img.crossOrigin = 'anonymous'; // Handle CORS if needed
 
@@ -53,7 +91,7 @@ window.drawImageAsync = async function(ctx, imageUrl, x, y, width, height) {
             }
         }
 
-        // Draw the loaded image
+        // Draw the loaded image from cache (fast!)
         if (img.complete && img.naturalWidth > 0) {
             ctx.drawImage(img, x, y, width, height);
         } else {
@@ -83,7 +121,7 @@ window.drawImageAsync = async function(ctx, imageUrl, x, y, width, height) {
 }
 
 // Get or create offscreen canvas for double buffering
-function getOffscreenCanvas(canvas) {
+function getOffscreenCanvas(canvas, allowResize = true) {
     // Safety check: return null if canvas is null or not valid
     if (!canvas || !canvas.width || !canvas.height) {
         console.warn('getOffscreenCanvas called with invalid canvas:', canvas);
@@ -99,24 +137,12 @@ function getOffscreenCanvas(canvas) {
 
     const offscreen = offscreenBuffers.get(canvas);
 
-    // Ensure offscreen canvas matches visible canvas size
-    // When resizing, this clears the canvas automatically
-    if (offscreen.width !== canvas.width || offscreen.height !== canvas.height) {
-        // Resizing the canvas clears it automatically in most browsers
-        // But we force a complete reset for reliability
+    // Resize buffer to match canvas if allowed and sizes differ
+    if (allowResize && (offscreen.width !== canvas.width || offscreen.height !== canvas.height)) {
+        console.log('Resizing offscreen buffer:', offscreen.width, 'x', offscreen.height, 
+            '→', canvas.width, 'x', canvas.height);
         offscreen.width = canvas.width;
         offscreen.height = canvas.height;
-
-        // Additional clearing strategy: get fresh context and clear explicitly
-        const ctx = offscreen.getContext('2d');
-        if (ctx) {
-            // Reset transform to ensure we're clearing everything
-            ctx.setTransform(1, 0, 0, 1, 0, 0);
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            // Fill with white to ensure no artifacts (will be overwritten)
-            ctx.fillStyle = 'white';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-        }
     }
 
     return offscreen;
@@ -195,12 +221,15 @@ window.measureTextBatch = (fontFamily, fontSize, texts) => {
         return;
     }
 
-    // Use offscreen canvas for double buffering
-    const offscreen = getOffscreenCanvas(canvas);
+    // Get offscreen canvas - allow resize to match current canvas size
+    const offscreen = getOffscreenCanvas(canvas, true);
     if (!offscreen) {
         console.warn('renderFormCanvas: Failed to get offscreen canvas');
         return;
     }
+
+    // Now lock to prevent resize during remainder of render
+    activeRenders.set(canvas, true);
 
     const ctx = offscreen.getContext('2d', { 
         alpha: false,  // No transparency needed, improves performance
@@ -212,17 +241,10 @@ window.measureTextBatch = (fontFamily, fontSize, texts) => {
         return;
     }
 
-    // CRITICAL: Multiple clearing strategies to work around browser canvas rendering bugs
-    // Strategy 1: Clear entire buffer
+    // Clear and reset to prevent artifacts during resize
     ctx.clearRect(0, 0, offscreen.width, offscreen.height);
-
-    // Strategy 2: Fill with solid color (more reliable than clearRect in some browsers)
     ctx.fillStyle = backColor;
     ctx.fillRect(0, 0, offscreen.width, offscreen.height);
-
-    // Reset all canvas state
-    ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
 
     // Draw outer border
     ctx.strokeStyle = 'rgba(74, 144, 226, 0.5)';
@@ -309,13 +331,16 @@ window.measureTextBatch = (fontFamily, fontSize, texts) => {
     // Copy offscreen canvas to visible canvas in one operation (double buffering)
     const visibleCtx = canvas.getContext('2d');
 
-    // Clear visible canvas using multiple strategies for reliability
-    visibleCtx.clearRect(0, 0, canvas.width, canvas.height);
-    visibleCtx.fillStyle = backColor;
-    visibleCtx.fillRect(0, 0, canvas.width, canvas.height);
+    // Safety check: Don't blit if offscreen buffer is invalid
+    if (offscreen && offscreen.width > 0 && offscreen.height > 0) {
+        // Single atomic blit - no clearing needed, we're overwriting everything
+        visibleCtx.drawImage(offscreen, 0, 0);
+    } else {
+        console.warn('renderFormCanvas: Skipping blit due to invalid offscreen buffer', 
+            offscreen?.width, offscreen?.height);
+    }
 
-    // Copy the offscreen buffer
-    visibleCtx.drawImage(offscreen, 0, 0);
+    // Note: Don't clear activeRenders here - renderClientArea will do it
 };
 
 // Render user drawing commands in the client area
@@ -326,8 +351,8 @@ window.renderClientArea = async (canvas, offsetX, offsetY, commands) => {
         return;
     }
 
-    // Get the offscreen canvas (already has the chrome rendered)
-    const offscreen = getOffscreenCanvas(canvas);
+    // Get the offscreen canvas (locked - don't allow resize, use existing size)
+    const offscreen = getOffscreenCanvas(canvas, false);
     if (!offscreen) {
         console.warn('renderClientArea: Failed to get offscreen canvas');
         return;
@@ -379,8 +404,15 @@ window.renderClientArea = async (canvas, offsetX, offsetY, commands) => {
 
     // Copy the complete offscreen canvas to visible canvas (double buffering)
     const visibleCtx = canvas.getContext('2d');
-    visibleCtx.clearRect(0, 0, canvas.width, canvas.height);
-    visibleCtx.drawImage(offscreen, 0, 0);
+
+    // Safety check: Don't blit if offscreen buffer is invalid
+    if (offscreen && offscreen.width > 0 && offscreen.height > 0) {
+        // Single atomic blit - this overwrites the entire canvas, no clearing needed
+        visibleCtx.drawImage(offscreen, 0, 0);
+    } else {
+        console.warn('renderClientArea: Skipping blit due to invalid offscreen buffer', 
+            offscreen?.width, offscreen?.height);
+    }
 };
 
 // Get canvas bounding rectangle for coordinate conversion
