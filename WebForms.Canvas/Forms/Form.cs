@@ -317,12 +317,12 @@ public class Form : Control
         }
     }
 
-    public void Maximize(int desktopWidth, int desktopHeight, int taskbarHeight)
+    public void Maximize(int desktopWidth, int desktopHeight, int taskbarHeight, bool preserveNormalBounds = false)
     {
         if (_windowState != FormWindowState.Maximized)
         {
-            // Save current bounds if not already minimized
-            if (_windowState == FormWindowState.Normal)
+            // Save current bounds if not already minimized (unless preserveNormalBounds is true)
+            if (_windowState == FormWindowState.Normal && !preserveNormalBounds)
             {
                 _normalBounds = new Rectangle(Left, Top, Width, Height);
             }
@@ -335,6 +335,15 @@ public class Form : Control
             Height = desktopHeight - taskbarHeight;
             WindowState = FormWindowState.Maximized;
         }
+    }
+
+    /// <summary>
+    /// Sets the normal bounds that will be used when restoring from maximized/minimized state.
+    /// This is useful for snap-to-maximize where we want to restore to the pre-drag position.
+    /// </summary>
+    public void SetNormalBounds(int left, int top, int width, int height)
+    {
+        _normalBounds = new Rectangle(left, top, width, height);
     }
 
     public void Restore()

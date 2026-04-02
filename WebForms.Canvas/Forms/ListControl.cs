@@ -13,6 +13,15 @@ public abstract class ListControl : Control
     protected int _hoveredIndex = -1;
     protected ObjectCollection _items;
 
+    // Scrollbar constants
+    protected const int ScrollbarWidth = 16;
+    protected const int DefaultItemHeight = 16;
+
+    // Scrollbar dragging state
+    protected bool _isDraggingScrollbar = false;
+    protected int _scrollbarDragStartY = 0;
+    protected int _scrollbarDragStartTopIndex = 0;
+
     public ListControl()
     {
         _items = new ObjectCollection(this);
@@ -115,6 +124,200 @@ public abstract class ListControl : Control
 
         return item.ToString() ?? "";
     }
+
+    #region Scrollbar Support
+
+    /// <summary>
+    /// Gets the height of each item. Override in derived classes if needed.
+    /// </summary>
+    protected virtual int ItemHeight => DefaultItemHeight;
+
+    /// <summary>
+    /// Gets the border width for calculating content bounds. Override in derived classes.
+    /// </summary>
+    protected virtual int BorderWidth => 2;
+
+    /// <summary>
+    /// Gets whether the control needs a scrollbar
+    /// </summary>
+    protected virtual bool NeedsScrollbar()
+    {
+        var contentHeight = Height - (BorderWidth * 2);
+        var itemsPerPage = contentHeight / ItemHeight;
+        return Items.Count > itemsPerPage;
+    }
+
+    /// <summary>
+    /// Gets the content bounds (area available for items, excluding border and scrollbar)
+    /// </summary>
+    protected virtual Rectangle GetContentBounds()
+    {
+        return new Rectangle(
+            BorderWidth,
+            BorderWidth,
+            Width - (BorderWidth * 2) - (NeedsScrollbar() ? ScrollbarWidth : 0),
+            Height - (BorderWidth * 2)
+        );
+    }
+
+    /// <summary>
+    /// Gets the scrollbar bounds
+    /// </summary>
+    protected virtual Rectangle GetScrollbarBounds()
+    {
+        var contentBounds = GetContentBounds();
+        return new Rectangle(
+            Width - ScrollbarWidth - BorderWidth,
+            BorderWidth,
+            ScrollbarWidth,
+            Height - (BorderWidth * 2)
+        );
+    }
+
+    /// <summary>
+    /// Gets the scrollbar thumb bounds
+    /// </summary>
+    protected virtual Rectangle GetScrollbarThumbBounds()
+    {
+        var scrollbarBounds = GetScrollbarBounds();
+        var contentBounds = GetContentBounds();
+        var itemsPerPage = contentBounds.Height / ItemHeight;
+        var thumbHeight = Math.Max(20, (itemsPerPage * scrollbarBounds.Height) / Math.Max(1, Items.Count));
+        var maxTopIndex = Math.Max(1, Items.Count - itemsPerPage);
+        var thumbTop = (_topIndex * (scrollbarBounds.Height - thumbHeight)) / maxTopIndex;
+
+        return new Rectangle(
+            scrollbarBounds.X + 2,
+            scrollbarBounds.Y + thumbTop,
+            ScrollbarWidth - 4,
+            thumbHeight
+        );
+    }
+
+    /// <summary>
+    /// Draws the scrollbar
+    /// </summary>
+    protected virtual void DrawScrollbar(Graphics g)
+    {
+        var scrollbarBounds = GetScrollbarBounds();
+
+        // Scrollbar background
+        using var scrollBgBrush = new SolidBrush(Color.FromArgb(240, 240, 240));
+        g.FillRectangle(scrollBgBrush, scrollbarBounds);
+
+        // Calculate thumb
+        var thumbBounds = GetScrollbarThumbBounds();
+
+        // Thumb
+        using var thumbBrush = new SolidBrush(Color.FromArgb(205, 205, 205));
+        g.FillRectangle(thumbBrush, thumbBounds);
+    }
+
+    /// <summary>
+    /// Handles scrollbar mouse down. Returns true if the event was handled.
+    /// </summary>
+    protected virtual bool HandleScrollbarMouseDown(MouseEventArgs e)
+    {
+        if (!NeedsScrollbar()) return false;
+
+        var scrollbarBounds = GetScrollbarBounds();
+        if (e.X < scrollbarBounds.X || e.X >= scrollbarBounds.Right ||
+            e.Y < scrollbarBounds.Y || e.Y >= scrollbarBounds.Bottom)
+        {
+            return false;
+        }
+
+        var thumbBounds = GetScrollbarThumbBounds();
+
+        if (e.Y >= thumbBounds.Y && e.Y < thumbBounds.Bottom)
+        {
+            // Clicking on thumb - start dragging
+            _isDraggingScrollbar = true;
+            _scrollbarDragStartY = e.Y;
+            _scrollbarDragStartTopIndex = _topIndex;
+        }
+        else if (e.Y < thumbBounds.Y)
+        {
+            // Clicking above thumb - page up
+            var contentBounds = GetContentBounds();
+            var itemsPerPage = contentBounds.Height / ItemHeight;
+            _topIndex = Math.Max(0, _topIndex - itemsPerPage);
+            Invalidate();
+        }
+        else
+        {
+            // Clicking below thumb - page down
+            var contentBounds = GetContentBounds();
+            var itemsPerPage = contentBounds.Height / ItemHeight;
+            var maxTopIndex = Math.Max(0, Items.Count - itemsPerPage);
+            _topIndex = Math.Min(maxTopIndex, _topIndex + itemsPerPage);
+            Invalidate();
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Handles scrollbar mouse move. Returns true if the event was handled.
+    /// </summary>
+    protected virtual bool HandleScrollbarMouseMove(MouseEventArgs e)
+    {
+        if (!_isDraggingScrollbar) return false;
+
+        var scrollbarBounds = GetScrollbarBounds();
+        var contentBounds = GetContentBounds();
+        var itemsPerPage = contentBounds.Height / ItemHeight;
+        var maxTopIndex = Math.Max(0, Items.Count - itemsPerPage);
+
+        // Calculate thumb height and track height
+        var thumbHeight = Math.Max(20, (itemsPerPage * scrollbarBounds.Height) / Math.Max(1, Items.Count));
+        var trackHeight = scrollbarBounds.Height - thumbHeight;
+
+        // Calculate new top index based on mouse movement
+        var deltaY = e.Y - _scrollbarDragStartY;
+        var indexDelta = (int)((deltaY * maxTopIndex) / Math.Max(1, trackHeight));
+        var newTopIndex = Math.Clamp(_scrollbarDragStartTopIndex + indexDelta, 0, maxTopIndex);
+
+        if (newTopIndex != _topIndex)
+        {
+            _topIndex = newTopIndex;
+            Invalidate();
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Handles scrollbar mouse up
+    /// </summary>
+    protected virtual void HandleScrollbarMouseUp()
+    {
+        _isDraggingScrollbar = false;
+    }
+
+    /// <summary>
+    /// Ensures that the specified item index is visible
+    /// </summary>
+    public virtual void EnsureVisible(int index)
+    {
+        if (index < 0 || index >= Items.Count) return;
+
+        var contentBounds = GetContentBounds();
+        var itemsPerPage = contentBounds.Height / ItemHeight;
+
+        if (index < _topIndex)
+        {
+            _topIndex = index;
+            Invalidate();
+        }
+        else if (index >= _topIndex + itemsPerPage)
+        {
+            _topIndex = index - itemsPerPage + 1;
+            Invalidate();
+        }
+    }
+
+    #endregion
 
     /// <summary>
     /// Represents a collection of items in a list control

@@ -74,16 +74,25 @@
     private bool _isDragging = false;
     private double _dragStartX = 0;
     private double _dragStartY = 0;
-    private int _formStartLeft = 0;
-    private int _formStartTop = 0;
+    private int _dragFormStartLeft = 0;  // Position when drag started (for delta calc)
+    private int _dragFormStartTop = 0;   // Position when drag started (for delta calc)
+
+    // Pre-drag bounds (for snap-to-maximize restore)
+    private int _preDragLeft = 0;
+    private int _preDragTop = 0;
+    private int _preDragWidth = 0;
+    private int _preDragHeight = 0;
+    private bool _preDragBoundsSaved = false;
 
     // Resizing state
     private bool _isResizing = false;
     private ResizeDirection _resizeDirection = ResizeDirection.None;
     private double _resizeStartX = 0;
     private double _resizeStartY = 0;
-    private int _formStartWidth = 0;
-    private int _formStartHeight = 0;
+    private int _resizeFormStartWidth = 0;
+    private int _resizeFormStartHeight = 0;
+    private int _resizeFormStartLeft = 0;
+    private int _resizeFormStartTop = 0;
 
     // Throttling for resize rendering
     private DateTime _lastResizeRender = DateTime.MinValue;
@@ -360,9 +369,21 @@
 
         BringToFrontSync();
 
+        // Save the pre-drag bounds for potential snap-to-maximize restore
+        // This ensures we restore to the position BEFORE dragging started
+        _preDragLeft = Form.Left;
+        _preDragTop = Form.Top;
+        _preDragWidth = Form.Width;
+        _preDragHeight = Form.Height;
+        _preDragBoundsSaved = true;
+
         // If window is maximized, restore it first (Windows-style behavior)
         if (Form.WindowState == FormWindowState.Maximized)
         {
+            // For maximized windows, the pre-drag bounds should be the stored normal bounds
+            // (not the maximized position), so don't use current position
+            _preDragBoundsSaved = false; // Let Maximize use its own saved bounds
+
             // Calculate where the mouse is relative to the window width
             var mouseXRatio = e.OffsetX / Form.Width;
 
@@ -374,12 +395,12 @@
 
             // Adjust the starting position so the mouse stays under the same relative position
             // This makes the window "stick" to the cursor when dragging from maximized
-            _formStartLeft = (int)(e.ClientX - (Form.Width * mouseXRatio));
-            _formStartTop = 0; // Start at top of desktop area
+            var newLeft = (int)(e.ClientX - (Form.Width * mouseXRatio));
+            var newTop = 0; // Start at top of desktop area
 
             // Set the form to the calculated position immediately
-            Form.Left = _formStartLeft;
-            Form.Top = _formStartTop;
+            Form.Left = newLeft;
+            Form.Top = newTop;
 
             // Force multiple state updates to ensure Blazor picks up the changes
             StateHasChanged();
@@ -394,8 +415,8 @@
         _isDragging = true;
         _dragStartX = e.ClientX;
         _dragStartY = e.ClientY;
-        _formStartLeft = Form.Left;
-        _formStartTop = Form.Top;
+        _dragFormStartLeft = Form.Left;
+        _dragFormStartTop = Form.Top;
 
         StateHasChanged();
     }
@@ -412,10 +433,10 @@
         _resizeDirection = direction;
         _resizeStartX = e.ClientX;
         _resizeStartY = e.ClientY;
-        _formStartWidth = Form.Width;
-        _formStartHeight = Form.Height;
-        _formStartLeft = Form.Left;
-        _formStartTop = Form.Top;
+        _resizeFormStartWidth = Form.Width;
+        _resizeFormStartHeight = Form.Height;
+        _resizeFormStartLeft = Form.Left;
+        _resizeFormStartTop = Form.Top;
 
         StateHasChanged();
     }
@@ -424,13 +445,12 @@
     public async Task OnGlobalMouseMove(double clientX, double clientY)
     {
         if (Form == null) return;
-
         if (_isDragging)
         {
             var deltaX = (int)(clientX - _dragStartX);
             var deltaY = (int)(clientY - _dragStartY);
-            Form.Left = _formStartLeft + deltaX;
-            Form.Top = _formStartTop + deltaY;
+            Form.Left = _dragFormStartLeft + deltaX;
+            Form.Top = _dragFormStartTop + deltaY;
 
             // Check for snap-to-top maximize (only for normal windows)
             if (Form.WindowState == FormWindowState.Normal)
@@ -461,13 +481,13 @@
             {
                 case ResizeDirection.Left:
                     {
-                        var newWidth = _formStartWidth - deltaX;
+                        var newWidth = _resizeFormStartWidth - deltaX;
                         var minWidth = Math.Max(Form.MinimumWidth, 100);
                         newWidth = Math.Max(minWidth, newWidth);
                         if (Form.MaximumWidth > 0) newWidth = Math.Min(Form.MaximumWidth, newWidth);
 
-                        var actualDelta = _formStartWidth - newWidth;
-                        var newLeft = _formStartLeft + actualDelta;
+                        var actualDelta = _resizeFormStartWidth - newWidth;
+                        var newLeft = _resizeFormStartLeft + actualDelta;
 
                         Form.Width = newWidth;
                         Form.Left = newLeft;
@@ -477,7 +497,7 @@
                 case ResizeDirection.Right:
                     {
                         var minWidth = Math.Max(Form.MinimumWidth, 100);
-                        var newWidth = Math.Max(minWidth, _formStartWidth + deltaX);
+                        var newWidth = Math.Max(minWidth, _resizeFormStartWidth + deltaX);
                         if (Form.MaximumWidth > 0) newWidth = Math.Min(newWidth, Form.MaximumWidth);
                         Form.Width = newWidth;
                     }
@@ -485,13 +505,13 @@
 
                 case ResizeDirection.Top:
                     {
-                        var newHeight = _formStartHeight - deltaY;
+                        var newHeight = _resizeFormStartHeight - deltaY;
                         var minHeight = Math.Max(Form.MinimumHeight, TitleBarHeight + 50);
                         newHeight = Math.Max(minHeight, newHeight);
                         if (Form.MaximumHeight > 0) newHeight = Math.Min(Form.MaximumHeight, newHeight);
 
-                        var actualDelta = _formStartHeight - newHeight;
-                        var newTop = _formStartTop + actualDelta;
+                        var actualDelta = _resizeFormStartHeight - newHeight;
+                        var newTop = _resizeFormStartTop + actualDelta;
 
                         Form.Height = newHeight;
                         Form.Top = newTop;
@@ -501,7 +521,7 @@
                 case ResizeDirection.Bottom:
                     {
                         var minHeight = Math.Max(Form.MinimumHeight, TitleBarHeight + 50);
-                        var newHeight = Math.Max(minHeight, _formStartHeight + deltaY);
+                        var newHeight = Math.Max(minHeight, _resizeFormStartHeight + deltaY);
                         if (Form.MaximumHeight > 0) newHeight = Math.Min(newHeight, Form.MaximumHeight);
                         Form.Height = newHeight;
                     }
@@ -509,17 +529,17 @@
 
                 case ResizeDirection.TopLeft:
                     {
-                        var newWidth = _formStartWidth - deltaX;
+                        var newWidth = _resizeFormStartWidth - deltaX;
                         newWidth = Math.Max(Math.Max(Form.MinimumWidth, 100), newWidth);
                         if (Form.MaximumWidth > 0) newWidth = Math.Min(Form.MaximumWidth, newWidth);
-                        var actualDeltaX = _formStartWidth - newWidth;
-                        var newLeft = _formStartLeft + actualDeltaX;
+                        var actualDeltaX = _resizeFormStartWidth - newWidth;
+                        var newLeft = _resizeFormStartLeft + actualDeltaX;
 
-                        var newHeight = _formStartHeight - deltaY;
+                        var newHeight = _resizeFormStartHeight - deltaY;
                         newHeight = Math.Max(Math.Max(Form.MinimumHeight, TitleBarHeight + 50), newHeight);
                         if (Form.MaximumHeight > 0) newHeight = Math.Min(Form.MaximumHeight, newHeight);
-                        var actualDeltaY = _formStartHeight - newHeight;
-                        var newTop = _formStartTop + actualDeltaY;
+                        var actualDeltaY = _resizeFormStartHeight - newHeight;
+                        var newTop = _resizeFormStartTop + actualDeltaY;
 
                         Form.Width = newWidth;
                         Form.Left = newLeft;
@@ -530,14 +550,14 @@
 
                 case ResizeDirection.TopRight:
                     {
-                        var newWidth = Math.Max(Math.Max(Form.MinimumWidth, 100), _formStartWidth + deltaX);
+                        var newWidth = Math.Max(Math.Max(Form.MinimumWidth, 100), _resizeFormStartWidth + deltaX);
                         if (Form.MaximumWidth > 0) newWidth = Math.Min(newWidth, Form.MaximumWidth);
 
-                        var newHeight = _formStartHeight - deltaY;
+                        var newHeight = _resizeFormStartHeight - deltaY;
                         newHeight = Math.Max(Math.Max(Form.MinimumHeight, TitleBarHeight + 50), newHeight);
                         if (Form.MaximumHeight > 0) newHeight = Math.Min(Form.MaximumHeight, newHeight);
-                        var actualDeltaY = _formStartHeight - newHeight;
-                        var newTop = _formStartTop + actualDeltaY;
+                        var actualDeltaY = _resizeFormStartHeight - newHeight;
+                        var newTop = _resizeFormStartTop + actualDeltaY;
 
                         Form.Width = newWidth;
                         Form.Height = newHeight;
@@ -547,13 +567,13 @@
 
                 case ResizeDirection.BottomLeft:
                     {
-                        var newWidth = _formStartWidth - deltaX;
+                        var newWidth = _resizeFormStartWidth - deltaX;
                         newWidth = Math.Max(Math.Max(Form.MinimumWidth, 100), newWidth);
                         if (Form.MaximumWidth > 0) newWidth = Math.Min(Form.MaximumWidth, newWidth);
-                        var actualDeltaX = _formStartWidth - newWidth;
-                        var newLeft = _formStartLeft + actualDeltaX;
+                        var actualDeltaX = _resizeFormStartWidth - newWidth;
+                        var newLeft = _resizeFormStartLeft + actualDeltaX;
 
-                        var newHeight = Math.Max(Math.Max(Form.MinimumHeight, TitleBarHeight + 50), _formStartHeight + deltaY);
+                        var newHeight = Math.Max(Math.Max(Form.MinimumHeight, TitleBarHeight + 50), _resizeFormStartHeight + deltaY);
                         if (Form.MaximumHeight > 0) newHeight = Math.Min(newHeight, Form.MaximumHeight);
 
                         Form.Width = newWidth;
@@ -564,8 +584,8 @@
 
                 case ResizeDirection.BottomRight:
                     {
-                        var newWidth = Math.Max(Math.Max(Form.MinimumWidth, 100), _formStartWidth + deltaX);
-                        var newHeight = Math.Max(Math.Max(Form.MinimumHeight, TitleBarHeight + 50), _formStartHeight + deltaY);
+                        var newWidth = Math.Max(Math.Max(Form.MinimumWidth, 100), _resizeFormStartWidth + deltaX);
+                        var newHeight = Math.Max(Math.Max(Form.MinimumHeight, TitleBarHeight + 50), _resizeFormStartHeight + deltaY);
                         if (Form.MaximumWidth > 0) newWidth = Math.Min(newWidth, Form.MaximumWidth);
                         if (Form.MaximumHeight > 0) newHeight = Math.Min(newHeight, Form.MaximumHeight);
 
@@ -607,8 +627,22 @@
         // Check if we should snap-to-maximize
         if (shouldSnapMaximize && Form != null)
         {
+            // Save the pre-drag bounds before maximizing
+            var savedLeft = _preDragLeft;
+            var savedTop = _preDragTop;
+            var savedWidth = _preDragWidth;
+            var savedHeight = _preDragHeight;
+            var shouldRestorePreDragBounds = _preDragBoundsSaved;
+
             // Maximize the form with animation
             await ToggleMaximize();
+
+            // AFTER maximizing, set the normal bounds to the pre-drag position
+            // This ensures restore goes back to where the form was BEFORE the user started dragging
+            if (shouldRestorePreDragBounds && Form != null)
+            {
+                Form.SetNormalBounds(savedLeft, savedTop, savedWidth, savedHeight);
+            }
         }
         else if (wasResizing || wasDragging)
         {
@@ -618,6 +652,9 @@
                 await EnsureFormTitleBarVisible();
             }
         }
+
+        // Reset pre-drag bounds tracking
+        _preDragBoundsSaved = false;
 
         if (wasResizing)
         {
@@ -636,6 +673,9 @@
     private async void HandleMouseDown(BlazorMouseEventArgs e)
     {
         if (Form == null) return;
+
+        // Update modifier keys state for mouse events
+        UpdateModifierKeys(e.CtrlKey, e.ShiftKey, e.AltKey);
 
         var x = (int)e.OffsetX;
         var y = (int)e.OffsetY;
@@ -996,6 +1036,10 @@
     private void HandleKeyDown(BlazorKeyboardEventArgs e)
     {
         if (Form == null) return;
+
+        // Update static modifier keys state
+        UpdateModifierKeys(e.CtrlKey, e.ShiftKey, e.AltKey);
+
         var args = new KeyEventArgs(
             ParseKeyCode(e.Code),
             e.AltKey,
@@ -1008,6 +1052,9 @@
     private void HandleKeyUp(BlazorKeyboardEventArgs e)
     {
         if (Form == null) return;
+
+        // Update static modifier keys state
+        UpdateModifierKeys(e.CtrlKey, e.ShiftKey, e.AltKey);
         var args = new KeyEventArgs(
             ParseKeyCode(e.Code),
             e.AltKey,
@@ -1040,6 +1087,18 @@
         StateHasChanged();
     }
 
+    /// <summary>
+    /// Updates the static Control.ModifierKeys based on current key state
+    /// </summary>
+    private void UpdateModifierKeys(bool ctrl, bool shift, bool alt)
+    {
+        var modifiers = Keys.None;
+        if (ctrl) modifiers |= Keys.Control;
+        if (shift) modifiers |= Keys.Shift;
+        if (alt) modifiers |= Keys.Alt;
+        Control.ModifierKeys = modifiers;
+    }
+
     private async Task ToggleMaximize()
     {
         if (Form == null) return;
@@ -1051,6 +1110,9 @@
         if (Form.WindowState == FormWindowState.Maximized)
         {
             Form.Restore();
+
+            // Ensure title bar is visible after restore (important for snap-to-top restore)
+            Form.EnsureTitleBarVisible(ViewportWidth, ViewportHeight, TaskbarHeight);
         }
         else
         {

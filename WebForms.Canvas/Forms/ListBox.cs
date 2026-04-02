@@ -7,7 +7,6 @@ namespace WebForms.Canvas.Forms;
 /// </summary>
 public class ListBox : ListControl
 {
-    private const int ItemHeight = 16;
     private const int ItemPadding = 2;
     private SelectionMode _selectionMode = SelectionMode.One;
     private readonly HashSet<int> _selectedIndices = new();
@@ -51,6 +50,11 @@ public class ListBox : ListControl
     /// Gets or sets the border style
     /// </summary>
     public BorderStyle BorderStyle { get; set; }
+
+    /// <summary>
+    /// Override border width based on BorderStyle
+    /// </summary>
+    protected override int BorderWidth => BorderStyle == BorderStyle.None ? 0 : 2;
 
     /// <summary>
     /// Gets or sets whether the list box should scroll when items are added
@@ -139,10 +143,10 @@ public class ListBox : ListControl
             DrawItem(g, itemIndex, itemBounds);
         }
 
-        // Draw scrollbar if needed
+        // Draw scrollbar if needed (uses base class method)
         if (NeedsScrollbar())
         {
-            DrawScrollbar(g, contentBounds);
+            DrawScrollbar(g);
         }
 
         base.OnPaint(e);
@@ -172,17 +176,6 @@ public class ListBox : ListControl
                 }
                 break;
         }
-    }
-
-    private Rectangle GetContentBounds()
-    {
-        int borderWidth = BorderStyle == BorderStyle.None ? 0 : 2;
-        return new Rectangle(
-            borderWidth,
-            borderWidth,
-            Width - (borderWidth * 2) - (NeedsScrollbar() ? 16 : 0),
-            Height - (borderWidth * 2)
-        );
     }
 
     private void DrawItem(Graphics g, int index, Rectangle bounds)
@@ -218,48 +211,6 @@ public class ListBox : ListControl
         g.DrawString(text, bounds.X + ItemPadding, bounds.Y + ItemPadding, textColor);
     }
 
-    private bool NeedsScrollbar()
-    {
-        var contentBounds = new Rectangle(0, 0, Width, Height);
-        if (BorderStyle != BorderStyle.None)
-        {
-            contentBounds = new Rectangle(2, 2, Width - 4, Height - 4);
-        }
-        var itemsPerPage = contentBounds.Height / ItemHeight;
-        return Items.Count > itemsPerPage;
-    }
-
-    private void DrawScrollbar(Graphics g, Rectangle contentBounds)
-    {
-        const int scrollbarWidth = 16;
-        var scrollbarBounds = new Rectangle(
-            Width - scrollbarWidth - (BorderStyle == BorderStyle.None ? 0 : 2),
-            contentBounds.Y,
-            scrollbarWidth,
-            contentBounds.Height
-        );
-
-        // Scrollbar background
-        using var scrollBgBrush = new SolidBrush(Color.FromArgb(240, 240, 240));
-        g.FillRectangle(scrollBgBrush, scrollbarBounds);
-
-        // Calculate thumb size and position
-        var itemsPerPage = contentBounds.Height / ItemHeight;
-        var thumbHeight = Math.Max(20, (itemsPerPage * scrollbarBounds.Height) / Items.Count);
-        var thumbTop = (_topIndex * (scrollbarBounds.Height - thumbHeight)) / Math.Max(1, Items.Count - itemsPerPage);
-
-        var thumbBounds = new Rectangle(
-            scrollbarBounds.X + 2,
-            scrollbarBounds.Y + thumbTop,
-            scrollbarWidth - 4,
-            thumbHeight
-        );
-
-        // Thumb
-        using var thumbBrush = new SolidBrush(Color.FromArgb(205, 205, 205));
-        g.FillRectangle(thumbBrush, thumbBounds);
-    }
-
     protected internal override void OnMouseDown(MouseEventArgs e)
     {
         if (!Enabled)
@@ -270,11 +221,19 @@ public class ListBox : ListControl
 
         Focus();
 
-        var contentBounds = GetContentBounds();
-        if (e.X >= contentBounds.X && e.X < contentBounds.Right &&
-            e.Y >= contentBounds.Y && e.Y < contentBounds.Bottom)
+        // Check if clicking on scrollbar (use base class method)
+        if (HandleScrollbarMouseDown(e))
         {
-            var itemIndex = _topIndex + ((e.Y - contentBounds.Y) / ItemHeight);
+            base.OnMouseDown(e);
+            return;
+        }
+
+        // Check if clicking on content area (items)
+        var contentArea = GetContentBounds();
+        if (e.X >= contentArea.X && e.X < contentArea.Right &&
+            e.Y >= contentArea.Y && e.Y < contentArea.Bottom)
+        {
+            var itemIndex = _topIndex + ((e.Y - contentArea.Y) / ItemHeight);
             if (itemIndex >= 0 && itemIndex < Items.Count)
             {
                 _mouseDownIndex = itemIndex;
@@ -288,6 +247,7 @@ public class ListBox : ListControl
     protected internal override void OnMouseUp(MouseEventArgs e)
     {
         _mouseDownIndex = -1;
+        HandleScrollbarMouseUp();
         base.OnMouseUp(e);
     }
 
@@ -299,13 +259,20 @@ public class ListBox : ListControl
             return;
         }
 
-        var contentBounds = GetContentBounds();
+        // Handle scrollbar dragging (use base class method)
+        if (HandleScrollbarMouseMove(e))
+        {
+            base.OnMouseMove(e);
+            return;
+        }
+
+        var contentArea = GetContentBounds();
         var oldHoveredIndex = _hoveredIndex;
 
-        if (e.X >= contentBounds.X && e.X < contentBounds.Right &&
-            e.Y >= contentBounds.Y && e.Y < contentBounds.Bottom)
+        if (e.X >= contentArea.X && e.X < contentArea.Right &&
+            e.Y >= contentArea.Y && e.Y < contentArea.Bottom)
         {
-            _hoveredIndex = _topIndex + ((e.Y - contentBounds.Y) / ItemHeight);
+            _hoveredIndex = _topIndex + ((e.Y - contentArea.Y) / ItemHeight);
             if (_hoveredIndex >= Items.Count)
             {
                 _hoveredIndex = -1;
@@ -473,28 +440,6 @@ public class ListBox : ListControl
                 OnSelectedIndexChanged(EventArgs.Empty);
                 Invalidate();
                 break;
-        }
-    }
-
-    /// <summary>
-    /// Ensures that the specified item is visible
-    /// </summary>
-    public void EnsureVisible(int index)
-    {
-        if (index < 0 || index >= Items.Count) return;
-
-        var contentBounds = GetContentBounds();
-        var itemsPerPage = contentBounds.Height / ItemHeight;
-
-        if (index < _topIndex)
-        {
-            _topIndex = index;
-            Invalidate();
-        }
-        else if (index >= _topIndex + itemsPerPage)
-        {
-            _topIndex = index - itemsPerPage + 1;
-            Invalidate();
         }
     }
 
