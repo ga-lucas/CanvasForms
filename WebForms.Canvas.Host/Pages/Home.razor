@@ -1,41 +1,37 @@
 ﻿@page "/"
+@using WebForms.Canvas
 @using WebForms.Canvas.Components
 @using WebForms.Canvas.Samples
 @using WebForms.Canvas.Forms
 
 <PageTitle>Windows Forms Canvas Clone</PageTitle>
 
-<!-- Desktop takes full viewport -->
-<Desktop Forms="@_allForms" Height="@_desktopHeight" TaskbarHeight="32" OnFormCreated="OnFormCreated" />
+<!-- Desktop component with FormManager integration -->
+<Desktop @ref="_desktop" TaskbarHeight="32" />
 
 @code {
-	private List<Form> _allForms = new();
-	private WelcomeForm _welcomeForm = new();
-	private int _desktopHeight = 1000;
+	private Desktop? _desktop;
 
-	protected override void OnInitialized()
+	protected override async Task OnAfterRenderAsync(bool firstRender)
 	{
-		_desktopHeight = 1000;
+		if (firstRender && _desktop != null)
+		{
+			// Initialize the application with the main form
+			// This follows the Windows Forms pattern: Application.Run(new MainForm())
+			var mainForm = new WelcomeForm();
 
-		// Only create and show the Welcome form initially
-		_welcomeForm.Left = 300;
-		_welcomeForm.Top = 100;
-		_welcomeForm.Width = 700;
-		_welcomeForm.Height = 650;
+			// Set initial position
+			mainForm.Left = 300;
+			mainForm.Top = 100;
+			mainForm.Width = 700;
+			mainForm.Height = 650;
 
-		// Set callback for Blazor re-rendering when forms change
-		_welcomeForm.OnContainerChanged = () => StateHasChanged();
+			// Set as main form and run
+			_desktop.FormManager.MainForm = mainForm;
+			Application.Run(mainForm);
 
-		// Give Welcome form access to the forms list so it can add new forms
-		_welcomeForm.SetParentFormList(_allForms);
-
-		_welcomeForm.Show();
-		_allForms.Add(_welcomeForm);
-	}
-
-	private void OnFormCreated(Form form)
-	{
-		// Handle any custom initialization for newly created forms
-		form.Show();
+			// Force re-render
+			StateHasChanged();
+		}
 	}
 }

@@ -9,9 +9,9 @@
     <div class="taskbar" style="position: absolute; top: 0; left: 0; right: 0; height: @(TaskbarHeight)px; background: linear-gradient(180deg, #f0f0f0 0%, #d0d0d0 100%); border-bottom: 1px solid #a0a0a0; z-index: 10000; display: flex; align-items: center; padding: 0 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 
         <!-- Window buttons -->
-        @foreach (var form in Forms.OrderBy(f => f.CreatedAt))
+        @foreach (var form in _formManager.OpenForms.OrderBy(f => f.CreatedAt))
         {
-            var isActive = form == _activeForm;
+            var isActive = form == _formManager.ActiveForm;
             var isMinimized = form.WindowState == FormWindowState.Minimized;
 
             <div class="window-button" 
@@ -43,11 +43,11 @@
 
     <!-- Desktop area (below taskbar) -->
     <div class="desktop-area" style="position: absolute; top: @(TaskbarHeight)px; left: 0; right: 0; bottom: 0;">
-        @foreach (var form in Forms.Where(f => f.WindowState != FormWindowState.Minimized))
+        @foreach (var form in _formManager.OpenForms.Where(f => f.WindowState != FormWindowState.Minimized))
         {
             <FormRenderer @key="form" 
                           Form="@form" 
-                          ViewportWidth="@_viewportWidth" 
+                          ViewportWidth="@_viewportWidth"
                           ViewportHeight="@_viewportHeight"
                           TaskbarHeight="@TaskbarHeight"
                           GetMaxZIndex="@GetCurrentMaxZIndex" />
@@ -57,21 +57,18 @@
 
 @code {
     [Parameter]
-    public List<Form> Forms { get; set; } = new();
-
-    [Parameter]
-    public int Height { get; set; } = 800;
-
-    [Parameter]
     public int TaskbarHeight { get; set; } = 32;
 
-    [Parameter]
-    public EventCallback<Form> OnFormCreated { get; set; }
-
-    private Form? _activeForm;
+    private FormManager _formManager = null!;
     private int _viewportWidth = 1920;
     private int _viewportHeight = 1080;
     private DotNetObjectReference<Desktop>? _dotNetRef;
+
+    protected override void OnInitialized()
+    {
+        // Initialize FormManager with state update callback
+        _formManager = new FormManager(() => InvokeAsync(StateHasChanged));
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -96,7 +93,7 @@
         // Ensure all visible forms have their title bars visible
         if (oldWidth != width || oldHeight != height)
         {
-            foreach (var form in Forms.Where(f => f.WindowState == FormWindowState.Normal && f.Visible))
+            foreach (var form in _formManager.OpenForms.Where(f => f.WindowState == FormWindowState.Normal && f.Visible))
             {
                 form.EnsureTitleBarVisible(_viewportWidth, _viewportHeight, TaskbarHeight);
             }
@@ -107,40 +104,26 @@
 
     protected override void OnParametersSet()
     {
+        // Ensure main form stays visible
+        if (_formManager.MainForm != null && !_formManager.MainForm.Visible)
+        {
+            _formManager.MainForm.Visible = true;
+        }
+
         // Subscribe to window state changes and form closed events for all forms
-        foreach (var form in Forms)
+        foreach (var form in _formManager.OpenForms)
         {
             form.WindowStateChanged -= OnFormWindowStateChanged;
             form.WindowStateChanged += OnFormWindowStateChanged;
 
             form.FormClosed -= OnFormClosed;
             form.FormClosed += OnFormClosed;
-
-            form.Activated -= OnFormActivated;
-            form.Activated += OnFormActivated;
-        }
-
-        // Set active form to the topmost visible form
-        if (_activeForm == null || !Forms.Contains(_activeForm))
-        {
-            _activeForm = Forms.Where(f => f.WindowState != FormWindowState.Minimized)
-                               .OrderByDescending(f => f.ZIndex)
-                               .FirstOrDefault();
         }
     }
 
     private void OnFormWindowStateChanged(object? sender, EventArgs e)
     {
         StateHasChanged();
-    }
-
-    private void OnFormActivated(object? sender, EventArgs e)
-    {
-        if (sender is Form activatedForm)
-        {
-            _activeForm = activatedForm;
-            StateHasChanged();
-        }
     }
 
     private void OnFormClosed(object? sender, EventArgs e)
@@ -150,35 +133,14 @@
             // Unsubscribe from events
             closedForm.WindowStateChanged -= OnFormWindowStateChanged;
             closedForm.FormClosed -= OnFormClosed;
-            closedForm.Activated -= OnFormActivated;
 
-            // Remove from forms list
-            Forms.Remove(closedForm);
-
-            // Update active form if the closed form was active
-            if (_activeForm == closedForm)
-            {
-                _activeForm = Forms.Where(f => f.WindowState != FormWindowState.Minimized)
-                                   .OrderByDescending(f => f.ZIndex)
-                                   .FirstOrDefault();
-            }
-
+            // FormManager already handles removal
             StateHasChanged();
         }
     }
-
     private void ActivateForm(Form form)
     {
-        if (form.WindowState == FormWindowState.Minimized)
-        {
-            // Restore the form
-            form.Restore();
-        }
-
-        // Bring to front
-        form.BringToFront();
-        _activeForm = form;
-        StateHasChanged();
+        _formManager.ActivateForm(form);
     }
 
     /// <summary>
@@ -186,11 +148,16 @@
     /// </summary>
     private int GetCurrentMaxZIndex()
     {
-        return Forms.Where(f => f.Visible && f.WindowState != FormWindowState.Minimized)
+        return _formManager.OpenForms.Where(f => f.Visible && f.WindowState != FormWindowState.Minimized)
                     .Select(f => f.ZIndex)
                     .DefaultIfEmpty(0)
                     .Max();
     }
+
+    /// <summary>
+    /// Gets the FormManager for accessing application-level form operations
+    /// </summary>
+    public FormManager FormManager => _formManager;
 
     public void Dispose()
     {

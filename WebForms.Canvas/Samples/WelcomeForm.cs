@@ -5,16 +5,6 @@ namespace WebForms.Canvas.Samples;
 
 public class WelcomeForm : Form
 {
-    // References to other forms (lazy-initialized)
-    private DockingDemoForm? _dockingDemoForm;
-    private ControlsDemoForm? _controlsDemoForm;
-    private InteractiveForm? _interactiveForm;
-    private SampleDrawingForm? _sampleDrawingForm;
-
-    // Reference to parent form list (to add new forms)
-    private List<Form>? _parentFormList;
-    private Action? _onFormsChanged;
-
     // UI Controls
     private Label? _titleLabel;
     private Label? _infoLabel;
@@ -22,6 +12,7 @@ public class WelcomeForm : Form
     private Button? _btnControlsDemo;
     private Button? _btnInteractive;
     private Button? _btnDrawingSample;
+    private Button? _btnListControl;
 
     public WelcomeForm()
     {
@@ -38,14 +29,6 @@ public class WelcomeForm : Form
 
         // Force layout after initialization
         PerformLayout();
-    }
-
-    /// <summary>
-    /// Set reference to parent form list for adding new forms
-    /// </summary>
-    public void SetParentFormList(List<Form> parentFormList)
-    {
-        _parentFormList = parentFormList;
     }
 
     private void InitializeControls()
@@ -113,7 +96,10 @@ public class WelcomeForm : Form
             Width = 280,
             Height = 50
         };
-        _btnDockingDemo.Click += BtnDockingDemo_Click;
+        _btnDockingDemo.Click += (s, e) =>
+        {
+            Application.FormManager?.ShowOrCreateForm<DockingDemoForm>();
+        };
         Controls.Add(_btnDockingDemo);
 
         // Controls Demo Button
@@ -125,7 +111,10 @@ public class WelcomeForm : Form
             Width = 280,
             Height = 50
         };
-        _btnControlsDemo.Click += BtnControlsDemo_Click;
+        _btnControlsDemo.Click += (s, e) =>
+        {
+            Application.FormManager?.ShowOrCreateForm<ControlsDemoForm>();
+        };
         Controls.Add(_btnControlsDemo);
 
         // Interactive Form Button
@@ -137,7 +126,10 @@ public class WelcomeForm : Form
             Width = 280,
             Height = 50
         };
-        _btnInteractive.Click += BtnInteractive_Click;
+        _btnInteractive.Click += (s, e) =>
+        {
+            Application.FormManager?.ShowOrCreateForm<InteractiveForm>();
+        };
         Controls.Add(_btnInteractive);
 
         // Drawing Sample Button
@@ -149,215 +141,26 @@ public class WelcomeForm : Form
             Width = 280,
             Height = 50
         };
-        _btnDrawingSample.Click += BtnDrawingSample_Click;
+        _btnDrawingSample.Click += (s, e) =>
+        {
+            Application.FormManager?.ShowOrCreateForm<SampleDrawingForm>();
+        };
         Controls.Add(_btnDrawingSample);
 
-        // Re-enable Paint event for features list at bottom
-        Paint += OnFormPaint;
-    }
 
-    private void BtnDockingDemo_Click(object? sender, EventArgs e)
-    {
-        System.Diagnostics.Debug.WriteLine("Docking Demo button clicked!");
-
-        // Check if form was closed/removed from list
-        if (_dockingDemoForm != null && _parentFormList != null && !_parentFormList.Contains(_dockingDemoForm))
+        // ListControl
+        _btnListControl = new Button
         {
-            System.Diagnostics.Debug.WriteLine("Form was removed, clearing reference");
-            _dockingDemoForm = null;
-        }
-
-        // Create new instance if needed
-        if (_dockingDemoForm == null)
-        {
-            System.Diagnostics.Debug.WriteLine("Creating new DockingDemoForm");
-            _dockingDemoForm = new DockingDemoForm
-            {
-                Left = 50,
-                Top = 50,
-                Width = 600,
-                Height = 500,
-                OnContainerChanged = this.OnContainerChanged
-            };
-            _parentFormList?.Add(_dockingDemoForm);
-            _dockingDemoForm.Show(); // Show will set Visible=true and call OnContainerChanged
-            _dockingDemoForm.BringToFront();
-            System.Diagnostics.Debug.WriteLine($"Created and shown. Total forms: {_parentFormList?.Count}");
-        }
-        else if (!_dockingDemoForm.Visible)
-        {
-            System.Diagnostics.Debug.WriteLine("Re-showing existing form");
-            _dockingDemoForm.Show();
-            _dockingDemoForm.BringToFront();
-        }
-        else
-        {
-            System.Diagnostics.Debug.WriteLine("Bringing existing form to front");
-            _dockingDemoForm.BringToFront();
-        }
-    }
-
-    private void BtnControlsDemo_Click(object? sender, EventArgs e)
-    {
-        System.Diagnostics.Debug.WriteLine("Controls Demo button clicked!");
-
-        // Check if form was closed/removed from list
-        if (_controlsDemoForm != null && _parentFormList != null && !_parentFormList.Contains(_controlsDemoForm))
-        {
-            System.Diagnostics.Debug.WriteLine("Form was removed, clearing reference");
-            _controlsDemoForm = null;
-        }
-
-        // Create new instance if needed
-        if (_controlsDemoForm == null)
-        {
-            System.Diagnostics.Debug.WriteLine("Creating new ControlsDemoForm");
-            _controlsDemoForm = new ControlsDemoForm
-            {
-                Left = 700,
-                Top = 50,
-                Width = 400,
-                Height = 550,
-                OnContainerChanged = this.OnContainerChanged
-            };
-            _parentFormList?.Add(_controlsDemoForm);
-            _controlsDemoForm.Show();
-            _controlsDemoForm.BringToFront();
-            System.Diagnostics.Debug.WriteLine($"Created and shown. Total forms: {_parentFormList?.Count}");
-        }
-        else if (!_controlsDemoForm.Visible)
-        {
-            System.Diagnostics.Debug.WriteLine("Re-showing existing form");
-            _controlsDemoForm.Show();
-            _controlsDemoForm.BringToFront();
-        }
-        else
-        {
-            System.Diagnostics.Debug.WriteLine("Bringing existing form to front");
-            _controlsDemoForm.BringToFront();
-        }
-    }
-
-    private void BtnInteractive_Click(object? sender, EventArgs e)
-    {
-        System.Diagnostics.Debug.WriteLine("Interactive button clicked!");
-
-        // Check if form was closed/removed from list
-        if (_interactiveForm != null && _parentFormList != null && !_parentFormList.Contains(_interactiveForm))
-        {
-            System.Diagnostics.Debug.WriteLine("Form was removed, clearing reference");
-            _interactiveForm = null;
-        }
-
-        // Create new instance if needed
-        if (_interactiveForm == null)
-        {
-            System.Diagnostics.Debug.WriteLine("Creating new InteractiveForm");
-            _interactiveForm = new InteractiveForm
-            {
-                Left = 50,
-                Top = 580,
-                Width = 500,
-                Height = 400,
-                OnContainerChanged = this.OnContainerChanged
-            };
-            _parentFormList?.Add(_interactiveForm);
-            _interactiveForm.Show();
-            _interactiveForm.BringToFront();
-            System.Diagnostics.Debug.WriteLine($"Created and shown. Total forms: {_parentFormList?.Count}");
-        }
-        else if (!_interactiveForm.Visible)
-        {
-            System.Diagnostics.Debug.WriteLine("Re-showing existing form");
-            _interactiveForm.Show();
-            _interactiveForm.BringToFront();
-        }
-        else
-        {
-            System.Diagnostics.Debug.WriteLine("Bringing existing form to front");
-            _interactiveForm.BringToFront();
-        }
-    }
-
-    private void BtnDrawingSample_Click(object? sender, EventArgs e)
-    {
-        System.Diagnostics.Debug.WriteLine("Drawing Sample button clicked!");
-
-        // Check if form was closed/removed from list
-        if (_sampleDrawingForm != null && _parentFormList != null && !_parentFormList.Contains(_sampleDrawingForm))
-        {
-            System.Diagnostics.Debug.WriteLine("Form was removed, clearing reference");
-            _sampleDrawingForm = null;
-        }
-
-        // Create new instance if needed
-        if (_sampleDrawingForm == null)
-        {
-            System.Diagnostics.Debug.WriteLine("Creating new SampleDrawingForm");
-            _sampleDrawingForm = new SampleDrawingForm
-            {
-                Left = 600,
-                Top = 580,
-                Width = 600,
-                Height = 400,
-                OnContainerChanged = this.OnContainerChanged
-            };
-            _parentFormList?.Add(_sampleDrawingForm);
-            _sampleDrawingForm.Show();
-            _sampleDrawingForm.BringToFront();
-            System.Diagnostics.Debug.WriteLine($"Created and shown. Total forms: {_parentFormList?.Count}");
-        }
-        else if (!_sampleDrawingForm.Visible)
-        {
-            System.Diagnostics.Debug.WriteLine("Re-showing existing form");
-            _sampleDrawingForm.Show();
-            _sampleDrawingForm.BringToFront();
-        }
-        else
-        {
-            System.Diagnostics.Debug.WriteLine("Bringing existing form to front");
-            _sampleDrawingForm.BringToFront();
-        }
-    }
-
-    private void OnFormPaint(object? sender, PaintEventArgs e)
-    {
-        var g = e.Graphics;
-
-        int y = 320;
-        int lineHeight = 16;
-
-        // Features header
-        using var headerBrush = new SolidBrush(Color.FromArgb(60, 60, 60));
-        g.DrawString("✅ Features Implemented:", "Arial", 12, headerBrush, 20, y);
-        y += 20;
-
-        // Features list (condensed)
-        using var featureBrush = new SolidBrush(Color.FromArgb(80, 80, 80));
-        string[] features = new[]
-        {
-            "Drawing: Primitives, Fills, Pens, Brushes, Colors, Text",
-            "Events: Mouse (click, dblclick, move), Keyboard, Touch",
-            "Forms: Dragging, Resizing, Min/Max/Close, Taskbar",
-            "Layout: Docking (Top/Bottom/Left/Right/Fill), Anchoring",
-            "Controls: Button, Label, TextBox, CheckBox, RadioButton, PictureBox",
-            "Window Manager: Multiple windows, Age-based ordering"
+            Text = "ListBox Demo",
+            Left = 40,
+            Top = 310,
+            Width = 280,
+            Height = 50
         };
-
-        foreach (var feature in features)
+        _btnListControl.Click += (s, e) =>
         {
-            if (y + lineHeight > Height - 20) break;
-            g.DrawString($"• {feature}", "Arial", 9, featureBrush, 30, y);
-            y += lineHeight;
-        }
-
-        // Instructions at bottom
-        if (y + 40 < Height - 10)
-        {
-            y = Height - 50;
-            using var tipBrush = new SolidBrush(Color.FromArgb(100, 100, 100));
-            g.DrawString("💡 Tip: Click buttons above to explore. Resize this form to see anchoring!", 
-                "Arial", 9, tipBrush, 20, y);
-        }
+            Application.FormManager?.ShowOrCreateForm<ListBoxDemoForm>();
+        };
+        Controls.Add(_btnListControl);
     }
 }

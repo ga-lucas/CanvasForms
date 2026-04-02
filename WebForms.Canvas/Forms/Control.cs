@@ -138,6 +138,18 @@ public abstract class Control
 
     public Rectangle DisplayRectangle => ClientRectangle;
 
+    /// <summary>
+    /// Gets the width available for laying out child controls.
+    /// Override in derived classes to account for chrome (e.g., title bar in Forms).
+    /// </summary>
+    protected virtual int LayoutWidth => Width;
+
+    /// <summary>
+    /// Gets the height available for laying out child controls.
+    /// Override in derived classes to account for chrome (e.g., title bar in Forms).
+    /// </summary>
+    protected virtual int LayoutHeight => Height;
+
     // Font properties
     private Font? _font;
     public Font Font
@@ -2017,6 +2029,10 @@ public abstract class Control
 
         if (_controls.Count == 0) return;
 
+        // Use virtual LayoutWidth/LayoutHeight to account for chrome (e.g., title bar in Forms)
+        var layoutWidth = LayoutWidth;
+        var layoutHeight = LayoutHeight;
+
         // First, store original bounds for anchored controls
         foreach (var control in _controls)
         {
@@ -2026,14 +2042,14 @@ public abstract class Control
                 control.OriginalTop = control.Top;
                 control.OriginalWidth = control.Width;
                 control.OriginalHeight = control.Height;
-                control.OriginalParentWidth = this.Width;
-                control.OriginalParentHeight = this.Height;
+                control.OriginalParentWidth = layoutWidth;
+                control.OriginalParentHeight = layoutHeight;
                 control.OriginalBoundsSet = true;
             }
         }
 
-        // Available client area
-        var clientRect = new Rectangle(0, 0, Width, Height);
+        // Available client area for layout
+        var clientRect = new Rectangle(0, 0, layoutWidth, layoutHeight);
 
         // Process docked controls in order: Top, Bottom, Left, Right, then Fill
         var dockedControls = _controls.Where(c => c.Visible && c.Dock != DockStyle.None).ToList();
@@ -2094,8 +2110,8 @@ public abstract class Control
             if (!control.OriginalBoundsSet) continue;
 
             var anchor = control.Anchor;
-            var deltaWidth = Width - control.OriginalParentWidth;
-            var deltaHeight = Height - control.OriginalParentHeight;
+            var deltaWidth = layoutWidth - control.OriginalParentWidth;
+            var deltaHeight = layoutHeight - control.OriginalParentHeight;
 
             // Calculate new position and size based on anchoring
             var left = control.OriginalLeft;

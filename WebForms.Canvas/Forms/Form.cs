@@ -87,6 +87,10 @@ public class Form : Control
     public int ClientWidth => Width;
     public int ClientHeight => Math.Max(0, Height - TitleBarHeight);
 
+    // Override layout dimensions to use client area (excludes title bar)
+    protected override int LayoutWidth => ClientWidth;
+    protected override int LayoutHeight => ClientHeight;
+
     public Form()
     {
         Text = "Form";

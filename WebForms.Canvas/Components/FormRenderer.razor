@@ -126,7 +126,9 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && Form != null)
+        if (Form == null) return;
+
+        if (firstRender)
         {
             _initialized = true;
 
@@ -134,14 +136,25 @@
             Form.TextMeasurementService = new TextMeasurementService(JSRuntime);
 
             // Set RequestRender and propagate to all children
-            var renderFunc = async () => await InvokeAsync(RenderForm);
+            var renderFunc = async () => 
+            {
+                // Only render if canvas ref is still valid and form is still visible
+                if (_canvasRef.Id != null && Form?.Visible == true)
+                {
+                    await RenderForm();
+                }
+            };
             Form.PropagateRequestRender(renderFunc);
-            await RenderForm();
 
             _dotNetRef = DotNetObjectReference.Create(this);
         }
-    }
 
+        // Always render the form after any render cycle if initialized and visible
+        if (_initialized && Form.Visible)
+        {
+            await RenderForm();
+        }
+    }
     private async Task RenderForm()
     {
         // Don't render if not initialized, form is null, or form is not visible
@@ -153,6 +166,14 @@
 
         try
         {
+            // Verify canvas reference is still valid
+            if (_canvasRef.Id == null)
+            {
+                Console.WriteLine("RenderForm: Canvas reference is invalid, skipping render");
+                _renderPending = false;
+                return;
+            }
+
             // First, render the form chrome (title bar, border, window control buttons)
             await JSRuntime.InvokeVoidAsync("renderFormCanvas", _canvasRef, 
                 Form.Width,
@@ -203,9 +224,6 @@
         {
             _renderPending = false;
         }
-
-        // Ensure Blazor component updates on the UI thread
-        StateHasChanged();
     }
 
     // Bring form to front when clicked (synchronous version for drag/resize)
