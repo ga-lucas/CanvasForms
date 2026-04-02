@@ -2,9 +2,12 @@ using WebForms.Canvas.Drawing;
 
 namespace WebForms.Canvas.Forms;
 
-public class RadioButton : Control
+/// <summary>
+/// Represents a Windows Forms radio button control
+/// </summary>
+public class RadioButton : ButtonBase
 {
-    private bool _isHovered = false;
+    private bool _checked = false;
 
     public RadioButton()
     {
@@ -13,10 +16,25 @@ public class RadioButton : Control
         BackColor = Color.Transparent;
         ForeColor = Color.Black;
         Text = "RadioButton";
-        Checked = false;
     }
 
-    public bool Checked { get; set; }
+    /// <summary>
+    /// Gets or sets a value indicating whether the radio button is checked
+    /// </summary>
+    public bool Checked
+    {
+        get => _checked;
+        set
+        {
+            if (_checked != value)
+            {
+                _checked = value;
+                OnCheckedChanged(EventArgs.Empty);
+                Invalidate();
+            }
+        }
+    }
+
     public event EventHandler? CheckedChanged;
 
     protected internal override void OnPaint(PaintEventArgs e)
@@ -38,8 +56,11 @@ public class RadioButton : Control
         var bgColor = Enabled ? Color.White : Color.FromArgb(240, 240, 240);
         g.FillEllipse(new SolidBrush(bgColor), circleBounds);
 
-        // Border
-        var borderColor = _isHovered && Enabled ? Color.FromArgb(0, 120, 215) : Color.FromArgb(122, 122, 122);
+        // Border - use hover state from ButtonBase
+        var state = GetButtonState();
+        var borderColor = (state == ButtonState.Hot || state == ButtonState.Pushed) && Enabled
+            ? Color.FromArgb(0, 120, 215)
+            : Color.FromArgb(122, 122, 122);
         g.DrawEllipse(new Pen(borderColor), circleBounds);
 
         // Draw inner dot if checked
@@ -69,9 +90,10 @@ public class RadioButton : Control
         base.OnPaint(e);
     }
 
-    protected internal override void OnMouseDown(MouseEventArgs e)
+    protected override void OnClick(EventArgs e)
     {
-        if (Enabled && e.Button == MouseButtons.Left && !Checked)
+        // Only check if not already checked
+        if (!Checked)
         {
             // Uncheck other radio buttons in the same parent
             if (Parent != null)
@@ -81,36 +103,14 @@ public class RadioButton : Control
                     if (control is RadioButton rb && rb != this)
                     {
                         rb.Checked = false;
-                        rb.Invalidate();
                     }
                 }
             }
 
             Checked = true;
-            OnCheckedChanged(EventArgs.Empty);
-            Invalidate();
         }
-        base.OnMouseDown(e);
-    }
 
-    protected internal override void OnMouseEnter(EventArgs e)
-    {
-        if (Enabled)
-        {
-            _isHovered = true;
-            Invalidate();
-        }
-        base.OnMouseEnter(e);
-    }
-
-    protected internal override void OnMouseLeave(EventArgs e)
-    {
-        if (_isHovered)
-        {
-            _isHovered = false;
-            Invalidate();
-        }
-        base.OnMouseLeave(e);
+        base.OnClick(e);
     }
 
     protected virtual void OnCheckedChanged(EventArgs e)
@@ -128,5 +128,23 @@ public class RadioButton : Control
     {
         Invalidate();
         base.OnLostFocus(e);
+    }
+
+    /// <summary>
+    /// Gets or sets the appearance of the radio button
+    /// </summary>
+    public Appearance Appearance { get; set; } = Appearance.Normal;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the radio button is automatically checked on click
+    /// </summary>
+    public bool AutoCheck { get; set; } = true;
+
+    /// <summary>
+    /// Simulates a click on the radio button
+    /// </summary>
+    public void PerformClick()
+    {
+        OnClick(EventArgs.Empty);
     }
 }

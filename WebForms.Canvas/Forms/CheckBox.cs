@@ -2,9 +2,12 @@ using WebForms.Canvas.Drawing;
 
 namespace WebForms.Canvas.Forms;
 
-public class CheckBox : Control
+/// <summary>
+/// Represents a Windows Forms checkbox control
+/// </summary>
+public class CheckBox : ButtonBase
 {
-    private bool _isHovered = false;
+    private bool _checked = false;
 
     public CheckBox()
     {
@@ -13,10 +16,25 @@ public class CheckBox : Control
         BackColor = Color.Transparent;
         ForeColor = Color.Black;
         Text = "CheckBox";
-        Checked = false;
     }
 
-    public bool Checked { get; set; }
+    /// <summary>
+    /// Gets or sets a value indicating whether the check box is checked
+    /// </summary>
+    public bool Checked
+    {
+        get => _checked;
+        set
+        {
+            if (_checked != value)
+            {
+                _checked = value;
+                OnCheckedChanged(EventArgs.Empty);
+                Invalidate();
+            }
+        }
+    }
+
     public event EventHandler? CheckedChanged;
 
     protected internal override void OnPaint(PaintEventArgs e)
@@ -38,8 +56,11 @@ public class CheckBox : Control
         var bgColor = Enabled ? Color.White : Color.FromArgb(240, 240, 240);
         g.FillRectangle(new SolidBrush(bgColor), boxBounds);
 
-        // Border
-        var borderColor = _isHovered && Enabled ? Color.FromArgb(0, 120, 215) : Color.FromArgb(122, 122, 122);
+        // Border - use hover state from ButtonBase
+        var state = GetButtonState();
+        var borderColor = (state == ButtonState.Hot || state == ButtonState.Pushed) && Enabled
+            ? Color.FromArgb(0, 120, 215)
+            : Color.FromArgb(122, 122, 122);
         g.DrawRectangle(new Pen(borderColor), boxBounds);
 
         // Draw checkmark if checked
@@ -72,35 +93,11 @@ public class CheckBox : Control
         base.OnPaint(e);
     }
 
-    protected internal override void OnMouseDown(MouseEventArgs e)
+    protected override void OnClick(EventArgs e)
     {
-        if (Enabled && e.Button == MouseButtons.Left)
-        {
-            Checked = !Checked;
-            OnCheckedChanged(EventArgs.Empty);
-            Invalidate();
-        }
-        base.OnMouseDown(e);
-    }
-
-    protected internal override void OnMouseEnter(EventArgs e)
-    {
-        if (Enabled)
-        {
-            _isHovered = true;
-            Invalidate();
-        }
-        base.OnMouseEnter(e);
-    }
-
-    protected internal override void OnMouseLeave(EventArgs e)
-    {
-        if (_isHovered)
-        {
-            _isHovered = false;
-            Invalidate();
-        }
-        base.OnMouseLeave(e);
+        // Toggle checked state on click
+        Checked = !Checked;
+        base.OnClick(e);
     }
 
     protected virtual void OnCheckedChanged(EventArgs e)
@@ -119,4 +116,43 @@ public class CheckBox : Control
         Invalidate();
         base.OnLostFocus(e);
     }
+
+    /// <summary>
+    /// Gets or sets the appearance of the check box
+    /// </summary>
+    public Appearance Appearance { get; set; } = Appearance.Normal;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the check box will allow three check states
+    /// </summary>
+    public bool ThreeState { get; set; } = false;
+
+    /// <summary>
+    /// Gets or sets the state of the check box
+    /// </summary>
+    public CheckState CheckState { get; set; } = CheckState.Unchecked;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the check box is automatically checked on click
+    /// </summary>
+    public bool AutoCheck { get; set; } = true;
+}
+
+/// <summary>
+/// Specifies the appearance of a check box
+/// </summary>
+public enum Appearance
+{
+    Normal,
+    Button
+}
+
+/// <summary>
+/// Specifies the state of a check box
+/// </summary>
+public enum CheckState
+{
+    Unchecked,
+    Checked,
+    Indeterminate
 }

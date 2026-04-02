@@ -23,7 +23,7 @@ public abstract class ButtonBase : Control
 
     protected ButtonBase()
     {
-        SetStyle(ControlStyles.Selectable | ControlStyles.StandardClick | ControlStyles.UserPaint, true);
+        this.SetStyle(ControlStyles.Selectable | ControlStyles.StandardClick | ControlStyles.UserPaint, true);
         TabStop = true;
     }
 
@@ -43,7 +43,7 @@ public abstract class ButtonBase : Control
         return ButtonState.Normal;
     }
 
-    protected override void OnMouseDown(MouseEventArgs e)
+    protected internal override void OnMouseDown(MouseEventArgs e)
     {
         if (Enabled && e.Button == MouseButtons.Left)
         {
@@ -54,7 +54,7 @@ public abstract class ButtonBase : Control
         base.OnMouseDown(e);
     }
 
-    protected override void OnMouseUp(MouseEventArgs e)
+    protected internal override void OnMouseUp(MouseEventArgs e)
     {
         bool wasPressed = _isPressed;
         _isPressed = false;
@@ -73,14 +73,14 @@ public abstract class ButtonBase : Control
         base.OnMouseUp(e);
     }
 
-    protected override void OnMouseEnter(EventArgs e)
+    protected internal override void OnMouseEnter(EventArgs e)
     {
         _isHovered = true;
         Invalidate();
         base.OnMouseEnter(e);
     }
 
-    protected override void OnMouseLeave(EventArgs e)
+    protected internal override void OnMouseLeave(EventArgs e)
     {
         _isHovered = false;
         _isPressed = false;
@@ -88,7 +88,7 @@ public abstract class ButtonBase : Control
         base.OnMouseLeave(e);
     }
 
-    protected override void OnKeyDown(KeyEventArgs e)
+    protected internal override void OnKeyDown(KeyEventArgs e)
     {
         if (e.KeyCode == Keys.Space || e.KeyCode == Keys.Enter)
         {
@@ -99,7 +99,7 @@ public abstract class ButtonBase : Control
         base.OnKeyDown(e);
     }
 
-    protected override void OnKeyUp(KeyEventArgs e)
+    protected internal override void OnKeyUp(KeyEventArgs e)
     {
         if (e.KeyCode == Keys.Space || e.KeyCode == Keys.Enter)
         {
@@ -157,22 +157,6 @@ public enum FlatStyle
     Popup,
     Standard,
     System
-}
-
-/// <summary>
-/// Specifies the alignment of content on a drawing surface
-/// </summary>
-public enum ContentAlignment
-{
-    TopLeft,
-    TopCenter,
-    TopRight,
-    MiddleLeft,
-    MiddleCenter,
-    MiddleRight,
-    BottomLeft,
-    BottomCenter,
-    BottomRight
 }
 
 /// <summary>
