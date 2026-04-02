@@ -16,12 +16,15 @@ public class ControlsDemoForm : Form
     private RadioButton? _radio2;
     private RadioButton? _radio3;
     private PictureBox? _pictureBox;
+    private ComboBox? _comboBox1;
+    private ComboBox? _comboBox2;
+    private Label? _comboBoxOutput;
 
     public ControlsDemoForm()
     {
         Text = "Controls Demo";
         Width = 400;
-        Height = 550;
+        Height = 600;
         BackColor = Color.FromArgb(240, 240, 240);
 
         InitializeControls();
@@ -182,12 +185,93 @@ public class ControlsDemoForm : Form
         };
         Controls.Add(statusLabel);
 
+        // ComboBox Section
+        var comboLabel = new Label
+        {
+            Text = "ComboBoxes:",
+            Left = 10,
+            Top = 370,
+            Width = 100,
+            Height = 20,
+            ForeColor = Color.Black
+        };
+        Controls.Add(comboLabel);
+
+        // DropDownList style (non-editable)
+        _comboBox1 = new ComboBox
+        {
+            Left = 10,
+            Top = 395,
+            Width = 150,
+            DropDownStyle = ComboBoxStyle.DropDownList
+        };
+        _comboBox1.Items.Add("Red");
+        _comboBox1.Items.Add("Green");
+        _comboBox1.Items.Add("Blue");
+        _comboBox1.Items.Add("Yellow");
+        _comboBox1.Items.Add("Orange");
+        _comboBox1.Items.Add("Purple");
+        _comboBox1.Items.Add("Cyan");
+        _comboBox1.Items.Add("Magenta");
+        _comboBox1.SelectedIndex = 0;
+        _comboBox1.SelectedIndexChanged += ComboBox1_SelectedIndexChanged;
+        Controls.Add(_comboBox1);
+
+        var combo1Label = new Label
+        {
+            Text = "(DropDownList)",
+            Left = 170,
+            Top = 397,
+            Width = 100,
+            Height = 20,
+            ForeColor = Color.FromArgb(128, 128, 128)
+        };
+        Controls.Add(combo1Label);
+
+        // DropDown style (editable)
+        _comboBox2 = new ComboBox
+        {
+            Left = 10,
+            Top = 425,
+            Width = 150,
+            DropDownStyle = ComboBoxStyle.DropDown
+        };
+        _comboBox2.Items.Add("Apple");
+        _comboBox2.Items.Add("Banana");
+        _comboBox2.Items.Add("Cherry");
+        _comboBox2.Items.Add("Date");
+        _comboBox2.Items.Add("Elderberry");
+        _comboBox2.SelectedIndexChanged += ComboBox2_SelectedIndexChanged;
+        Controls.Add(_comboBox2);
+
+        var combo2Label = new Label
+        {
+            Text = "(DropDown)",
+            Left = 170,
+            Top = 427,
+            Width = 100,
+            Height = 20,
+            ForeColor = Color.FromArgb(128, 128, 128)
+        };
+        Controls.Add(combo2Label);
+
+        _comboBoxOutput = new Label
+        {
+            Text = "ComboBox selection: Red",
+            Left = 10,
+            Top = 455,
+            Width = 380,
+            Height = 20,
+            ForeColor = Color.FromArgb(64, 64, 64)
+        };
+        Controls.Add(_comboBoxOutput);
+
         // PictureBox Section
         var pictureLabel = new Label
         {
             Text = "PictureBox:",
             Left = 10,
-            Top = 370,
+            Top = 485,
             Width = 100,
             Height = 20,
             ForeColor = Color.Black
@@ -197,19 +281,19 @@ public class ControlsDemoForm : Form
         _pictureBox = new PictureBox
         {
             Left = 10,
-            Top = 395,
+            Top = 510,
             Width = 150,
-            Height = 100,
-            ImageUrl = "https://via.placeholder.com/150x100", // Placeholder image
+            Height = 60,
+            ImageUrl = "https://via.placeholder.com/150x60", // Placeholder image
             SizeMode = PictureBoxSizeMode.StretchImage
         };
         Controls.Add(_pictureBox);
 
         var pictureInfo = new Label
         {
-            Text = "Image loaded from server URL",
+            Text = "Image loaded from URL",
             Left = 170,
-            Top = 395,
+            Top = 510,
             Width = 210,
             Height = 40,
             ForeColor = Color.FromArgb(64, 64, 64)
@@ -260,6 +344,22 @@ public class ControlsDemoForm : Form
         if (sender is RadioButton rb && rb.Checked)
         {
             System.Diagnostics.Debug.WriteLine($"Selected: {rb.Text}");
+        }
+    }
+
+    private void ComboBox1_SelectedIndexChanged(object? sender, EventArgs e)
+    {
+        if (_comboBoxOutput != null && _comboBox1 != null)
+        {
+            _comboBoxOutput.Text = $"ComboBox selection: {_comboBox1.Text}";
+        }
+    }
+
+    private void ComboBox2_SelectedIndexChanged(object? sender, EventArgs e)
+    {
+        if (_comboBoxOutput != null && _comboBox2 != null)
+        {
+            _comboBoxOutput.Text = $"ComboBox selection: {_comboBox2.Text}";
         }
     }
 }

@@ -161,8 +161,6 @@ function getOffscreenCanvas(canvas, allowResize = true) {
 
     // Resize buffer to match canvas if allowed and sizes differ
     if (allowResize && (offscreen.width !== canvas.width || offscreen.height !== canvas.height)) {
-        //console.log('Resizing offscreen buffer:', offscreen.width, 'x', offscreen.height, 
-        //    '→', canvas.width, 'x', canvas.height);
         offscreen.width = canvas.width;
         offscreen.height = canvas.height;
     }
@@ -263,6 +261,12 @@ window.measureTextBatch = (fontFamily, fontSize, texts) => {
         return;
     }
 
+    // Enable better text rendering
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.textRendering = 'optimizeLegibility'; // Not widely supported but doesn't hurt
+    ctx.fontKerning = 'normal';
+
     // Clear and reset to prevent artifacts during resize
     ctx.clearRect(0, 0, offscreen.width, offscreen.height);
     ctx.fillStyle = backColor;
@@ -283,7 +287,7 @@ window.measureTextBatch = (fontFamily, fontSize, texts) => {
     ctx.fillStyle = gradient;
     ctx.fillRect(borderWidth, borderWidth, width - (borderWidth * 2), titleBarHeight);
 
-    // Draw title text
+    // Draw title text with anti-aliasing
     ctx.fillStyle = 'white';
     ctx.font = '14px "Segoe UI", Arial, sans-serif';
     ctx.textBaseline = 'middle';
@@ -398,6 +402,10 @@ window.renderClientArea = async (canvas, offsetX, offsetY, commands) => {
         console.error('Failed to get 2D context for client area');
         return;
     }
+
+    // Enable better text rendering
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
 
     // Save context state
     ctx.save();

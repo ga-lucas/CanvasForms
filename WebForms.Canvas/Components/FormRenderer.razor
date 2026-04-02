@@ -34,7 +34,6 @@
                    cursor: @GetCanvasCursor();
                    user-select: none;
                    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-                   image-rendering: pixelated;
                    transition: @(_enableAnimation ? $"left {AnimationDurationMs}ms ease-out, top {AnimationDurationMs}ms ease-out, width {AnimationDurationMs}ms ease-out, height {AnimationDurationMs}ms ease-out" : "none");
                    will-change: @(_isResizing || _isDragging ? "transform" : "auto");">
     </canvas>

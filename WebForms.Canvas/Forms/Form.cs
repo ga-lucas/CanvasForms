@@ -178,23 +178,54 @@ public class Form : Control
                 new Rectangle(0, 0, control.Width, control.Height)
             );
 
-            // Let control paint itself
-            control.OnPaint(controlPaintArgs);
+            // Let control paint itself (but skip drop-downs for ComboBox)
+            if (control is ComboBox comboBox)
+            {
+                comboBox.PaintWithoutDropDown(controlPaintArgs);
+            }
+            else
+            {
+                control.OnPaint(controlPaintArgs);
+            }
 
             // Restore graphics state
             g.TranslateTransform(-control.Left, -control.Top);
+        }
+
+        // Paint all ComboBox drop-downs on top of everything
+        foreach (var control in Controls)
+        {
+            if (control is ComboBox comboBox && comboBox.DroppedDown && control.Visible)
+            {
+                // Translate to control position
+                g.TranslateTransform(control.Left, control.Top);
+
+                // Paint just the drop-down
+                var dropDownPaintArgs = new PaintEventArgs(
+                    g,
+                    new Rectangle(0, 0, control.Width, control.Height)
+                );
+                comboBox.PaintDropDownOnly(dropDownPaintArgs);
+
+                // Restore
+                g.TranslateTransform(-control.Left, -control.Top);
+            }
         }
     }
 
     protected internal override void OnMouseDown(MouseEventArgs e)
     {
         // Check if any child control was clicked
+        bool hitAnyControl = false;
+
         foreach (var control in Controls)
         {
             if (!control.Visible || !control.Enabled) continue;
 
             if (HitTest(control, e.X, e.Y))
             {
+                hitAnyControl = true;
+
                 // Set focus to this control
                 FocusedControl = control;
 
@@ -205,14 +236,40 @@ public class Form : Control
                     e.Y - control.Top
                 );
                 control.OnMouseDown(controlArgs);
-                return; // Don't propagate to form
+                break; // Don't check other controls
             }
         }
 
-        // Clicked on form background - clear focus
-        FocusedControl = null;
+        if (!hitAnyControl)
+        {
+            // Clicked on form background - clear focus and close any open ComboBox drop-downs
+            FocusedControl = null;
 
-        base.OnMouseDown(e);
+            // Close all ComboBox drop-downs
+            foreach (var control in Controls)
+            {
+                if (control is ComboBox comboBox && comboBox.DroppedDown)
+                {
+                    comboBox.DroppedDown = false;
+                }
+            }
+        }
+        else
+        {
+            // Close other ComboBox drop-downs (keep only the clicked one open if it's a ComboBox)
+            foreach (var control in Controls)
+            {
+                if (control is ComboBox comboBox && comboBox != FocusedControl && comboBox.DroppedDown)
+                {
+                    comboBox.DroppedDown = false;
+                }
+            }
+        }
+
+        if (!hitAnyControl)
+        {
+            base.OnMouseDown(e);
+        }
     }
 
     protected internal override void OnMouseUp(MouseEventArgs e)
@@ -263,8 +320,25 @@ public class Form : Control
 
     private bool HitTest(Control control, int x, int y)
     {
-        return x >= control.Left && x < control.Left + control.Width &&
-               y >= control.Top && y < control.Top + control.Height;
+        // Normal bounds check
+        var inNormalBounds = x >= control.Left && x < control.Left + control.Width &&
+                             y >= control.Top && y < control.Top + control.Height;
+
+        if (inNormalBounds)
+            return true;
+
+        // Special case: ComboBox with drop-down open
+        if (control is ComboBox comboBox && comboBox.DroppedDown)
+        {
+            // Check if clicking in drop-down area (below the control)
+            var dropDownHeight = comboBox.DropDownHeight;
+            var dropDownWidth = comboBox.DropDownWidth;
+
+            return x >= control.Left && x < control.Left + dropDownWidth &&
+                   y >= control.Top + control.Height && y < control.Top + control.Height + dropDownHeight;
+        }
+
+        return false;
     }
 
     protected internal override void OnKeyDown(KeyEventArgs e)
