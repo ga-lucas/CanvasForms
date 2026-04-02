@@ -5,24 +5,37 @@
 ### Immediate Rendering on Double-Click Maximize (Fixed)
 **Issue:** When double-clicking to maximize, the form would move but not resize/change icon until clicked again.
 
-**Root Cause:** The `ToggleMaximize()` method wasn't forcing an immediate re-render after changing window state.
+**Root Cause:** The `ToggleMaximize()` method wasn't forcing an immediate re-render after changing window state. Blazor's state management wasn't picking up the changes immediately.
 
 **Solution:** 
 - Made `ToggleMaximize()` async
+- Added multiple `StateHasChanged()` calls with `Task.Yield()` between them
+- This forces Blazor to process the state changes on the UI thread
 - Added explicit `await RenderForm()` call after state change
 - Ensures immediate visual update of size and icon
+
+```csharp
+// Force multiple state updates to ensure immediate visual update
+StateHasChanged();
+await Task.Yield(); // Let Blazor process the state change
+StateHasChanged();
+await RenderForm();
+StateHasChanged();
+```
 
 ### Windows-Style Drag from Maximize (Fixed)
 **Issue:** When dragging a maximized window, it would stay at full size instead of restoring to previous size.
 
-**Root Cause:** The drag operation didn't detect maximized state and restore the window first.
+**Root Cause:** The drag operation didn't detect maximized state and restore the window first. Additionally, Blazor wasn't immediately updating the UI to reflect the size change.
 
 **Solution:** Enhanced `StartDrag()` to:
 1. Detect if window is maximized when drag starts
 2. Automatically restore the window to previous size
 3. Calculate mouse position ratio to keep cursor under the same relative spot
 4. Position the restored window so it "sticks" to the cursor
-5. This matches Windows desktop behavior perfectly
+5. Force multiple state updates with `Task.Yield()` to ensure Blazor processes changes
+6. Trigger explicit rendering
+7. This matches Windows desktop behavior perfectly
 
 ```csharp
 // If window is maximized, restore it first (Windows-style behavior)
@@ -34,6 +47,9 @@ if (Form.WindowState == FormWindowState.Maximized)
     // Restore the window
     Form.Restore();
 
+    // Trigger layout update after restore
+    Form.PerformLayout();
+
     // Adjust position so mouse stays under same relative position
     _formStartLeft = (int)(e.ClientX - (Form.Width * mouseXRatio));
     _formStartTop = 0;
@@ -42,8 +58,12 @@ if (Form.WindowState == FormWindowState.Maximized)
     Form.Left = _formStartLeft;
     Form.Top = _formStartTop;
 
-    // Trigger re-render to show restored size
+    // Force multiple state updates to ensure Blazor picks up the changes
+    StateHasChanged();
+    await Task.Yield(); // Yield to allow Blazor to process
+    StateHasChanged();
     await RenderForm();
+    StateHasChanged();
 }
 ```
 

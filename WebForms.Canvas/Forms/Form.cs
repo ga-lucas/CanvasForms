@@ -105,6 +105,26 @@ public class Form : Control
         Invalidate();
     }
 
+    /// <summary>
+    /// Brings the form to front only if it's not already the topmost form.
+    /// </summary>
+    /// <param name="currentMaxZIndex">The current maximum z-index of all visible forms</param>
+    /// <returns>True if the z-index was changed, false otherwise</returns>
+    public bool BringToFrontIfNeeded(int currentMaxZIndex)
+    {
+        if (ZIndex < currentMaxZIndex)
+        {
+            ZIndex = _nextZIndex++;
+            OnActivated(EventArgs.Empty);
+            Invalidate();
+            return true;
+        }
+
+        // Already at front, just fire activated event
+        OnActivated(EventArgs.Empty);
+        return false;
+    }
+
     public Graphics CreateGraphics()
     {
         return new Graphics(ClientWidth, ClientHeight);

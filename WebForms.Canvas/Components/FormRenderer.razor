@@ -35,8 +35,24 @@
                    user-select: none;
                    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
                    image-rendering: pixelated;
-                   will-change: @(_isResizing ? "width, height" : "auto");">
+                   transition: @(_enableAnimation ? $"left {AnimationDurationMs}ms ease-out, top {AnimationDurationMs}ms ease-out, width {AnimationDurationMs}ms ease-out, height {AnimationDurationMs}ms ease-out" : "none");
+                   will-change: @(_isResizing || _isDragging ? "transform" : "auto");">
     </canvas>
+
+    @if (_showMaximizePreview)
+    {
+        <div style="position: fixed;
+                    left: 0;
+                    top: @(TaskbarHeight)px;
+                    width: @(ViewportWidth)px;
+                    height: @(ViewportHeight - TaskbarHeight)px;
+                    border: 3px solid #4a90e2;
+                    background-color: rgba(74, 144, 226, 0.1);
+                    pointer-events: none;
+                    z-index: 9999;
+                    box-sizing: border-box;">
+        </div>
+    }
 }
 
 @code {
@@ -86,6 +102,14 @@
     private bool _maximizeButtonHover = false;
     private int _lastMouseX = 0;
     private int _lastMouseY = 0;
+
+    // Animation state
+    private bool _enableAnimation = false;
+    private const int AnimationDurationMs = 200; // Low priority, quick animation
+
+    // Snap-to-maximize state
+    private bool _showMaximizePreview = false;
+    private const int SnapToTopThreshold = 5; // Pixels from top to trigger snap
 
     private enum ResizeDirection
     {
@@ -190,10 +214,21 @@
         if (Form == null) return;
 
         var oldZIndex = Form.ZIndex;
-        Form.BringToFront();
+        var currentMaxZIndex = GetMaxZIndex?.Invoke() ?? 0;
 
-        _ = JSRuntime.InvokeVoidAsync("console.log", 
-            $"BringToFront: '{Form.Text}' z-index {oldZIndex} → {Form.ZIndex}");
+        // Only increment z-index if not already at front
+        var changed = Form.BringToFrontIfNeeded(currentMaxZIndex);
+
+        if (changed)
+        {
+            _ = JSRuntime.InvokeVoidAsync("console.log", 
+                $"BringToFront: '{Form.Text}' z-index {oldZIndex} → {Form.ZIndex}");
+        }
+        else
+        {
+            _ = JSRuntime.InvokeVoidAsync("console.log", 
+                $"BringToFront: '{Form.Text}' already at front (z-index {Form.ZIndex})");
+        }
     }
 
     // Hit-testing helpers
@@ -316,6 +351,9 @@
             // Restore the window
             Form.Restore();
 
+            // Trigger layout update after restore
+            Form.PerformLayout();
+
             // Adjust the starting position so the mouse stays under the same relative position
             // This makes the window "stick" to the cursor when dragging from maximized
             _formStartLeft = (int)(e.ClientX - (Form.Width * mouseXRatio));
@@ -325,10 +363,12 @@
             Form.Left = _formStartLeft;
             Form.Top = _formStartTop;
 
-            // Force immediate Blazor state update and re-render
+            // Force multiple state updates to ensure Blazor picks up the changes
             StateHasChanged();
-            await InvokeAsync(StateHasChanged);
+            await Task.Yield(); // Yield to allow Blazor to process
+            StateHasChanged();
             await RenderForm();
+            StateHasChanged();
         }
 
         await JSRuntime.InvokeVoidAsync("setActiveFormRenderer", _dotNetRef);
@@ -373,6 +413,25 @@
             var deltaY = (int)(clientY - _dragStartY);
             Form.Left = _formStartLeft + deltaX;
             Form.Top = _formStartTop + deltaY;
+
+            // Check for snap-to-top maximize (only for normal windows)
+            if (Form.WindowState == FormWindowState.Normal)
+            {
+                // Calculate actual screen Y position
+                var screenY = clientY - TaskbarHeight;
+
+                if (screenY <= SnapToTopThreshold && !_showMaximizePreview)
+                {
+                    // Show maximize preview
+                    _showMaximizePreview = true;
+                }
+                else if (screenY > SnapToTopThreshold && _showMaximizePreview)
+                {
+                    // Hide maximize preview
+                    _showMaximizePreview = false;
+                }
+            }
+
             StateHasChanged();
         }
         else if (_isResizing)
@@ -520,12 +579,20 @@
     {
         var wasResizing = _isResizing;
         var wasDragging = _isDragging;
+        var shouldSnapMaximize = _showMaximizePreview && wasDragging;
 
         _isDragging = false;
         _isResizing = false;
         _resizeDirection = ResizeDirection.None;
+        _showMaximizePreview = false; // Hide preview
 
-        if (wasResizing || wasDragging)
+        // Check if we should snap-to-maximize
+        if (shouldSnapMaximize && Form != null)
+        {
+            // Maximize the form with animation
+            await ToggleMaximize();
+        }
+        else if (wasResizing || wasDragging)
         {
             // Ensure title bar is visible after moving or resizing
             if (Form != null && _dotNetRef != null)
@@ -959,6 +1026,10 @@
     {
         if (Form == null) return;
 
+        // Enable animation for smooth transition
+        _enableAnimation = true;
+        StateHasChanged();
+
         if (Form.WindowState == FormWindowState.Maximized)
         {
             Form.Restore();
@@ -972,9 +1043,17 @@
         // Trigger layout after window state change
         Form.PerformLayout();
 
-        // Force immediate re-render to update size and icon
+        // Force multiple state updates to ensure immediate visual update
+        StateHasChanged();
+        await Task.Yield(); // Let Blazor process the state change
         StateHasChanged();
         await RenderForm();
+        StateHasChanged();
+
+        // Disable animation after transition completes
+        await Task.Delay(AnimationDurationMs);
+        _enableAnimation = false;
+        StateHasChanged();
     }
 
     // Helper methods
@@ -1079,6 +1158,10 @@
 
     [Parameter]
     public int TaskbarHeight { get; set; } = 32;
+
+    // Callback to get current max z-index from Desktop
+    [Parameter]
+    public Func<int>? GetMaxZIndex { get; set; }
 
     /// <summary>
     /// Ensures the form's title bar is visible within the viewport.

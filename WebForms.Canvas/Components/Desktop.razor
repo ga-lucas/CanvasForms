@@ -49,7 +49,8 @@
                           Form="@form" 
                           ViewportWidth="@_viewportWidth" 
                           ViewportHeight="@_viewportHeight"
-                          TaskbarHeight="@TaskbarHeight" />
+                          TaskbarHeight="@TaskbarHeight"
+                          GetMaxZIndex="@GetCurrentMaxZIndex" />
         }
     </div>
 </div>
@@ -178,6 +179,17 @@
         form.BringToFront();
         _activeForm = form;
         StateHasChanged();
+    }
+
+    /// <summary>
+    /// Gets the current maximum z-index of all visible forms
+    /// </summary>
+    private int GetCurrentMaxZIndex()
+    {
+        return Forms.Where(f => f.Visible && f.WindowState != FormWindowState.Minimized)
+                    .Select(f => f.ZIndex)
+                    .DefaultIfEmpty(0)
+                    .Max();
     }
 
     public void Dispose()
