@@ -6,6 +6,25 @@ namespace WebForms.Canvas.Drawing;
 public abstract class DrawingCommand
 {
     public abstract string ToJavaScript();
+
+    // Structured command representation to avoid building/executing JS source strings.
+    // Format: object[] where [0] is an int opcode and remaining entries are primitive args.
+    public abstract object[] ToCommand();
+}
+
+internal static class CanvasCommandOp
+{
+    public const int StrokeLine = 1;
+    public const int StrokeRect = 2;
+    public const int FillRect = 3;
+    public const int StrokeEllipse = 4;
+    public const int FillEllipse = 5;
+    public const int DrawText = 6;
+    public const int Clear = 7;
+    public const int Save = 8;
+    public const int Restore = 9;
+    public const int ClipRect = 10;
+    public const int DrawImage = 11;
 }
 
 public class DrawLineCommand : DrawingCommand
@@ -36,6 +55,9 @@ public class DrawLineCommand : DrawingCommand
         sb.AppendLine("ctx.stroke();");
         return sb.ToString();
     }
+
+    public override object[] ToCommand()
+        => new object[] { CanvasCommandOp.StrokeLine, X1, Y1, X2, Y2, Pen.Width, Pen.Color.ToRgbaString() };
 }
 
 public class DrawRectangleCommand : DrawingCommand
@@ -63,6 +85,9 @@ public class DrawRectangleCommand : DrawingCommand
         sb.AppendLine($"ctx.strokeRect({X}, {Y}, {Width}, {Height});");
         return sb.ToString();
     }
+
+    public override object[] ToCommand()
+        => new object[] { CanvasCommandOp.StrokeRect, X, Y, Width, Height, Pen.Width, Pen.Color.ToRgbaString() };
 }
 
 public class FillRectangleCommand : DrawingCommand
@@ -91,6 +116,12 @@ public class FillRectangleCommand : DrawingCommand
         }
         sb.AppendLine($"ctx.fillRect({X}, {Y}, {Width}, {Height});");
         return sb.ToString();
+    }
+
+    public override object[] ToCommand()
+    {
+        var color = Brush is SolidBrush solidBrush ? solidBrush.Color.ToRgbaString() : "rgba(0,0,0,1)";
+        return new object[] { CanvasCommandOp.FillRect, X, Y, Width, Height, color };
     }
 }
 
@@ -126,6 +157,9 @@ public class DrawEllipseCommand : DrawingCommand
         sb.AppendLine("ctx.stroke();");
         return sb.ToString();
     }
+
+    public override object[] ToCommand()
+        => new object[] { CanvasCommandOp.StrokeEllipse, X, Y, Width, Height, Pen.Width, Pen.Color.ToRgbaString() };
 }
 
 public class FillEllipseCommand : DrawingCommand
@@ -162,6 +196,12 @@ public class FillEllipseCommand : DrawingCommand
         sb.AppendLine("ctx.fill();");
         return sb.ToString();
     }
+
+    public override object[] ToCommand()
+    {
+        var color = Brush is SolidBrush solidBrush ? solidBrush.Color.ToRgbaString() : "rgba(0,0,0,1)";
+        return new object[] { CanvasCommandOp.FillEllipse, X, Y, Width, Height, color };
+    }
 }
 
 public class DrawStringCommand : DrawingCommand
@@ -195,6 +235,12 @@ public class DrawStringCommand : DrawingCommand
         sb.AppendLine($"ctx.fillText('{Text.Replace("'", "\\'")}', {X}, {Y});");
         return sb.ToString();
     }
+
+    public override object[] ToCommand()
+    {
+        var color = Brush is SolidBrush solidBrush ? solidBrush.Color.ToRgbaString() : "rgba(0,0,0,1)";
+        return new object[] { CanvasCommandOp.DrawText, Text, FontFamily, FontSize, X, Y, color };
+    }
 }
 
 public class ClearCommand : DrawingCommand
@@ -217,6 +263,9 @@ public class ClearCommand : DrawingCommand
         sb.AppendLine($"ctx.fillRect(0, 0, {Width}, {Height});");
         return sb.ToString();
     }
+
+    public override object[] ToCommand()
+        => new object[] { CanvasCommandOp.Clear, Width, Height, BackColor.ToRgbaString() };
 }
 
 public class SaveStateCommand : DrawingCommand
@@ -225,6 +274,9 @@ public class SaveStateCommand : DrawingCommand
     {
         return "ctx.save();";
     }
+
+    public override object[] ToCommand()
+        => new object[] { CanvasCommandOp.Save };
 }
 
 public class RestoreStateCommand : DrawingCommand
@@ -233,6 +285,9 @@ public class RestoreStateCommand : DrawingCommand
     {
         return "ctx.restore();";
     }
+
+    public override object[] ToCommand()
+        => new object[] { CanvasCommandOp.Restore };
 }
 
 public class SetClipCommand : DrawingCommand
@@ -252,6 +307,9 @@ public class SetClipCommand : DrawingCommand
         sb.AppendLine("ctx.clip();");
         return sb.ToString();
     }
+
+    public override object[] ToCommand()
+        => new object[] { CanvasCommandOp.ClipRect, ClipRect.X, ClipRect.Y, ClipRect.Width, ClipRect.Height };
 }
 
 public class DrawImageCommand : DrawingCommand
@@ -278,4 +336,7 @@ public class DrawImageCommand : DrawingCommand
         sb.AppendLine($"await drawImageAsync(ctx, '{ImageUrl.Replace("'", "\\'")}', {X}, {Y}, {Width}, {Height});");
         return sb.ToString();
     }
+
+    public override object[] ToCommand()
+        => new object[] { CanvasCommandOp.DrawImage, ImageUrl, X, Y, Width, Height };
 }

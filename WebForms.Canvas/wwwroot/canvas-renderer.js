@@ -10,6 +10,10 @@ const imageCache = new Map();
 // Cache for failed image URLs (don't retry)
 const failedImages = new Set();
 
+// Reusable canvas/context for text measurement (avoid allocating a new canvas per call)
+const __measureCanvas = document.createElement('canvas');
+const __measureCtx = __measureCanvas.getContext('2d');
+
 // Preload an image into cache without drawing
 window.preloadImage = async function(imageUrl) {
     if (!imageUrl || imageUrl.trim() === '') {
@@ -39,6 +43,198 @@ window.preloadImage = async function(imageUrl) {
         imageCache.set(imageUrl, img);
     } catch (error) {
         console.warn('Image preload failed:', error.message);
+    }
+};
+
+// Fast-path updates for canvas element position without triggering a Blazor re-render.
+// Used during drag operations to reduce UI-thread pressure.
+window.setCanvasPosition = (canvas, left, top) => {
+    if (!canvas) return;
+    canvas.style.left = `${left}px`;
+    canvas.style.top = `${top}px`;
+};
+
+// Fast-path updates for both canvas element position and backing store size.
+// Setting canvas.width/height updates the drawing buffer (and resets context state).
+// We only update when values change.
+window.setCanvasBounds = (canvas, left, top, width, height) => {
+    if (!canvas) return;
+
+    canvas.style.left = `${left}px`;
+    canvas.style.top = `${top}px`;
+
+    if (typeof width === 'number' && width > 0 && canvas.width !== width) {
+        canvas.width = width;
+    }
+
+    if (typeof height === 'number' && height > 0 && canvas.height !== height) {
+        canvas.height = height;
+    }
+};
+
+// Render user drawing commands in the client area using a structured command buffer.
+// commands: array of arrays. Each command is [op, ...args].
+// This avoids generating/evaluating JS source and is significantly faster/safer.
+window.renderClientAreaCommands = async (canvas, offsetX, offsetY, commands) => {
+    // Safety check for null canvas
+    if (!canvas || !canvas.width || !canvas.height) {
+        console.warn('renderClientAreaCommands: Invalid canvas element');
+        return;
+    }
+
+    const offscreen = getOffscreenCanvas(canvas, false);
+    if (!offscreen) {
+        console.warn('renderClientAreaCommands: Failed to get offscreen canvas');
+        return;
+    }
+
+    const ctx = offscreen.getContext('2d', {
+        alpha: false,
+        desynchronized: true
+    });
+
+    if (!ctx) {
+        console.error('Failed to get 2D context for client area');
+        return;
+    }
+
+    // Enable better text rendering
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
+    // Save context state
+    ctx.save();
+
+    // Translate to client area origin
+    ctx.translate(offsetX, offsetY);
+
+    // Clip to client area bounds
+    const clientWidth = canvas.width - (offsetX * 2);
+    const clientHeight = canvas.height - offsetY - offsetX;
+    ctx.beginPath();
+    ctx.rect(0, 0, clientWidth, clientHeight);
+    ctx.clip();
+
+    // Opcodes (must match CanvasCommandOp in C#)
+    const Op = {
+        StrokeLine: 1,
+        StrokeRect: 2,
+        FillRect: 3,
+        StrokeEllipse: 4,
+        FillEllipse: 5,
+        DrawText: 6,
+        Clear: 7,
+        Save: 8,
+        Restore: 9,
+        ClipRect: 10,
+        DrawImage: 11
+    };
+
+    try {
+        if (commands && Array.isArray(commands) && commands.length > 0) {
+            for (let i = 0; i < commands.length; i++) {
+                const cmd = commands[i];
+                if (!cmd || cmd.length === 0) continue;
+                const op = cmd[0];
+
+                switch (op) {
+                    case Op.StrokeLine: {
+                        // [op, x1, y1, x2, y2, width, color]
+                        ctx.strokeStyle = cmd[6];
+                        ctx.lineWidth = cmd[5];
+                        ctx.beginPath();
+                        ctx.moveTo(cmd[1], cmd[2]);
+                        ctx.lineTo(cmd[3], cmd[4]);
+                        ctx.stroke();
+                        break;
+                    }
+                    case Op.StrokeRect: {
+                        // [op, x, y, w, h, width, color]
+                        ctx.strokeStyle = cmd[6];
+                        ctx.lineWidth = cmd[5];
+                        ctx.strokeRect(cmd[1], cmd[2], cmd[3], cmd[4]);
+                        break;
+                    }
+                    case Op.FillRect: {
+                        // [op, x, y, w, h, color]
+                        ctx.fillStyle = cmd[5];
+                        ctx.fillRect(cmd[1], cmd[2], cmd[3], cmd[4]);
+                        break;
+                    }
+                    case Op.StrokeEllipse: {
+                        // [op, x, y, w, h, width, color]
+                        const x = cmd[1], y = cmd[2], w = cmd[3], h = cmd[4];
+                        const cx = x + w / 2.0;
+                        const cy = y + h / 2.0;
+                        ctx.strokeStyle = cmd[6];
+                        ctx.lineWidth = cmd[5];
+                        ctx.beginPath();
+                        ctx.ellipse(cx, cy, w / 2.0, h / 2.0, 0, 0, 2 * Math.PI);
+                        ctx.stroke();
+                        break;
+                    }
+                    case Op.FillEllipse: {
+                        // [op, x, y, w, h, color]
+                        const x = cmd[1], y = cmd[2], w = cmd[3], h = cmd[4];
+                        const cx = x + w / 2.0;
+                        const cy = y + h / 2.0;
+                        ctx.fillStyle = cmd[5];
+                        ctx.beginPath();
+                        ctx.ellipse(cx, cy, w / 2.0, h / 2.0, 0, 0, 2 * Math.PI);
+                        ctx.fill();
+                        break;
+                    }
+                    case Op.DrawText: {
+                        // [op, text, fontFamily, fontSize, x, y, color]
+                        ctx.font = `${cmd[3]}px ${cmd[2]}`;
+                        ctx.textBaseline = 'top';
+                        ctx.fillStyle = cmd[6];
+                        ctx.fillText(cmd[1], cmd[4], cmd[5]);
+                        break;
+                    }
+                    case Op.Clear: {
+                        // [op, width, height, color]
+                        ctx.fillStyle = cmd[3];
+                        ctx.fillRect(0, 0, cmd[1], cmd[2]);
+                        break;
+                    }
+                    case Op.Save:
+                        ctx.save();
+                        break;
+                    case Op.Restore:
+                        ctx.restore();
+                        break;
+                    case Op.ClipRect: {
+                        // [op, x, y, w, h]
+                        ctx.beginPath();
+                        ctx.rect(cmd[1], cmd[2], cmd[3], cmd[4]);
+                        ctx.clip();
+                        break;
+                    }
+                    case Op.DrawImage: {
+                        // [op, imageUrl, x, y, w, h]
+                        await drawImageAsync(ctx, cmd[1], cmd[2], cmd[3], cmd[4], cmd[5]);
+                        break;
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error rendering client area (commands):', error);
+        // Draw error indicator
+        ctx.fillStyle = 'red';
+        ctx.font = '12px Arial';
+        ctx.textBaseline = 'top';
+        ctx.fillText('Render Error: ' + error.message, 10, 20);
+    }
+
+    // Restore context state
+    ctx.restore();
+
+    // Copy the complete offscreen canvas to visible canvas (double buffering)
+    const visibleCtx = canvas.getContext('2d');
+    if (offscreen && offscreen.width > 0 && offscreen.height > 0) {
+        visibleCtx.drawImage(offscreen, 0, 0);
     }
 };
 
@@ -189,11 +385,10 @@ window.clearImageCache = () => {
 // fontSize: font size in pixels
 // text: text to measure
 window.measureText = (fontFamily, fontSize, text) => {
-    // Create a temporary canvas for measuring
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    ctx.font = `${fontSize}px ${fontFamily}`;
-    const metrics = ctx.measureText(text);
+    if (!text) return 0;
+    if (!__measureCtx) return 0;
+    __measureCtx.font = `${fontSize}px ${fontFamily}`;
+    const metrics = __measureCtx.measureText(text);
     return Math.ceil(metrics.width);
 };
 
@@ -208,9 +403,8 @@ window.measureTextBatch = (fontFamily, fontSize, texts) => {
             return [];
         }
 
-        // Create a temporary canvas for measuring (reuse for all measurements)
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
+        // Reuse shared measurement context
+        const ctx = __measureCtx;
         if (!ctx) {
             console.error('Failed to get 2D context for text measurement');
             return texts.map(() => 0);
@@ -357,11 +551,7 @@ window.measureTextBatch = (fontFamily, fontSize, texts) => {
     ctx.lineTo(minimizeButtonX + buttonSize - 5, buttonY + buttonSize / 2);
     ctx.stroke();
 
-    // Draw client area background (overdraw to ensure coverage)
-    ctx.fillStyle = backColor;
-    ctx.fillRect(clientX, clientY, clientWidth, clientHeight);
-
-    ctx.restore();
+    // Client area background was already covered by the full-canvas fill above.
 
     // Copy offscreen canvas to visible canvas in one operation (double buffering)
     const visibleCtx = canvas.getContext('2d');

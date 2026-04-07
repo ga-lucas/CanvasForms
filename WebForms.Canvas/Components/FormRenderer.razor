@@ -76,6 +76,10 @@
     private int _dragFormStartLeft = 0;  // Position when drag started (for delta calc)
     private int _dragFormStartTop = 0;   // Position when drag started (for delta calc)
 
+    // JS interop throttling for drag position updates
+    private DateTime _lastDragPositionUpdate = DateTime.MinValue;
+    private const int DragPositionThrottleMs = 16; // ~60 FPS
+
     // Pre-drag bounds (for snap-to-maximize restore)
     private int _preDragLeft = 0;
     private int _preDragTop = 0;
@@ -96,6 +100,10 @@
     // Throttling for resize rendering
     private DateTime _lastResizeRender = DateTime.MinValue;
     private const int ResizeRenderThrottleMs = 16; // ~60 FPS
+
+    // JS interop throttling for resize bounds updates
+    private DateTime _lastResizeBoundsUpdate = DateTime.MinValue;
+    private const int ResizeBoundsThrottleMs = 16; // ~60 FPS
 
     // Render queue for keyboard input
     private bool _renderPending = false;
@@ -249,12 +257,15 @@
 
             // Execute drawing commands in client area (translated and clipped)
             var commands = graphics.GetCommands();
-            var jsCommands = string.Join("\n", commands.Select(c => c.ToJavaScript()));
 
-            await JSRuntime.InvokeVoidAsync("renderClientArea", _canvasRef, 
-                BorderWidth, 
-                TitleBarHeight + BorderWidth, 
-                jsCommands);
+            // Prefer structured command buffer over JS source strings.
+            // This avoids per-frame JS string generation and runtime compilation via new Function.
+            var commandBuffer = commands.Select(c => c.ToCommand()).ToArray();
+
+            await JSRuntime.InvokeVoidAsync("renderClientAreaCommands", _canvasRef,
+                BorderWidth,
+                TitleBarHeight + BorderWidth,
+                commandBuffer);
         }
         catch (Exception ex)
         {
@@ -433,12 +444,9 @@
             Form.Left = newLeft;
             Form.Top = newTop;
 
-            // Force multiple state updates to ensure Blazor picks up the changes
-            StateHasChanged();
-            await Task.Yield(); // Yield to allow Blazor to process
-            StateHasChanged();
+            // Update DOM bounds without forcing multiple Blazor renders
+            await JSRuntime.InvokeVoidAsync("setCanvasBounds", _canvasRef, Form.Left, Form.Top, Form.Width, Form.Height);
             await RenderForm();
-            StateHasChanged();
         }
 
         await JSRuntime.InvokeVoidAsync("setActiveFormRenderer", _dotNetRef);
@@ -483,25 +491,40 @@
             Form.Left = _dragFormStartLeft + deltaX;
             Form.Top = _dragFormStartTop + deltaY;
 
+            // Update DOM position via JS to avoid frequent Blazor re-renders while dragging.
+            // We still render the canvas content separately; this only moves the element.
+            var now = DateTime.UtcNow;
+            if ((now - _lastDragPositionUpdate).TotalMilliseconds >= DragPositionThrottleMs)
+            {
+                _lastDragPositionUpdate = now;
+                await JSRuntime.InvokeVoidAsync("setCanvasPosition", _canvasRef, Form.Left, Form.Top);
+            }
+
             // Check for snap-to-top maximize (only for normal windows)
             if (Form.WindowState == FormWindowState.Normal)
             {
                 // Calculate actual screen Y position
                 var screenY = clientY - TaskbarHeight;
 
+                var previewChanged = false;
                 if (screenY <= SnapToTopThreshold && !_showMaximizePreview)
                 {
                     // Show maximize preview
                     _showMaximizePreview = true;
+                    previewChanged = true;
                 }
                 else if (screenY > SnapToTopThreshold && _showMaximizePreview)
                 {
                     // Hide maximize preview
                     _showMaximizePreview = false;
+                    previewChanged = true;
+                }
+
+                if (previewChanged)
+                {
+                    StateHasChanged();
                 }
             }
-
-            StateHasChanged();
         }
         else if (_isResizing)
         {
@@ -629,16 +652,18 @@
             var now = DateTime.UtcNow;
             var timeSinceLastRender = (now - _lastResizeRender).TotalMilliseconds;
 
+            // Update DOM bounds via JS to avoid frequent Blazor re-renders while resizing.
+            // This keeps the canvas element and backing store in sync with Form's dimensions.
+            if ((now - _lastResizeBoundsUpdate).TotalMilliseconds >= ResizeBoundsThrottleMs)
+            {
+                _lastResizeBoundsUpdate = now;
+                await JSRuntime.InvokeVoidAsync("setCanvasBounds", _canvasRef, Form.Left, Form.Top, Form.Width, Form.Height);
+            }
+
             if (timeSinceLastRender >= ResizeRenderThrottleMs)
             {
                 _lastResizeRender = now;
-                StateHasChanged();
                 await RenderForm();
-            }
-            else
-            {
-                // Still update the canvas size, just don't render content yet
-                StateHasChanged();
             }
         }
     }
@@ -1154,11 +1179,13 @@
         // Trigger layout after window state change
         Form.PerformLayout();
 
-        // Force multiple state updates to ensure immediate visual update
-        StateHasChanged();
-        await Task.Yield(); // Let Blazor process the state change
-        StateHasChanged();
+        // Update DOM bounds immediately without forcing multiple Blazor render passes.
+        await JSRuntime.InvokeVoidAsync("setCanvasBounds", _canvasRef, Form.Left, Form.Top, Form.Width, Form.Height);
+
+        // Render updated content once.
         await RenderForm();
+
+        // One Blazor render pass is enough to update cursor/style bindings.
         StateHasChanged();
 
         // Disable animation after transition completes
