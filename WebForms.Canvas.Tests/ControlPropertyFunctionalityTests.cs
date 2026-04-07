@@ -1,4 +1,4 @@
-using WebForms.Canvas.Forms;
+using System.Windows.Forms;
 using WebForms.Canvas.Drawing;
 
 namespace WebForms.Canvas.Tests;

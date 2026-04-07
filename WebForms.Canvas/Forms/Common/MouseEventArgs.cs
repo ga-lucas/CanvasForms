@@ -1,4 +1,4 @@
-namespace WebForms.Canvas.Forms;
+namespace System.Windows.Forms;
 
 public enum MouseButtons
 {

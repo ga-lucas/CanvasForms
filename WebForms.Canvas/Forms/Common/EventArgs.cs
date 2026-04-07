@@ -1,6 +1,6 @@
 using WebForms.Canvas.Drawing;
 
-namespace WebForms.Canvas.Forms;
+namespace System.Windows.Forms;
 
 /// <summary>
 /// Represents the method that will handle events that have no event data

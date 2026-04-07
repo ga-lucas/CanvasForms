@@ -1,6 +1,6 @@
 using WebForms.Canvas.Drawing;
 
-namespace WebForms.Canvas.Forms;
+namespace System.Windows.Forms;
 
 public abstract class Control
 {
@@ -10,14 +10,16 @@ public abstract class Control
 
     public string Name { get; set; } = string.Empty;
 
-    public string Text
+    public virtual string Text
     {
         get => _text;
         set
         {
-            if (_text != value)
+            var newValue = value ?? string.Empty;
+            if (_text != newValue)
             {
-                _text = value;
+                _text = newValue;
+                OnTextChanged(EventArgs.Empty);
                 Invalidate();
             }
         }

@@ -1,5 +1,5 @@
 using WebForms.Canvas;
-using WebForms.Canvas.Forms;
+using System.Windows.Forms;
 using WebForms.Canvas.Samples;
 
 namespace WebForms.Canvas.Host;

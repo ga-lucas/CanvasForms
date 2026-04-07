@@ -1,7 +1,7 @@
 using WebForms.Canvas.Drawing;
 using Microsoft.JSInterop;
 
-namespace WebForms.Canvas.Forms;
+namespace System.Windows.Forms;
 
 public class PictureBox : Control
 {

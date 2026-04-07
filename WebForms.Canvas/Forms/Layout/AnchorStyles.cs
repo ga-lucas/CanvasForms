@@ -1,4 +1,4 @@
-namespace WebForms.Canvas.Forms;
+namespace System.Windows.Forms;
 
 /// <summary>
 /// Specifies how a control anchors to the edges of its container.

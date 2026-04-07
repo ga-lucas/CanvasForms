@@ -1,6 +1,6 @@
 using WebForms.Canvas.Drawing;
 
-namespace WebForms.Canvas.Forms;
+namespace System.Windows.Forms;
 
 /// <summary>
 /// Base class for button-like controls (Button, CheckBox, RadioButton)

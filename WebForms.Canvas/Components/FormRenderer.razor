@@ -1,4 +1,4 @@
-@using WebForms.Canvas.Forms
+@using Forms = System.Windows.Forms
 @using WebForms.Canvas.Drawing
 @using BlazorMouseEventArgs = Microsoft.AspNetCore.Components.Web.MouseEventArgs
 @using BlazorKeyboardEventArgs = Microsoft.AspNetCore.Components.Web.KeyboardEventArgs
@@ -56,7 +56,7 @@
 
 @code {
     [Parameter]
-    public Form? Form { get; set; }
+    public Forms.Form? Form { get; set; }
 
     private ElementReference _canvasRef;
     private bool _initialized = false;
@@ -235,7 +235,7 @@
                 _closeButtonHover,
                 _minimizeButtonHover,
                 _maximizeButtonHover,
-                Form.WindowState == FormWindowState.Maximized);
+                Form.WindowState == Forms.FormWindowState.Maximized);
 
             // Create graphics for client area (size excludes chrome)
             using var graphics = new Graphics(
@@ -247,7 +247,7 @@
             graphics.Clear(Form.BackColor);
 
             // Trigger Paint event to let user code draw
-            var paintArgs = new PaintEventArgs(
+            var paintArgs = new Forms.PaintEventArgs(
                 graphics, 
                 new Rectangle(0, 0, 
                     Form.Width - (BorderWidth * 2), 
@@ -420,7 +420,7 @@
         _preDragBoundsSaved = true;
 
         // If window is maximized, restore it first (Windows-style behavior)
-        if (Form.WindowState == FormWindowState.Maximized)
+        if (Form.WindowState == Forms.FormWindowState.Maximized)
         {
             // For maximized windows, the pre-drag bounds should be the stored normal bounds
             // (not the maximized position), so don't use current position
@@ -501,7 +501,7 @@
             }
 
             // Check for snap-to-top maximize (only for normal windows)
-            if (Form.WindowState == FormWindowState.Normal)
+            if (Form.WindowState == Forms.FormWindowState.Normal)
             {
                 // Calculate actual screen Y position
                 var screenY = clientY - TaskbarHeight;
@@ -896,7 +896,7 @@
             clientY < Form.Height - TitleBarHeight - (BorderWidth * 2))
         {
             var args = new Forms.MouseEventArgs(
-                MouseButtons.None,
+                Forms.MouseButtons.None,
                 0,
                 clientX,
                 clientY
@@ -1031,7 +1031,7 @@
             clientY < Form.Height - TitleBarHeight - (BorderWidth * 2))
         {
             var args = new Forms.MouseEventArgs(
-                MouseButtons.Left,
+                Forms.MouseButtons.Left,
                 1,
                 clientX,
                 clientY
@@ -1057,7 +1057,7 @@
             clientY < Form.Height - TitleBarHeight - (BorderWidth * 2))
         {
             var args = new Forms.MouseEventArgs(
-                MouseButtons.None,
+                Forms.MouseButtons.None,
                 0,
                 clientX,
                 clientY
@@ -1079,7 +1079,7 @@
             clientY < Form.Height - TitleBarHeight - (BorderWidth * 2))
         {
             var args = new Forms.MouseEventArgs(
-                MouseButtons.Left,
+                Forms.MouseButtons.Left,
                 1,
                 clientX,
                 clientY
@@ -1096,7 +1096,7 @@
         // Update static modifier keys state
         UpdateModifierKeys(e.CtrlKey, e.ShiftKey, e.AltKey);
 
-        var args = new KeyEventArgs(
+        var args = new Forms.KeyEventArgs(
             ParseKeyCode(e.Code),
             e.AltKey,
             e.CtrlKey,
@@ -1111,7 +1111,7 @@
 
         // Update static modifier keys state
         UpdateModifierKeys(e.CtrlKey, e.ShiftKey, e.AltKey);
-        var args = new KeyEventArgs(
+        var args = new Forms.KeyEventArgs(
             ParseKeyCode(e.Code),
             e.AltKey,
             e.CtrlKey,
@@ -1126,7 +1126,7 @@
 
         if (e.Key.Length == 1)
         {
-            var args = new KeyPressEventArgs(e.Key[0]);
+            var args = new Forms.KeyPressEventArgs(e.Key[0]);
             Form.OnKeyPress(args);
         }
     }
@@ -1148,11 +1148,11 @@
     /// </summary>
     private void UpdateModifierKeys(bool ctrl, bool shift, bool alt)
     {
-        var modifiers = Keys.None;
-        if (ctrl) modifiers |= Keys.Control;
-        if (shift) modifiers |= Keys.Shift;
-        if (alt) modifiers |= Keys.Alt;
-        Control.ModifierKeys = modifiers;
+        var modifiers = Forms.Keys.None;
+        if (ctrl) modifiers |= Forms.Keys.Control;
+        if (shift) modifiers |= Forms.Keys.Shift;
+        if (alt) modifiers |= Forms.Keys.Alt;
+        Forms.Control.ModifierKeys = modifiers;
     }
 
     private async Task ToggleMaximize()
@@ -1163,7 +1163,7 @@
         _enableAnimation = true;
         StateHasChanged();
 
-        if (Form.WindowState == FormWindowState.Maximized)
+        if (Form.WindowState == Forms.FormWindowState.Maximized)
         {
             Form.Restore();
 
@@ -1195,87 +1195,87 @@
     }
 
     // Helper methods
-    private MouseButtons GetMouseButton(long button)
+    private Forms.MouseButtons GetMouseButton(long button)
     {
         return button switch
         {
-            0 => MouseButtons.Left,
-            1 => MouseButtons.Middle,
-            2 => MouseButtons.Right,
-            _ => MouseButtons.None
+            0 => Forms.MouseButtons.Left,
+            1 => Forms.MouseButtons.Middle,
+            2 => Forms.MouseButtons.Right,
+            _ => Forms.MouseButtons.None
         };
     }
 
-    private Keys ParseKeyCode(string code)
+    private Forms.Keys ParseKeyCode(string code)
     {
         return code switch
         {
-            "Backspace" => Keys.Back,
-            "Tab" => Keys.Tab,
-            "Enter" => Keys.Enter,
-            "ShiftLeft" or "ShiftRight" => Keys.Shift,
-            "ControlLeft" or "ControlRight" => Keys.Control,
-            "AltLeft" or "AltRight" => Keys.Alt,
-            "Escape" => Keys.Escape,
-            "Space" => Keys.Space,
-            "PageUp" => Keys.PageUp,
-            "PageDown" => Keys.PageDown,
-            "End" => Keys.End,
-            "Home" => Keys.Home,
-            "ArrowLeft" => Keys.Left,
-            "ArrowUp" => Keys.Up,
-            "ArrowRight" => Keys.Right,
-            "ArrowDown" => Keys.Down,
-            "Delete" => Keys.Delete,
-            "Digit0" => Keys.D0,
-            "Digit1" => Keys.D1,
-            "Digit2" => Keys.D2,
-            "Digit3" => Keys.D3,
-            "Digit4" => Keys.D4,
-            "Digit5" => Keys.D5,
-            "Digit6" => Keys.D6,
-            "Digit7" => Keys.D7,
-            "Digit8" => Keys.D8,
-            "Digit9" => Keys.D9,
-            "KeyA" => Keys.A,
-            "KeyB" => Keys.B,
-            "KeyC" => Keys.C,
-            "KeyD" => Keys.D,
-            "KeyE" => Keys.E,
-            "KeyF" => Keys.F,
-            "KeyG" => Keys.G,
-            "KeyH" => Keys.H,
-            "KeyI" => Keys.I,
-            "KeyJ" => Keys.J,
-            "KeyK" => Keys.K,
-            "KeyL" => Keys.L,
-            "KeyM" => Keys.M,
-            "KeyN" => Keys.N,
-            "KeyO" => Keys.O,
-            "KeyP" => Keys.P,
-            "KeyQ" => Keys.Q,
-            "KeyR" => Keys.R,
-            "KeyS" => Keys.S,
-            "KeyT" => Keys.T,
-            "KeyU" => Keys.U,
-            "KeyV" => Keys.V,
-            "KeyW" => Keys.W,
-            "KeyX" => Keys.X,
-            "KeyY" => Keys.Y,
-            "KeyZ" => Keys.Z,
-            "F1" => Keys.F1,
-            "F2" => Keys.F2,
-            "F3" => Keys.F3,
-            "F4" => Keys.F4,
-            "F5" => Keys.F5,
-            "F6" => Keys.F6,
-            "F7" => Keys.F7,
-            "F8" => Keys.F8,
-            "F9" => Keys.F9,
-            "F10" => Keys.F10,
-            "F11" => Keys.F11,
-            "F12" => Keys.F12,
-            _ => Keys.None
+            "Backspace" => Forms.Keys.Back,
+            "Tab" => Forms.Keys.Tab,
+            "Enter" => Forms.Keys.Enter,
+            "ShiftLeft" or "ShiftRight" => Forms.Keys.Shift,
+            "ControlLeft" or "ControlRight" => Forms.Keys.Control,
+            "AltLeft" or "AltRight" => Forms.Keys.Alt,
+            "Escape" => Forms.Keys.Escape,
+            "Space" => Forms.Keys.Space,
+            "PageUp" => Forms.Keys.PageUp,
+            "PageDown" => Forms.Keys.PageDown,
+            "End" => Forms.Keys.End,
+            "Home" => Forms.Keys.Home,
+            "ArrowLeft" => Forms.Keys.Left,
+            "ArrowUp" => Forms.Keys.Up,
+            "ArrowRight" => Forms.Keys.Right,
+            "ArrowDown" => Forms.Keys.Down,
+            "Delete" => Forms.Keys.Delete,
+            "Digit0" => Forms.Keys.D0,
+            "Digit1" => Forms.Keys.D1,
+            "Digit2" => Forms.Keys.D2,
+            "Digit3" => Forms.Keys.D3,
+            "Digit4" => Forms.Keys.D4,
+            "Digit5" => Forms.Keys.D5,
+            "Digit6" => Forms.Keys.D6,
+            "Digit7" => Forms.Keys.D7,
+            "Digit8" => Forms.Keys.D8,
+            "Digit9" => Forms.Keys.D9,
+            "KeyA" => Forms.Keys.A,
+            "KeyB" => Forms.Keys.B,
+            "KeyC" => Forms.Keys.C,
+            "KeyD" => Forms.Keys.D,
+            "KeyE" => Forms.Keys.E,
+            "KeyF" => Forms.Keys.F,
+            "KeyG" => Forms.Keys.G,
+            "KeyH" => Forms.Keys.H,
+            "KeyI" => Forms.Keys.I,
+            "KeyJ" => Forms.Keys.J,
+            "KeyK" => Forms.Keys.K,
+            "KeyL" => Forms.Keys.L,
+            "KeyM" => Forms.Keys.M,
+            "KeyN" => Forms.Keys.N,
+            "KeyO" => Forms.Keys.O,
+            "KeyP" => Forms.Keys.P,
+            "KeyQ" => Forms.Keys.Q,
+            "KeyR" => Forms.Keys.R,
+            "KeyS" => Forms.Keys.S,
+            "KeyT" => Forms.Keys.T,
+            "KeyU" => Forms.Keys.U,
+            "KeyV" => Forms.Keys.V,
+            "KeyW" => Forms.Keys.W,
+            "KeyX" => Forms.Keys.X,
+            "KeyY" => Forms.Keys.Y,
+            "KeyZ" => Forms.Keys.Z,
+            "F1" => Forms.Keys.F1,
+            "F2" => Forms.Keys.F2,
+            "F3" => Forms.Keys.F3,
+            "F4" => Forms.Keys.F4,
+            "F5" => Forms.Keys.F5,
+            "F6" => Forms.Keys.F6,
+            "F7" => Forms.Keys.F7,
+            "F8" => Forms.Keys.F8,
+            "F9" => Forms.Keys.F9,
+            "F10" => Forms.Keys.F10,
+            "F11" => Forms.Keys.F11,
+            "F12" => Forms.Keys.F12,
+            _ => Forms.Keys.None
         };
     }
 

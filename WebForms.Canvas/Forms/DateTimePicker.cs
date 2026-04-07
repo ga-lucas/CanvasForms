@@ -1,7 +1,7 @@
 using System.Globalization;
 using WebForms.Canvas.Drawing;
 
-namespace WebForms.Canvas.Forms;
+namespace System.Windows.Forms;
 
 /// <summary>
 /// Represents a Windows Forms DateTimePicker control (simplified)
@@ -18,10 +18,13 @@ public class DateTimePicker : Control
     private const int CalendarCellSize = 20;
     private const int CalendarPadding = 2;
 
-    private DateTime _value = DateTime.Today;
+    private DateTime _value = DateTime.Now;
     private DateTime _displayMonth = new(DateTime.Today.Year, DateTime.Today.Month, 1);
     private bool _droppedDown;
     private int _hoverDay = -1;
+
+    private bool _showCheckBox;
+    private bool _checked = true;
 
     public DateTimePicker()
     {
@@ -29,11 +32,33 @@ public class DateTimePicker : Control
         Height = 23;
         BackColor = Color.White;
         ForeColor = Color.Black;
+
+        // WinForms default
+        Format = DateTimePickerFormat.Long;
     }
 
     public event EventHandler? ValueChanged;
     public event EventHandler? DropDown;
     public event EventHandler? CloseUp;
+    public event EventHandler? FormatChanged;
+
+    public event EventHandler? CheckedChanged;
+
+    public override string Text
+    {
+        get => Checked ? GetDisplayText() : string.Empty;
+        set
+        {
+            // Best-effort parse like WinForms.
+            if (string.IsNullOrWhiteSpace(value))
+                return;
+
+            if (DateTime.TryParse(value, CultureInfo.CurrentCulture, DateTimeStyles.None, out var dt))
+            {
+                Value = dt;
+            }
+        }
+    }
 
     public DateTime Value
     {
@@ -45,23 +70,149 @@ public class DateTimePicker : Control
             {
                 _value = clamped;
                 _displayMonth = new DateTime(_value.Year, _value.Month, 1);
-                ValueChanged?.Invoke(this, EventArgs.Empty);
+                OnValueChanged(EventArgs.Empty);
+                OnTextChanged(EventArgs.Empty);
                 Invalidate();
             }
         }
     }
 
-    public DateTime MinDate { get; set; } = new DateTime(1753, 1, 1);
-    public DateTime MaxDate { get; set; } = new DateTime(9998, 12, 31);
+    private DateTimePickerFormat _format = DateTimePickerFormat.Long;
+    public DateTimePickerFormat Format
+    {
+        get => _format;
+        set
+        {
+            if (_format != value)
+            {
+                _format = value;
+                OnFormatChanged(EventArgs.Empty);
+                OnTextChanged(EventArgs.Empty);
+                Invalidate();
+            }
+        }
+    }
 
-    public DateTimePickerFormat Format { get; set; } = DateTimePickerFormat.Short;
-    public string CustomFormat { get; set; } = "";
+    public string CustomFormat
+    {
+        get => _customFormat;
+        set
+        {
+            if (_customFormat != value)
+            {
+                _customFormat = value ?? string.Empty;
+                if (Format == DateTimePickerFormat.Custom)
+                    OnFormatChanged(EventArgs.Empty);
+                OnTextChanged(EventArgs.Empty);
+                Invalidate();
+            }
+        }
+    }
+
+    private string _customFormat = string.Empty;
+
+    public bool ShowCheckBox
+    {
+        get => _showCheckBox;
+        set
+        {
+            if (_showCheckBox != value)
+            {
+                _showCheckBox = value;
+                OnTextChanged(EventArgs.Empty);
+                Invalidate();
+            }
+        }
+    }
+
+    public bool Checked
+    {
+        get => !ShowCheckBox || _checked;
+        set
+        {
+            var newValue = value;
+            if (_checked != newValue)
+            {
+                _checked = newValue;
+                OnCheckedChanged(EventArgs.Empty);
+                OnTextChanged(EventArgs.Empty);
+                Invalidate();
+            }
+        }
+    }
+
+    protected virtual void OnValueChanged(EventArgs e)
+    {
+        ValueChanged?.Invoke(this, e);
+    }
+
+    protected virtual void OnDropDown(EventArgs e)
+    {
+        DropDown?.Invoke(this, e);
+    }
+
+    protected virtual void OnCloseUp(EventArgs e)
+    {
+        CloseUp?.Invoke(this, e);
+    }
+
+    protected virtual void OnFormatChanged(EventArgs e)
+    {
+        FormatChanged?.Invoke(this, e);
+    }
+
+    protected virtual void OnCheckedChanged(EventArgs e)
+    {
+        CheckedChanged?.Invoke(this, e);
+    }
+
+    public LeftRightAlignment DropDownAlign { get; set; } = LeftRightAlignment.Left;
+
+    public bool ShowUpDown { get; set; } = false;
+
+    public new Font Font { get; set; } = new("Segoe UI", 9);
+
+    private DateTime _minDate = new(1753, 1, 1);
+    public DateTime MinDate
+    {
+        get => _minDate;
+        set
+        {
+            _minDate = value;
+            if (_maxDate < _minDate)
+                _maxDate = _minDate;
+
+            Value = Clamp(Value);
+            Invalidate();
+        }
+    }
+
+    private DateTime _maxDate = new(9998, 12, 31);
+    public DateTime MaxDate
+    {
+        get => _maxDate;
+        set
+        {
+            _maxDate = value;
+            if (_minDate > _maxDate)
+                _minDate = _maxDate;
+
+            Value = Clamp(Value);
+            Invalidate();
+        }
+    }
 
     public bool DroppedDown
     {
         get => _droppedDown;
         set
         {
+            if (ShowUpDown)
+                value = false;
+
+            if (!Checked)
+                value = false;
+
             if (_droppedDown == value) return;
             _droppedDown = value;
             _hoverDay = -1;
@@ -69,11 +220,11 @@ public class DateTimePicker : Control
             if (_droppedDown)
             {
                 _displayMonth = new DateTime(_value.Year, _value.Month, 1);
-                DropDown?.Invoke(this, EventArgs.Empty);
+                OnDropDown(EventArgs.Empty);
             }
             else
             {
-                CloseUp?.Invoke(this, EventArgs.Empty);
+                OnCloseUp(EventArgs.Empty);
             }
 
             Invalidate();
@@ -83,6 +234,8 @@ public class DateTimePicker : Control
     protected internal override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics;
+
+        var checkBoxWidth = ShowCheckBox ? 18 : 0;
 
         // Background
         using (var bg = new SolidBrush(Enabled ? BackColor : Color.FromArgb(240, 240, 240)))
@@ -108,13 +261,25 @@ public class DateTimePicker : Control
             g.DrawLine(sepPen, btnRect.X, 0, btnRect.X, Height);
         }
 
-        DrawDropDownGlyph(g, btnRect);
+        if (ShowUpDown)
+        {
+            DrawUpDownGlyph(g, btnRect);
+        }
+        else
+        {
+            DrawDropDownGlyph(g, btnRect);
+        }
+
+        if (ShowCheckBox)
+        {
+            DrawCheckBox(g, 2, (Height - 14) / 2, Checked);
+        }
 
         // Text
-        var text = GetDisplayText();
-        var textBounds = new Rectangle(PaddingX, PaddingY, Width - DropDownButtonWidth - (PaddingX * 2), Height - (PaddingY * 2));
+        var text = Checked ? GetDisplayText() : string.Empty;
+        var textBounds = new Rectangle(PaddingX + checkBoxWidth, PaddingY, Width - DropDownButtonWidth - (PaddingX * 2) - checkBoxWidth, Height - (PaddingY * 2));
         var textColor = Enabled ? ForeColor : Color.FromArgb(109, 109, 109);
-        g.DrawString(text, "Arial", 12, new SolidBrush(textColor), textBounds.X, textBounds.Y + 2);
+        g.DrawString(text, Font.Family, (int)Font.Size, new SolidBrush(textColor), textBounds.X, textBounds.Y + 2);
 
         base.OnPaint(e);
     }
@@ -140,7 +305,9 @@ public class DateTimePicker : Control
         var width = Math.Max(contentWidth + (BorderWidth * 2), Width);
         var rows = GetRequiredRowCount(_displayMonth);
         var height = (CalendarPadding * 2) + CalendarHeaderHeight + CalendarDayHeaderHeight + (CalendarCellSize * rows) + (BorderWidth * 2);
-        return new Rectangle(0, Height, width, height);
+
+        var x = DropDownAlign == LeftRightAlignment.Right ? Width - width : 0;
+        return new Rectangle(x, Height, width, height);
     }
 
     protected internal override void OnMouseDown(MouseEventArgs e)
@@ -154,6 +321,15 @@ public class DateTimePicker : Control
         // WinForms behavior: clicking the text area sets focus and opens the drop-down
         Focus();
 
+        var checkBoxWidth = ShowCheckBox ? 18 : 0;
+
+        // Click on checkbox toggles checked
+        if (ShowCheckBox && e.X >= 2 && e.X < 2 + 14 && e.Y >= (Height - 14) / 2 && e.Y < (Height - 14) / 2 + 14)
+        {
+            Checked = !Checked;
+            return;
+        }
+
         var btnRect = new Rectangle(Width - DropDownButtonWidth, 0, DropDownButtonWidth, Height);
 
         // Click in dropdown calendar area
@@ -162,21 +338,33 @@ public class DateTimePicker : Control
             var dd = GetDropDownBounds();
             if (e.Y >= dd.Y && e.Y < dd.Bottom && e.X >= dd.X && e.X < dd.Right)
             {
-                if (HandleCalendarMouseDown(e.X, e.Y - dd.Y))
+                if (HandleCalendarMouseDown(e.X - dd.X, e.Y - dd.Y))
                     return;
             }
         }
 
-        // Click on button toggles dropdown
+        // Click on button toggles dropdown / spins value
         if (e.X >= btnRect.X)
         {
-            DroppedDown = !DroppedDown;
+            if (ShowUpDown)
+            {
+                // Split the button into two halves (up/down)
+                var isUp = e.Y < Height / 2;
+                ApplySpin(isUp ? 1 : -1);
+            }
+            else
+            {
+                DroppedDown = !DroppedDown;
+            }
             return;
         }
 
         // Click on text area opens/closes drop-down (like WinForms)
-        if (e.Y >= 0 && e.Y < Height)
+        if (e.Y >= 0 && e.Y < Height && e.X < btnRect.X)
         {
+            if (!Checked)
+                return;
+
             DroppedDown = !DroppedDown;
             return;
         }
@@ -191,7 +379,7 @@ public class DateTimePicker : Control
             var dd = GetDropDownBounds();
             if (e.Y >= dd.Y && e.Y < dd.Bottom && e.X >= dd.X && e.X < dd.Right)
             {
-                var hover = HitTestDay(e.X, e.Y - dd.Y);
+                var hover = HitTestDay(e.X - dd.X, e.Y - dd.Y);
                 if (_hoverDay != hover)
                 {
                     _hoverDay = hover;
@@ -207,6 +395,17 @@ public class DateTimePicker : Control
         }
 
         base.OnMouseMove(e);
+    }
+
+    protected internal override void OnMouseLeave(EventArgs e)
+    {
+        if (_hoverDay != -1)
+        {
+            _hoverDay = -1;
+            Invalidate();
+        }
+
+        base.OnMouseLeave(e);
     }
 
     protected internal override void OnKeyDown(KeyEventArgs e)
@@ -257,15 +456,98 @@ public class DateTimePicker : Control
         }
         else
         {
+            if (ShowUpDown)
+            {
+                if (e.KeyCode == Keys.Up)
+                {
+                    ApplySpin(1);
+                    e.Handled = true;
+                    return;
+                }
+                if (e.KeyCode == Keys.Down)
+                {
+                    ApplySpin(-1);
+                    e.Handled = true;
+                    return;
+                }
+            }
+
             if (e.KeyCode == Keys.Down && e.Alt)
             {
-                DroppedDown = true;
+                if (Checked)
+                    DroppedDown = true;
                 e.Handled = true;
                 return;
             }
         }
 
         base.OnKeyDown(e);
+    }
+
+    protected internal override void OnLostFocus(EventArgs e)
+    {
+        if (DroppedDown)
+        {
+            DroppedDown = false;
+        }
+
+        base.OnLostFocus(e);
+    }
+
+    private static void DrawCheckBox(Graphics g, int x, int y, bool isChecked)
+    {
+        using var borderPen = new Pen(Color.FromArgb(122, 122, 122));
+        using var bgBrush = new SolidBrush(Color.White);
+        var rect = new Rectangle(x, y, 14, 14);
+        g.FillRectangle(bgBrush, rect);
+        g.DrawRectangle(borderPen, rect);
+
+        if (isChecked)
+        {
+            using var pen = new Pen(Color.FromArgb(0, 0, 0), 2);
+            g.DrawLine(pen, x + 3, y + 7, x + 6, y + 10);
+            g.DrawLine(pen, x + 6, y + 10, x + 11, y + 3);
+        }
+    }
+
+    private static void DrawUpDownGlyph(Graphics g, Rectangle btnRect)
+    {
+        var centerX = btnRect.X + (btnRect.Width / 2);
+
+        using var pen = new Pen(Color.FromArgb(64, 64, 64), 2);
+
+        // Up chevron
+        var upCenterY = btnRect.Y + (btnRect.Height / 4);
+        g.DrawLine(pen, centerX - 4, upCenterY + 2, centerX, upCenterY - 2);
+        g.DrawLine(pen, centerX, upCenterY - 2, centerX + 4, upCenterY + 2);
+
+        // Down chevron
+        var downCenterY = btnRect.Y + (btnRect.Height * 3 / 4);
+        g.DrawLine(pen, centerX - 4, downCenterY - 2, centerX, downCenterY + 2);
+        g.DrawLine(pen, centerX, downCenterY + 2, centerX + 4, downCenterY - 2);
+    }
+
+    private void ApplySpin(int direction)
+    {
+        if (!Enabled || !Checked)
+            return;
+
+        var delta = GetSpinDelta();
+        if (delta == TimeSpan.Zero)
+            return;
+
+        var candidate = Value.AddTicks(delta.Ticks * direction);
+        Value = candidate;
+    }
+
+    private TimeSpan GetSpinDelta()
+    {
+        // Minimal, WinForms-compatible default behavior:
+        // - Time format spins by minutes
+        // - Otherwise spins by days
+        return Format == DateTimePickerFormat.Time
+            ? TimeSpan.FromMinutes(1)
+            : TimeSpan.FromDays(1);
     }
 
     private void PaintCalendar(Graphics g)
@@ -305,7 +587,7 @@ public class DateTimePicker : Control
         var titleAreaX = prevRect.Right + 4;
         var titleAreaWidth = nextRect.X - 4 - titleAreaX;
         var monthX = titleAreaX + Math.Max(0, (titleAreaWidth - monthTextWidth) / 2);
-        g.DrawString(monthText, "Arial", 11, new SolidBrush(Color.Black), monthX, headerRect.Y + 3);
+        g.DrawString(monthText, Font.Family, Math.Max(1, (int)Font.Size), new SolidBrush(Color.Black), monthX, headerRect.Y + 3);
 
         // Day-of-week header
         var dowRect = new Rectangle(gridOriginX, headerRect.Bottom, gridWidth, CalendarDayHeaderHeight);
@@ -321,7 +603,7 @@ public class DateTimePicker : Control
             var idx = (firstDayOfWeek + col) % 7;
             var name = dayNames[idx];
             var x = dowRect.X + (col * CalendarCellSize) + 5;
-            g.DrawString(name, "Arial", 9, new SolidBrush(Color.FromArgb(64, 64, 64)), x, dowRect.Y + 1);
+            g.DrawString(name, Font.Family, Math.Max(1, (int)(Font.Size - 1)), new SolidBrush(Color.FromArgb(64, 64, 64)), x, dowRect.Y + 1);
         }
 
         // Grid
@@ -378,7 +660,7 @@ public class DateTimePicker : Control
                 ? Color.White
                 : (isEnabledDay ? Color.Black : Color.FromArgb(160, 160, 160));
 
-            g.DrawString(day.ToString(CultureInfo.InvariantCulture), "Arial", 10, new SolidBrush(textColor), cellRect.X + 6, cellRect.Y + 4);
+            g.DrawString(day.ToString(CultureInfo.InvariantCulture), Font.Family, Math.Max(1, (int)Font.Size), new SolidBrush(textColor), cellRect.X + 6, cellRect.Y + 4);
 
             // Keyboard focus rectangle around the selected day when the control has focus.
             if (Focused && DroppedDown && isSelected)
