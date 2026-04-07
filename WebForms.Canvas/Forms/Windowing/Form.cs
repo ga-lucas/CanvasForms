@@ -178,10 +178,14 @@ public class Form : Control
                 new Rectangle(0, 0, control.Width, control.Height)
             );
 
-            // Let control paint itself (but skip drop-downs for ComboBox and autocomplete for TextBox)
+            // Let control paint itself (but skip drop-downs for ComboBox/DateTimePicker and autocomplete for TextBox)
             if (control is ComboBox comboBox)
             {
                 comboBox.PaintWithoutDropDown(controlPaintArgs);
+            }
+            else if (control is DateTimePicker dateTimePicker)
+            {
+                dateTimePicker.PaintWithoutDropDown(controlPaintArgs);
             }
             else if (control is TextBox textBox)
             {
@@ -210,6 +214,26 @@ public class Form : Control
                     new Rectangle(0, 0, control.Width, control.Height)
                 );
                 comboBox.PaintDropDownOnly(dropDownPaintArgs);
+
+                // Restore
+                g.TranslateTransform(-control.Left, -control.Top);
+            }
+        }
+
+        // Paint all DateTimePicker drop-downs on top of everything
+        foreach (var control in Controls)
+        {
+            if (control is DateTimePicker dateTimePicker && dateTimePicker.HasVisibleDropDown && control.Visible)
+            {
+                // Translate to control position
+                g.TranslateTransform(control.Left, control.Top);
+
+                // Paint just the drop-down
+                var dropDownPaintArgs = new PaintEventArgs(
+                    g,
+                    new Rectangle(0, 0, control.Width, control.Height)
+                );
+                dateTimePicker.PaintDropDownOnly(dropDownPaintArgs);
 
                 // Restore
                 g.TranslateTransform(-control.Left, -control.Top);
@@ -276,6 +300,10 @@ public class Form : Control
                 {
                     comboBox.DroppedDown = false;
                 }
+                if (control is DateTimePicker dateTimePicker && dateTimePicker.DroppedDown)
+                {
+                    dateTimePicker.DroppedDown = false;
+                }
             }
         }
         else
@@ -286,6 +314,10 @@ public class Form : Control
                 if (control is ComboBox comboBox && comboBox != FocusedControl && comboBox.DroppedDown)
                 {
                     comboBox.DroppedDown = false;
+                }
+                if (control is DateTimePicker dateTimePicker && dateTimePicker != FocusedControl && dateTimePicker.DroppedDown)
+                {
+                    dateTimePicker.DroppedDown = false;
                 }
             }
         }
@@ -360,6 +392,15 @@ public class Form : Control
 
             return x >= control.Left && x < control.Left + dropDownWidth &&
                    y >= control.Top + control.Height && y < control.Top + control.Height + dropDownHeight;
+        }
+
+        // Special case: DateTimePicker with drop-down open
+        if (control is DateTimePicker dateTimePicker && dateTimePicker.DroppedDown)
+        {
+            var dd = dateTimePicker.GetDropDownBounds();
+
+            return x >= control.Left + dd.X && x < control.Left + dd.Right &&
+                   y >= control.Top + dd.Y && y < control.Top + dd.Bottom;
         }
 
         // Special case: TextBox with autocomplete panel open

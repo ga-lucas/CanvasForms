@@ -21,11 +21,13 @@ public class ControlsDemoForm : Form
     private Label? _comboBoxOutput;
     private CheckedListBox? _checkedListBox;
     private Label? _checkedListBoxOutput;
+    private DateTimePicker? _dateTimePicker;
+    private Label? _dateTimePickerOutput;
 
     public ControlsDemoForm()
     {
         Text = "Controls Demo";
-        Width = 420;
+        Width = 820;
         Height = 720;
         BackColor = Color.FromArgb(240, 240, 240);
 
@@ -34,13 +36,17 @@ public class ControlsDemoForm : Form
 
     private void InitializeControls()
     {
+        const int leftColX = 10;
+        const int rightColX = 420;
+        const int colWidth = 380;
+
         // Title Label
         _titleLabel = new Label
         {
             Text = "Windows Forms Controls Demo",
             Left = 10,
             Top = 10,
-            Width = 380,
+            Width = 780,
             Height = 20,
             ForeColor = Color.FromArgb(0, 0, 128),
             TextAlign = ContentAlignment.TopCenter
@@ -50,7 +56,7 @@ public class ControlsDemoForm : Form
         // TextBox
         _textBox = new TextBox
         {
-            Left = 10,
+            Left = leftColX,
             Top = 40,
             Width = 200,
             Height = 20,
@@ -63,9 +69,9 @@ public class ControlsDemoForm : Form
         _outputLabel = new Label
         {
             Text = "Text: Type here...",
-            Left = 10,
+            Left = leftColX,
             Top = 70,
-            Width = 380,
+            Width = colWidth,
             Height = 20,
             ForeColor = Color.FromArgb(64, 64, 64)
         };
@@ -75,9 +81,9 @@ public class ControlsDemoForm : Form
         var autoCompleteLabel = new Label
         {
             Text = "AutoComplete TextBox (try: apple, banana, cherry):",
-            Left = 10,
+            Left = leftColX,
             Top = 100,
-            Width = 380,
+            Width = colWidth,
             Height = 20,
             ForeColor = Color.Black
         };
@@ -85,7 +91,7 @@ public class ControlsDemoForm : Form
 
         var autoCompleteTextBox = new TextBox
         {
-            Left = 10,
+            Left = leftColX,
             Top = 125,
             Width = 200,
             Height = 23,
@@ -113,7 +119,7 @@ public class ControlsDemoForm : Form
         _button1 = new Button
         {
             Text = "Click Me!",
-            Left = 10,
+            Left = leftColX,
             Top = 160,
             Width = 100,
             Height = 30
@@ -124,7 +130,7 @@ public class ControlsDemoForm : Form
         _button2 = new Button
         {
             Text = "Disabled",
-            Left = 120,
+            Left = leftColX + 110,
             Top = 160,
             Width = 100,
             Height = 30,
@@ -136,7 +142,7 @@ public class ControlsDemoForm : Form
         var checkBoxLabel = new Label
         {
             Text = "CheckBoxes:",
-            Left = 10,
+            Left = leftColX,
             Top = 205,
             Width = 100,
             Height = 20,
@@ -147,7 +153,7 @@ public class ControlsDemoForm : Form
         _checkBox1 = new CheckBox
         {
             Text = "Option 1",
-            Left = 10,
+            Left = leftColX,
             Top = 230,
             Width = 150,
             Height = 20,
@@ -159,7 +165,7 @@ public class ControlsDemoForm : Form
         _checkBox2 = new CheckBox
         {
             Text = "Option 2",
-            Left = 10,
+            Left = leftColX,
             Top = 255,
             Width = 150,
             Height = 20
@@ -171,7 +177,7 @@ public class ControlsDemoForm : Form
         var radioLabel = new Label
         {
             Text = "RadioButtons (Select One):",
-            Left = 10,
+            Left = leftColX,
             Top = 290,
             Width = 200,
             Height = 20,
@@ -182,7 +188,7 @@ public class ControlsDemoForm : Form
         _radio1 = new RadioButton
         {
             Text = "Choice A",
-            Left = 10,
+            Left = leftColX,
             Top = 315,
             Width = 150,
             Height = 20,
@@ -194,7 +200,7 @@ public class ControlsDemoForm : Form
         _radio2 = new RadioButton
         {
             Text = "Choice B",
-            Left = 10,
+            Left = leftColX,
             Top = 340,
             Width = 150,
             Height = 20
@@ -205,7 +211,7 @@ public class ControlsDemoForm : Form
         _radio3 = new RadioButton
         {
             Text = "Choice C",
-            Left = 10,
+            Left = leftColX,
             Top = 365,
             Width = 150,
             Height = 20
@@ -217,20 +223,56 @@ public class ControlsDemoForm : Form
         var statusLabel = new Label
         {
             Text = "Status: Ready",
-            Left = 10,
+            Left = leftColX,
             Top = 395,
-            Width = 380,
+            Width = colWidth,
             Height = 20,
             ForeColor = Color.FromArgb(0, 128, 0)
         };
         Controls.Add(statusLabel);
 
+        // DateTimePicker Section (right column)
+        var dateLabel = new Label
+        {
+            Text = "DateTimePicker:",
+            Left = rightColX,
+            Top = 40,
+            Width = 150,
+            Height = 20,
+            ForeColor = Color.Black
+        };
+        Controls.Add(dateLabel);
+
+        _dateTimePicker = new DateTimePicker
+        {
+            Left = rightColX,
+            Top = 65,
+            Width = 180,
+            Format = DateTimePickerFormat.Short,
+            MinDate = DateTime.Today.AddDays(-7),
+            MaxDate = DateTime.Today.AddDays(30),
+            Value = DateTime.Today
+        };
+        _dateTimePicker.ValueChanged += OnDateTimePickerValueChanged;
+        Controls.Add(_dateTimePicker);
+
+        _dateTimePickerOutput = new Label
+        {
+            Text = $"Selected: {DateTime.Today:d}",
+            Left = rightColX,
+            Top = 95,
+            Width = colWidth,
+            Height = 20,
+            ForeColor = Color.FromArgb(64, 64, 64)
+        };
+        Controls.Add(_dateTimePickerOutput);
+
         // ComboBox Section
         var comboLabel = new Label
         {
             Text = "ComboBoxes:",
-            Left = 10,
-            Top = 425,
+            Left = rightColX,
+            Top = 140,
             Width = 100,
             Height = 20,
             ForeColor = Color.Black
@@ -240,8 +282,8 @@ public class ControlsDemoForm : Form
         // DropDownList style (non-editable)
         _comboBox1 = new ComboBox
         {
-            Left = 10,
-            Top = 450,
+            Left = rightColX,
+            Top = 165,
             Width = 150,
             DropDownStyle = ComboBoxStyle.DropDownList
         };
@@ -260,8 +302,8 @@ public class ControlsDemoForm : Form
         var combo1Label = new Label
         {
             Text = "(DropDownList)",
-            Left = 170,
-            Top = 450,
+            Left = rightColX + 160,
+            Top = 165,
             Width = 100,
             Height = 20,
             ForeColor = Color.FromArgb(128, 128, 128)
@@ -271,8 +313,8 @@ public class ControlsDemoForm : Form
         // DropDown style (editable)
         _comboBox2 = new ComboBox
         {
-            Left = 10,
-            Top = 480,
+            Left = rightColX,
+            Top = 195,
             Width = 150,
             DropDownStyle = ComboBoxStyle.DropDown
         };
@@ -287,8 +329,8 @@ public class ControlsDemoForm : Form
         var combo2Label = new Label
         {
             Text = "(DropDown)",
-            Left = 170,
-            Top = 480,
+            Left = rightColX + 160,
+            Top = 195,
             Width = 100,
             Height = 20,
             ForeColor = Color.FromArgb(128, 128, 128)
@@ -298,9 +340,9 @@ public class ControlsDemoForm : Form
         _comboBoxOutput = new Label
         {
             Text = "ComboBox selection: Red",
-            Left = 10,
-            Top = 510,
-            Width = 380,
+            Left = rightColX,
+            Top = 225,
+            Width = colWidth,
             Height = 20,
             ForeColor = Color.FromArgb(64, 64, 64)
         };
@@ -310,8 +352,8 @@ public class ControlsDemoForm : Form
         var checkedListBoxLabel = new Label
         {
             Text = "CheckedListBox:",
-            Left = 10,
-            Top = 545,
+            Left = leftColX,
+            Top = 425,
             Width = 150,
             Height = 20,
             ForeColor = Color.Black
@@ -320,8 +362,8 @@ public class ControlsDemoForm : Form
 
         _checkedListBox = new CheckedListBox
         {
-            Left = 10,
-            Top = 570,
+            Left = leftColX,
+            Top = 450,
             Width = 180,
             Height = 100,
             CheckOnClick = true
@@ -339,8 +381,8 @@ public class ControlsDemoForm : Form
         _checkedListBoxOutput = new Label
         {
             Text = "Checked: 2 items",
-            Left = 200,
-            Top = 570,
+            Left = leftColX + 190,
+            Top = 450,
             Width = 200,
             Height = 40,
             ForeColor = Color.FromArgb(64, 64, 64)
@@ -351,8 +393,8 @@ public class ControlsDemoForm : Form
         var pictureLabel = new Label
         {
             Text = "PictureBox:",
-            Left = 10,
-            Top = 680,
+            Left = rightColX,
+            Top = 270,
             Width = 100,
             Height = 20,
             ForeColor = Color.Black
@@ -361,8 +403,8 @@ public class ControlsDemoForm : Form
 
         _pictureBox = new PictureBox
         {
-            Left = 10,
-            Top = 705,
+            Left = rightColX,
+            Top = 295,
             Width = 150,
             Height = 60,
             ImageUrl = "https://via.placeholder.com/150x60", // Placeholder image
@@ -373,13 +415,21 @@ public class ControlsDemoForm : Form
         var pictureInfo = new Label
         {
             Text = "Image loaded from URL",
-            Left = 170,
-            Top = 705,
+            Left = rightColX + 160,
+            Top = 295,
             Width = 210,
             Height = 40,
             ForeColor = Color.FromArgb(64, 64, 64)
         };
         Controls.Add(pictureInfo);
+    }
+
+    private void OnDateTimePickerValueChanged(object? sender, EventArgs e)
+    {
+        if (_dateTimePicker != null && _dateTimePickerOutput != null)
+        {
+            _dateTimePickerOutput.Text = $"Selected: {_dateTimePicker.Value:d}";
+        }
     }
 
     private void CheckedListBox_ItemCheck(object? sender, ItemCheckEventArgs e)
