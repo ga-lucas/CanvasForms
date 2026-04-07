@@ -102,7 +102,7 @@ public class Form : Control
         ZIndex = _nextZIndex++;
     }
 
-    public void BringToFront()
+    public new void BringToFront()
     {
         ZIndex = _nextZIndex++;
         OnActivated(EventArgs.Empty);
@@ -129,12 +129,12 @@ public class Form : Control
         return false;
     }
 
-    public Graphics CreateGraphics()
+    public new Graphics CreateGraphics()
     {
         return new Graphics(ClientWidth, ClientHeight);
     }
 
-    public void Show()
+    public new void Show()
     {
         Visible = true;
         PerformLayout(); // Layout controls when form is shown

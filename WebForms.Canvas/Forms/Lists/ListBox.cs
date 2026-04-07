@@ -604,16 +604,6 @@ public enum SelectionMode
 }
 
 /// <summary>
-/// Specifies the border style for a control
-/// </summary>
-public enum BorderStyle
-{
-    None,
-    FixedSingle,
-    Fixed3D
-}
-
-/// <summary>
 /// Specifies whether items in a list box are drawn by the operating system or by code
 /// </summary>
 public enum DrawMode
