@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\WebForms.Canvas\WebForms.Canvas.csproj" />
+    <ProjectReference Include="..\WebForms.Canvas\Canvas.Windows.Forms.csproj" />
   </ItemGroup>
 
 </Project>

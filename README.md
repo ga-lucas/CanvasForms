@@ -1,68 +1,81 @@
-# WebForms.Canvas - HTML Canvas-based Windows Forms Clone
+# WebForms.Canvas
 
-A Blazor WebAssembly implementation of Windows Forms drawing capabilities using HTML Canvas, designed to eventually run Windows Forms executables in the browser.
+WinForms-style UI framework rendered to an HTML `<canvas>` using Blazor WebAssembly. The goal is **maximum compatibility with the WinForms API surface/behavior**, while mapping rendering and input to the browser.
 
-## Overview
+## What this repo contains
 
-This project provides a canvas-based clone of Windows Forms that can render graphics primitives in a web browser. The initial implementation focuses on drawing capabilities, with plans to support running Windows Forms executables (excluding P/Invoke and Windows-specific system calls).
+- **WebForms.Canvas** (`net10.0` Razor Class Library): the WinForms-like API (types live under `System.Windows.Forms`) plus a lightweight drawing layer (`WebForms.Canvas.Drawing`).
+- **WebForms.Canvas.Host** (`net10.0` Blazor WebAssembly): a runnable demo host that boots a desktop-like surface and shows sample forms.
+- **WebForms.Canvas.Tests** (`net10.0`): tests and documentation tracking WinForms API completeness (especially `Control`).
 
-## Architecture
+## Quick start
 
-### Core Components
+### Prerequisites
 
-1. **Drawing Primitives** (`WebForms.Canvas.Drawing`)
-   - `Color`: RGBA color representation with common named colors
-   - `Point`, `PointF`: 2D coordinate structures
-   - `Size`, `SizeF`: Dimension structures
-   - `Rectangle`, `RectangleF`: Rectangular region structures
-   - `Pen`: Line drawing tool with color and width
-   - `Brush`: Fill tool (currently supports `SolidBrush`)
-   - `Graphics`: Main drawing surface with command buffering
+- .NET SDK **10.0**
+- Visual Studio 2026+ (or any editor that can build/run Blazor WebAssembly)
 
-2. **Forms System** (`WebForms.Canvas.Forms`)
-   - `Control`: Base class for all visual elements
-   - `Form`: Top-level window container
-   - `PaintEventArgs`: Event arguments for paint operations
-   - Paint event system for custom drawing
+### Run the demo
 
-3. **Rendering** (`WebForms.Canvas.Components`)
-   - `FormRenderer`: Blazor component that renders forms to HTML Canvas
-   - JavaScript interop for canvas drawing commands
+1. Open the solution.
+2. Set **WebForms.Canvas.Host** as the startup project.
+3. Run (F5).
 
-## Currently Implemented Features
+The host renders a **Desktop** surface and opens `WelcomeForm`.
 
-✅ **Drawing Primitives**
-- Lines (`DrawLine`)
-- Rectangles (`DrawRectangle`, `FillRectangle`)
-- Ellipses/Circles (`DrawEllipse`, `FillEllipse`)
-- Text (`DrawString`)
+## How it works (high level)
 
-✅ **Graphics System**
-- Pen and Brush abstractions
-- Color management with RGBA support
-- Command buffering for efficient rendering
-- Paint event system
+### Desktop + FormManager
 
-✅ **Event System**
-- Mouse events (MouseDown, MouseUp, MouseMove, MouseClick, MouseDoubleClick, MouseEnter, MouseLeave)
-- Keyboard events (KeyDown, KeyUp, KeyPress)
-- Touch events for mobile devices (mapped to mouse events)
+The `Desktop` component hosts a `FormManager` that tracks open forms, z-order, activation, and taskbar buttons.
 
-✅ **Form Management**
-- Form display and visibility control
-- Background color support
-- Show/Close operations
-- Title bar with close button
-- **Form dragging** - Click and drag title bar to move forms
-- **Form resizing** - Drag edges and corners to resize forms
-- Minimum/Maximum size constraints
-- Position management (Left, Top properties)
+### Rendering pipeline
 
-## Usage Example
+- `FormRenderer` draws the window chrome (title bar, border, min/max/close buttons) and then renders the client area.
+- User code draws via `Paint` handlers using `WebForms.Canvas.Drawing.Graphics`.
+- Drawing commands are sent to JavaScript and executed on the canvas.
+
+### Input
+
+Mouse, keyboard, and touch events are captured by Blazor and translated into WinForms-style events on `Form`/`Control`.
+
+## Usage
+
+### Add the desktop surface (Blazor)
+
+In a page like `Pages/Home.razor`:
+
+```razor
+@page "/"
+@using WebForms.Canvas
+@using WebForms.Canvas.Components
+@using WebForms.Canvas.Samples
+@using System.Windows.Forms
+
+<Desktop @ref="_desktop" TaskbarHeight="32" />
+
+@code {
+    private Desktop? _desktop;
+
+    protected override void OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && _desktop != null)
+        {
+            var mainForm = new WelcomeForm();
+            _desktop.FormManager.MainForm = mainForm;
+            Application.Run(mainForm);
+        }
+
+        return Task.CompletedTask;
+    }
+}
+```
+
+### Create a form and draw
 
 ```csharp
 using WebForms.Canvas.Drawing;
-using WebForms.Canvas.Forms;
+using System.Windows.Forms;
 
 public class MyDrawingForm : Form
 {
@@ -76,189 +89,111 @@ public class MyDrawingForm : Form
         Paint += OnPaint;
     }
 
-    private void OnPaint(object sender, PaintEventArgs e)
+    private void OnPaint(object? sender, PaintEventArgs e)
     {
         var g = e.Graphics;
-
-        // Draw a red rectangle
         using var pen = new Pen(Color.Red, 2);
         g.DrawRectangle(pen, 50, 50, 200, 100);
-
-        // Fill a blue circle
-        using var brush = new SolidBrush(Color.Blue);
-        g.FillEllipse(brush, 300, 50, 100, 100);
-
-        // Draw text
-        g.DrawString("Hello World!", "Arial", 24, 
-            new SolidBrush(Color.Black), 50, 200);
     }
 }
 ```
 
-In your Blazor page:
-
-```razor
-@page "/"
-@using WebForms.Canvas.Components
-
-<FormRenderer Form="@myForm" />
-
-@code {
-    private MyDrawingForm myForm = new();
-
-    protected override void OnInitialized()
-    {
-        myForm.Show();
-    }
-}
-```
-
-## Roadmap
-
-### Phase 1: Drawing ✅ COMPLETED
-- ✅ Basic shapes (lines, rectangles, ellipses)
-- ✅ Fill operations
-- ✅ Text rendering
-- ✅ Color support
-
-### Phase 2: Interaction ✅ COMPLETED
-- ✅ Mouse events (click, double-click, move, down, up, enter, leave)
-- ✅ Keyboard events (keydown, keyup, keypress)
-- ✅ Touch events for mobile devices
-- ✅ Form dragging (move via title bar)
-- ✅ Form resizing (drag edges/corners)
-- ⬜ Focus management
-- ⬜ Tab order
-
-### Phase 3: Controls (NEXT)
-- ⬜ Button
-- ⬜ Label
-- ⬜ TextBox
-- ⬜ CheckBox
-- ⬜ RadioButton
-- ⬜ ListBox
-- ⬜ ComboBox
-- ⬜ PictureBox
-
-### Phase 4: Advanced Drawing
-- ⬜ Images and bitmaps
-- ⬜ Paths and polygons
-- ⬜ Gradients
-- ⬜ Transformations (rotate, scale, translate)
-- ⬜ Clipping regions
-
-### Phase 5: IL Execution
-- ⬜ IL bytecode interpreter
-- ⬜ Assembly loading and reflection
-- ⬜ Windows Forms API compatibility layer
-- ⬜ Executable execution engine
-
-## Project Structure
-
-```
-WebForms.Canvas/              # Core library (Razor Class Library)
-├── Drawing/                  # Drawing primitives and graphics
-│   ├── Color.cs
-│   ├── Point.cs
-│   ├── Size.cs
-│   ├── Rectangle.cs
-│   ├── Pen.cs
-│   ├── Brush.cs
-│   ├── Graphics.cs
-│   └── DrawingCommands.cs
-├── Forms/                    # Form system and events
-│   ├── Control.cs
-│   ├── Form.cs
-│   ├── PaintEventArgs.cs
-│   ├── MouseEventArgs.cs
-│   └── KeyEventArgs.cs
-├── Components/               # Blazor components
-│   └── FormRenderer.razor
-├── Samples/                  # Example forms
-│   ├── SampleDrawingForm.cs
-│   └── InteractiveForm.cs
-└── wwwroot/
-    └── canvas-renderer.js    # JavaScript interop
-
-WebForms.Canvas.Host/         # Blazor WebAssembly host
-└── Pages/
-    └── Home.razor            # Demo page
-```
-
-## Technical Details
-
-### Command-Based Rendering
-
-The graphics system uses a command pattern where drawing operations are buffered as commands and then serialized to JavaScript for execution on the canvas. This approach:
-
-- Allows for batched rendering
-- Provides a clean separation between .NET and JavaScript
-- Enables future optimization opportunities (command merging, caching, etc.)
-
-### Event Handling
-
-Mouse, keyboard, and touch events are captured by Blazor and converted to Windows Forms-compatible event arguments:
-
-- **Mouse Events**: Blazor mouse events are mapped to `MouseEventArgs` with button, position, and click count
-- **Keyboard Events**: Keyboard events are mapped to `KeyEventArgs` with key codes and modifiers (Ctrl, Alt, Shift)
-- **Touch Events**: Touch events are converted to mouse events for compatibility
-
-Global mouse handlers enable smooth dragging and resizing outside the form bounds.
-
-### JavaScript Interop
-
-Drawing commands are converted to JavaScript code and executed via `IJSRuntime`:
+### Open forms (WinForms-style)
 
 ```csharp
-var jsCommands = string.Join("\n", commands.Select(c => c.ToJavaScript()));
-await JSRuntime.InvokeVoidAsync("renderCanvas", _canvasRef, jsCommands);
+Application.FormManager?.ShowOrCreateForm<ControlsDemoForm>();
 ```
 
-Example generated JavaScript:
-```javascript
-ctx.strokeStyle = 'rgba(255,0,0,1)';
-ctx.lineWidth = 2;
-ctx.strokeRect(50, 50, 200, 100);
-```
+More details: `APPLICATION_FORMMANAGER.md`.
 
-## Limitations
+## Implemented features (selected)
 
-Current limitations that will be addressed in future phases:
+### Windowing / desktop
 
-1. **No P/Invoke support**: Native Windows API calls cannot be executed
-2. **No system-specific features**: Clipboard, file dialogs, etc. require browser APIs
-3. **Single-threaded**: Browser limitations apply
-4. **No GDI+ features**: Advanced graphics features not yet implemented
-5. **No designer support**: Forms must be created programmatically
+- Desktop surface with taskbar buttons
+- Multiple windows with z-ordering / activation
+- Drag to move, resize handles
+- Minimize / maximize / close
+- Min/Max size constraints
 
-## Building and Running
+### Controls
 
-1. Clone the repository
-2. Open the solution in Visual Studio 2026 or later
-3. Build the solution (Ctrl+Shift+B)
-4. Run the WebForms.Canvas.Host project (F5)
+Implemented controls (see `WebForms.Canvas/Forms/...` in the `Canvas.Windows.Forms` project):
 
-The demo page will show a sample form with various drawing primitives.
+- **Windowing**
+  - `Form`
 
-## Contributing
+- **Core**
+  - `Control` (base type)
 
-This project is in early development. Contributions are welcome for:
+- **Text**
+  - `Label`
+  - `TextBox` (`TextBoxBase`)
 
-- Additional drawing primitives
-- Event system implementation
-- Control implementations
-- Performance optimizations
-- Documentation improvements
+- **Buttons**
+  - `Button` (`ButtonBase`)
+  - `CheckBox`
+  - `RadioButton`
+
+- **Lists**
+  - `ListControl` (base type)
+  - `ListBox`
+  - `CheckedListBox`
+  - `ComboBox`
+
+- **Display**
+  - `PictureBox` (URL-based image loading)
+
+- **Other**
+  - `DateTimePicker` (simplified)
+
+Docs: `WebForms.Canvas/Docs/PictureBox.md`.
+
+### Layout
+
+- Docking and anchoring (`Dock`, `Anchor`)
+
+### Drawing
+
+- Shapes (lines/rectangles/ellipses)
+- Fill operations
+- Text rendering
+- Command-buffered rendering to JS canvas
+
+## WinForms compatibility notes
+
+This project prioritizes matching the **WinForms SDK API surface**. Some APIs exist primarily for compatibility in a browser/canvas environment.
+
+The test project tracks `Control` property parity:
+
+- ✅ **102/102 `Control` properties implemented** (API completeness)
+- ⚠️ Not all properties are fully functional yet (some are stubs by design)
+
+See:
+
+- `WebForms.Canvas.Tests/README.md`
+- `WebForms.Canvas.Tests/PROPERTY_COMPLETENESS.md`
+- `WebForms.Canvas.Tests/PROPERTY_FUNCTIONALITY.md`
+
+## Limitations (current)
+
+- No HWND/real window handles (`Handle` and related APIs are compatibility-oriented)
+- No P/Invoke / native Windows APIs
+- No Visual Studio WinForms designer
+- Browser runtime constraints (single-threaded UI model)
+
+## Repo docs
+
+- `APPLICATION_FORMMANAGER.md` – Application + FormManager model
+- `EXTENDING.md` – extending drawing primitives and features
+- `WebForms.Canvas/Docs/PictureBox.md` – PictureBox specifics
+
+## Roadmap (short)
+
+- Focus management and tab order
+- Continue aligning control behavior with WinForms
+- More controls and richer drawing primitives
 
 ## License
 
-[Your License Here]
-
-## Future Vision
-
-The ultimate goal is to create a system that can load and execute Windows Forms `.exe` files directly in the browser, providing a web-based Windows Forms runtime. This would enable:
-
-- Legacy application modernization without rewriting
-- Cross-platform Windows Forms apps via web browsers
-- Gradual migration paths for existing WinForms codebases
-- Educational tools for learning Windows Forms programming
+No license file is currently included in the repository.

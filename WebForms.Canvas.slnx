@@ -1,5 +1,5 @@
 <Solution>
-  <Project Path="WebForms.Canvas.Host/WebForms.Canvas.Host.csproj" />
-  <Project Path="WebForms.Canvas.Tests/WebForms.Canvas.Tests.csproj" />
-  <Project Path="WebForms.Canvas/WebForms.Canvas.csproj" />
+  <Project Path="WebForms.Canvas.Host/Canvas.Windows.Forms.Host.csproj" />
+  <Project Path="WebForms.Canvas.Tests/Canvas.Windows.Forms.Tests.csproj" />
+  <Project Path="WebForms.Canvas/Canvas.Windows.Forms.csproj" />
 </Solution>
