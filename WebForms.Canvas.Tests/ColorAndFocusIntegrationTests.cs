@@ -1,7 +1,7 @@
-using WebForms.Canvas.Drawing;
+using Canvas.Windows.Forms.Drawing;
 using System.Windows.Forms;
 
-namespace WebForms.Canvas.Tests;
+namespace Canvas.Windows.Forms.Tests;
 
 /// <summary>
 /// Integration tests demonstrating the complete color and focus system improvements

@@ -1,4 +1,4 @@
-using WebForms.Canvas.Drawing;
+using Canvas.Windows.Forms.Drawing;
 using Microsoft.JSInterop;
 
 namespace System.Windows.Forms;

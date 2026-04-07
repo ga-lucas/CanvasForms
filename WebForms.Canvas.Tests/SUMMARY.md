@@ -126,7 +126,7 @@ dotnet test --filter "MethodName=Control_PropertyReport_ByCategory"
 ## 📚 Documentation Hierarchy
 
 ```
-WebForms.Canvas.Tests/
+Canvas.Windows.Forms.Tests/
 ├── README.md                          ← Start here
 │   └── Quick overview, how to run tests
 │

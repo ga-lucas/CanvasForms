@@ -1,4 +1,4 @@
-using WebForms.Canvas.Drawing;
+using Canvas.Windows.Forms.Drawing;
 
 namespace System.Windows.Forms;
 
@@ -494,9 +494,9 @@ public abstract class Control
     }
 
     // Assembly info
-    public string ProductName => "WebForms Canvas";
+    public string ProductName => "Canvas.Windows.Forms";
     public string ProductVersion => "1.0.0";
-    public string CompanyName => "WebForms Canvas";
+    public string CompanyName => "Canvas.Windows.Forms";
 
     // Create params (stub)
     public virtual object? CreateParams => null;

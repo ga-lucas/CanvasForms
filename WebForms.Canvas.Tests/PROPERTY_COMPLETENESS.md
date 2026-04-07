@@ -1,13 +1,13 @@
 # Control Property Completeness - Summary
 
 ## Overview
-This project tracks the implementation completeness of the WebForms.Canvas Control class compared to System.Windows.Forms.Control.
+This project tracks the implementation completeness of the Canvas.Windows.Forms Control class compared to System.Windows.Forms.Control.
 
 ## Current Status
 **100% Complete** - All 102 properties from Windows Forms Control are implemented.
 
 ## Test Project
-- **Location**: `WebForms.Canvas.Tests`
+- **Location**: `Canvas.Windows.Forms.Tests`
 - **Test File**: `ControlPropertyCompletenessTests.cs`
 - **Test Methods**:
   - `Control_ShouldHaveAllExpectedProperties()` - Verifies all expected properties are present
@@ -163,7 +163,7 @@ Correctly implemented as static properties (matching Windows Forms):
 
 ```bash
 # Run all tests in the test project
-dotnet test WebForms.Canvas.Tests
+dotnet test Canvas.Windows.Forms.Tests
 
 # Run only the completeness tests
 dotnet test --filter "FullyQualifiedName~ControlPropertyCompletenessTests"

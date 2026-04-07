@@ -1,12 +1,12 @@
-# WebForms.Canvas
+# Canvas.Windows.Forms
 
 WinForms-style UI framework rendered to an HTML `<canvas>` using Blazor WebAssembly. The goal is **maximum compatibility with the WinForms API surface/behavior**, while mapping rendering and input to the browser.
 
 ## What this repo contains
 
-- **WebForms.Canvas** (`net10.0` Razor Class Library): the WinForms-like API (types live under `System.Windows.Forms`) plus a lightweight drawing layer (`WebForms.Canvas.Drawing`).
-- **WebForms.Canvas.Host** (`net10.0` Blazor WebAssembly): a runnable demo host that boots a desktop-like surface and shows sample forms.
-- **WebForms.Canvas.Tests** (`net10.0`): tests and documentation tracking WinForms API completeness (especially `Control`).
+- **Canvas.Windows.Forms** (`net10.0` Razor Class Library): the WinForms-like API (types live under `System.Windows.Forms`) plus a lightweight drawing layer (`Canvas.Windows.Forms.Drawing`).
+- **Canvas.Windows.Forms.Host** (`net10.0` Blazor WebAssembly): a runnable demo host that boots a desktop-like surface and shows sample forms.
+- **Canvas.Windows.Forms.Tests** (`net10.0`): tests and documentation tracking WinForms API completeness (especially `Control`).
 
 ## Quick start
 
@@ -18,7 +18,7 @@ WinForms-style UI framework rendered to an HTML `<canvas>` using Blazor WebAssem
 ### Run the demo
 
 1. Open the solution.
-2. Set **WebForms.Canvas.Host** as the startup project.
+2. Set **Canvas.Windows.Forms.Host** as the startup project.
 3. Run (F5).
 
 The host renders a **Desktop** surface and opens `WelcomeForm`.
@@ -32,7 +32,7 @@ The `Desktop` component hosts a `FormManager` that tracks open forms, z-order, a
 ### Rendering pipeline
 
 - `FormRenderer` draws the window chrome (title bar, border, min/max/close buttons) and then renders the client area.
-- User code draws via `Paint` handlers using `WebForms.Canvas.Drawing.Graphics`.
+- User code draws via `Paint` handlers using `Canvas.Windows.Forms.Drawing.Graphics`.
 - Drawing commands are sent to JavaScript and executed on the canvas.
 
 ### Input
@@ -47,9 +47,9 @@ In a page like `Pages/Home.razor`:
 
 ```razor
 @page "/"
-@using WebForms.Canvas
-@using WebForms.Canvas.Components
-@using WebForms.Canvas.Samples
+@using Canvas.Windows.Forms
+@using Canvas.Windows.Forms.Components
+@using Canvas.Windows.Forms.Samples
 @using System.Windows.Forms
 
 <Desktop @ref="_desktop" TaskbarHeight="32" />
@@ -74,7 +74,7 @@ In a page like `Pages/Home.razor`:
 ### Create a form and draw
 
 ```csharp
-using WebForms.Canvas.Drawing;
+using Canvas.Windows.Forms.Drawing;
 using System.Windows.Forms;
 
 public class MyDrawingForm : Form
@@ -171,9 +171,9 @@ The test project tracks `Control` property parity:
 
 See:
 
-- `WebForms.Canvas.Tests/README.md`
-- `WebForms.Canvas.Tests/PROPERTY_COMPLETENESS.md`
-- `WebForms.Canvas.Tests/PROPERTY_FUNCTIONALITY.md`
+- `Canvas.Windows.Forms.Tests/README.md`
+- `Canvas.Windows.Forms.Tests/PROPERTY_COMPLETENESS.md`
+- `Canvas.Windows.Forms.Tests/PROPERTY_FUNCTIONALITY.md`
 
 ## Limitations (current)
 

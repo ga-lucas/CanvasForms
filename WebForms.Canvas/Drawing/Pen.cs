@@ -1,4 +1,4 @@
-namespace WebForms.Canvas.Drawing;
+namespace Canvas.Windows.Forms.Drawing;
 
 public class Pen : IDisposable
 {

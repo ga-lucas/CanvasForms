@@ -56,7 +56,7 @@ Options:
 Place images in `wwwroot` folder of your Blazor host project:
 
 ```
-WebForms.Canvas.Host/
+Canvas.Windows.Forms.Host/
   wwwroot/
     images/
       logo.png

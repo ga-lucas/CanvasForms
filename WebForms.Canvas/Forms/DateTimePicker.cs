@@ -1,5 +1,5 @@
 using System.Globalization;
-using WebForms.Canvas.Drawing;
+using Canvas.Windows.Forms.Drawing;
 
 namespace System.Windows.Forms;
 

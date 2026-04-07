@@ -1,7 +1,7 @@
-using WebForms.Canvas.Drawing;
+using Canvas.Windows.Forms.Drawing;
 using System.Windows.Forms;
 
-namespace WebForms.Canvas.Tests;
+namespace Canvas.Windows.Forms.Tests;
 
 /// <summary>
 /// Tests to verify controls properly use BackColor and ForeColor in rendering

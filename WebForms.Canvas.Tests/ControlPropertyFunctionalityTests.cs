@@ -1,7 +1,7 @@
 using System.Windows.Forms;
-using WebForms.Canvas.Drawing;
+using Canvas.Windows.Forms.Drawing;
 
-namespace WebForms.Canvas.Tests;
+namespace Canvas.Windows.Forms.Tests;
 
 /// <summary>
 /// Tests to verify which Control properties are functional vs compatibility-only
@@ -212,9 +212,9 @@ public class ControlPropertyFunctionalityTests
         Assert.Equal(tag, control.Tag);
 
         // These are fixed metadata
-        Assert.Equal("WebForms Canvas", control.ProductName);
+        Assert.Equal("Canvas.Windows.Forms", control.ProductName);
         Assert.Equal("1.0.0", control.ProductVersion);
-        Assert.Equal("WebForms Canvas", control.CompanyName);
+        Assert.Equal("Canvas.Windows.Forms", control.CompanyName);
     }
 
     #endregion

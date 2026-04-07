@@ -1,6 +1,6 @@
-# WebForms.Canvas.Tests
+# Canvas.Windows.Forms.Tests
 
-This test project tracks the completeness and correctness of the WebForms.Canvas Control class compared to System.Windows.Forms.Control.
+This test project tracks the completeness and correctness of the Canvas.Windows.Forms Control class compared to System.Windows.Forms.Control.
 
 ## Test Results
 

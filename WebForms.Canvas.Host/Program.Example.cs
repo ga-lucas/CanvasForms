@@ -1,8 +1,8 @@
-using WebForms.Canvas;
+using Canvas.Windows.Forms;
 using System.Windows.Forms;
-using WebForms.Canvas.Samples;
+using Canvas.Windows.Forms.Samples;
 
-namespace WebForms.Canvas.Host;
+namespace Canvas.Windows.Forms.Host;
 
 /// <summary>
 /// Example Program class showing how to structure a Windows Forms application

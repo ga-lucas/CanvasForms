@@ -1,7 +1,7 @@
-using WebForms.Canvas.Drawing;
+using Canvas.Windows.Forms.Drawing;
 using System.Windows.Forms;
 
-namespace WebForms.Canvas.Samples;
+namespace Canvas.Windows.Forms.Samples;
 
 public class InteractiveForm : Form
 {

@@ -1,7 +1,7 @@
 ﻿using System.Windows.Forms;
 using System.Reflection;
 
-namespace WebForms.Canvas.Tests;
+namespace Canvas.Windows.Forms.Tests;
 
 /// <summary>
 /// Tests to track the completeness of Control class properties 

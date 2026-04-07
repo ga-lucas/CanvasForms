@@ -1,6 +1,6 @@
 using System.Windows.Forms;
 
-namespace WebForms.Canvas.Tests;
+namespace Canvas.Windows.Forms.Tests;
 
 /// <summary>
 /// Tests for Tab key navigation functionality

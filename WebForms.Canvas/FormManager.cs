@@ -1,6 +1,6 @@
 using System.Windows.Forms;
 
-namespace WebForms.Canvas;
+namespace Canvas.Windows.Forms;
 
 /// <summary>
 /// Manages the lifecycle of forms in the application

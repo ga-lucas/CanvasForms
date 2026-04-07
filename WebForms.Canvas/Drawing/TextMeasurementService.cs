@@ -1,7 +1,7 @@
 using Microsoft.JSInterop;
 using System.Collections.Concurrent;
 
-namespace WebForms.Canvas.Drawing;
+namespace Canvas.Windows.Forms.Drawing;
 
 /// <summary>
 /// Service for measuring text width using JavaScript canvas.measureText()

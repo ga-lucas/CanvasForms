@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace WebForms.Canvas.Drawing;
+namespace Canvas.Windows.Forms.Drawing;
 
 // Represents drawing commands that can be serialized to JavaScript
 public abstract class DrawingCommand

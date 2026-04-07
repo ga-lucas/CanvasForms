@@ -1,7 +1,7 @@
 using System;
 using Xunit;
 
-namespace WebForms.Canvas.Tests;
+namespace Canvas.Windows.Forms.Tests;
 
 public class DateTimePickerTests
 {

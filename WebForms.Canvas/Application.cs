@@ -1,6 +1,6 @@
 using System.Windows.Forms;
 
-namespace WebForms.Canvas;
+namespace Canvas.Windows.Forms;
 
 /// <summary>
 /// Provides static methods and properties to manage an application, such as methods to start and stop an application,
@@ -99,12 +99,12 @@ public static class Application
     /// <summary>
     /// Gets the company name associated with the application
     /// </summary>
-    public static string CompanyName => "WebForms Canvas";
+    public static string CompanyName => "Canvas.Windows.Forms";
 
     /// <summary>
     /// Gets the product name associated with this application
     /// </summary>
-    public static string ProductName => "WebForms Canvas Application";
+    public static string ProductName => "Canvas.Windows.Forms Application";
 
     /// <summary>
     /// Gets the product version associated with this application
