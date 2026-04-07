@@ -19,12 +19,14 @@ public class ControlsDemoForm : Form
     private ComboBox? _comboBox1;
     private ComboBox? _comboBox2;
     private Label? _comboBoxOutput;
+    private CheckedListBox? _checkedListBox;
+    private Label? _checkedListBoxOutput;
 
     public ControlsDemoForm()
     {
         Text = "Controls Demo";
-        Width = 400;
-        Height = 600;
+        Width = 420;
+        Height = 720;
         BackColor = Color.FromArgb(240, 240, 240);
 
         InitializeControls();
@@ -69,12 +71,50 @@ public class ControlsDemoForm : Form
         };
         Controls.Add(_outputLabel);
 
+        // AutoComplete TextBox
+        var autoCompleteLabel = new Label
+        {
+            Text = "AutoComplete TextBox (try: apple, banana, cherry):",
+            Left = 10,
+            Top = 100,
+            Width = 380,
+            Height = 20,
+            ForeColor = Color.Black
+        };
+        Controls.Add(autoCompleteLabel);
+
+        var autoCompleteTextBox = new TextBox
+        {
+            Left = 10,
+            Top = 125,
+            Width = 200,
+            Height = 23,
+            AutoCompleteMode = AutoCompleteMode.Suggest,
+            AutoCompleteSource = AutoCompleteSource.CustomSource,
+            AutoCompleteCustomSource = new[]
+            {
+                "apple", "apricot", "avocado",
+                "banana", "blueberry", "blackberry",
+                "cherry", "cranberry", "coconut",
+                "date", "dragonfruit", "durian",
+                "elderberry", "fig", "grape",
+                "grapefruit", "guava", "honeydew",
+                "kiwi", "lemon", "lime",
+                "mango", "melon", "nectarine",
+                "orange", "papaya", "peach",
+                "pear", "pineapple", "plum",
+                "raspberry", "strawberry", "tangerine",
+                "watermelon"
+            }
+        };
+        Controls.Add(autoCompleteTextBox);
+
         // Buttons
         _button1 = new Button
         {
             Text = "Click Me!",
             Left = 10,
-            Top = 100,
+            Top = 160,
             Width = 100,
             Height = 30
         };
@@ -85,7 +125,7 @@ public class ControlsDemoForm : Form
         {
             Text = "Disabled",
             Left = 120,
-            Top = 100,
+            Top = 160,
             Width = 100,
             Height = 30,
             Enabled = false
@@ -97,7 +137,7 @@ public class ControlsDemoForm : Form
         {
             Text = "CheckBoxes:",
             Left = 10,
-            Top = 145,
+            Top = 205,
             Width = 100,
             Height = 20,
             ForeColor = Color.Black
@@ -108,7 +148,7 @@ public class ControlsDemoForm : Form
         {
             Text = "Option 1",
             Left = 10,
-            Top = 170,
+            Top = 230,
             Width = 150,
             Height = 20,
             Checked = true
@@ -120,7 +160,7 @@ public class ControlsDemoForm : Form
         {
             Text = "Option 2",
             Left = 10,
-            Top = 195,
+            Top = 255,
             Width = 150,
             Height = 20
         };
@@ -132,7 +172,7 @@ public class ControlsDemoForm : Form
         {
             Text = "RadioButtons (Select One):",
             Left = 10,
-            Top = 230,
+            Top = 290,
             Width = 200,
             Height = 20,
             ForeColor = Color.Black
@@ -143,7 +183,7 @@ public class ControlsDemoForm : Form
         {
             Text = "Choice A",
             Left = 10,
-            Top = 255,
+            Top = 315,
             Width = 150,
             Height = 20,
             Checked = true
@@ -155,7 +195,7 @@ public class ControlsDemoForm : Form
         {
             Text = "Choice B",
             Left = 10,
-            Top = 280,
+            Top = 340,
             Width = 150,
             Height = 20
         };
@@ -166,7 +206,7 @@ public class ControlsDemoForm : Form
         {
             Text = "Choice C",
             Left = 10,
-            Top = 305,
+            Top = 365,
             Width = 150,
             Height = 20
         };
@@ -178,7 +218,7 @@ public class ControlsDemoForm : Form
         {
             Text = "Status: Ready",
             Left = 10,
-            Top = 340,
+            Top = 395,
             Width = 380,
             Height = 20,
             ForeColor = Color.FromArgb(0, 128, 0)
@@ -190,7 +230,7 @@ public class ControlsDemoForm : Form
         {
             Text = "ComboBoxes:",
             Left = 10,
-            Top = 370,
+            Top = 425,
             Width = 100,
             Height = 20,
             ForeColor = Color.Black
@@ -201,7 +241,7 @@ public class ControlsDemoForm : Form
         _comboBox1 = new ComboBox
         {
             Left = 10,
-            Top = 395,
+            Top = 450,
             Width = 150,
             DropDownStyle = ComboBoxStyle.DropDownList
         };
@@ -221,7 +261,7 @@ public class ControlsDemoForm : Form
         {
             Text = "(DropDownList)",
             Left = 170,
-            Top = 397,
+            Top = 450,
             Width = 100,
             Height = 20,
             ForeColor = Color.FromArgb(128, 128, 128)
@@ -232,7 +272,7 @@ public class ControlsDemoForm : Form
         _comboBox2 = new ComboBox
         {
             Left = 10,
-            Top = 425,
+            Top = 480,
             Width = 150,
             DropDownStyle = ComboBoxStyle.DropDown
         };
@@ -248,7 +288,7 @@ public class ControlsDemoForm : Form
         {
             Text = "(DropDown)",
             Left = 170,
-            Top = 427,
+            Top = 480,
             Width = 100,
             Height = 20,
             ForeColor = Color.FromArgb(128, 128, 128)
@@ -259,19 +299,60 @@ public class ControlsDemoForm : Form
         {
             Text = "ComboBox selection: Red",
             Left = 10,
-            Top = 455,
+            Top = 510,
             Width = 380,
             Height = 20,
             ForeColor = Color.FromArgb(64, 64, 64)
         };
         Controls.Add(_comboBoxOutput);
 
+        // CheckedListBox Section
+        var checkedListBoxLabel = new Label
+        {
+            Text = "CheckedListBox:",
+            Left = 10,
+            Top = 545,
+            Width = 150,
+            Height = 20,
+            ForeColor = Color.Black
+        };
+        Controls.Add(checkedListBoxLabel);
+
+        _checkedListBox = new CheckedListBox
+        {
+            Left = 10,
+            Top = 570,
+            Width = 180,
+            Height = 100,
+            CheckOnClick = true
+        };
+        _checkedListBox.Items.Add("Feature A");
+        _checkedListBox.Items.Add("Feature B");
+        _checkedListBox.Items.Add("Feature C");
+        _checkedListBox.Items.Add("Feature D");
+        _checkedListBox.Items.Add("Feature E");
+        _checkedListBox.SetItemChecked(0, true);
+        _checkedListBox.SetItemChecked(2, true);
+        _checkedListBox.ItemCheck += CheckedListBox_ItemCheck;
+        Controls.Add(_checkedListBox);
+
+        _checkedListBoxOutput = new Label
+        {
+            Text = "Checked: 2 items",
+            Left = 200,
+            Top = 570,
+            Width = 200,
+            Height = 40,
+            ForeColor = Color.FromArgb(64, 64, 64)
+        };
+        Controls.Add(_checkedListBoxOutput);
+
         // PictureBox Section
         var pictureLabel = new Label
         {
             Text = "PictureBox:",
             Left = 10,
-            Top = 485,
+            Top = 680,
             Width = 100,
             Height = 20,
             ForeColor = Color.Black
@@ -281,7 +362,7 @@ public class ControlsDemoForm : Form
         _pictureBox = new PictureBox
         {
             Left = 10,
-            Top = 510,
+            Top = 705,
             Width = 150,
             Height = 60,
             ImageUrl = "https://via.placeholder.com/150x60", // Placeholder image
@@ -293,12 +374,27 @@ public class ControlsDemoForm : Form
         {
             Text = "Image loaded from URL",
             Left = 170,
-            Top = 510,
+            Top = 705,
             Width = 210,
             Height = 40,
             ForeColor = Color.FromArgb(64, 64, 64)
         };
         Controls.Add(pictureInfo);
+    }
+
+    private void CheckedListBox_ItemCheck(object? sender, ItemCheckEventArgs e)
+    {
+        if (_checkedListBox != null && _checkedListBoxOutput != null)
+        {
+            // Calculate new count (accounting for the change)
+            var newCount = _checkedListBox.CheckedIndices.Count;
+            if (e.NewValue == CheckState.Checked && e.CurrentValue != CheckState.Checked)
+                newCount++;
+            else if (e.NewValue != CheckState.Checked && e.CurrentValue == CheckState.Checked)
+                newCount--;
+
+            _checkedListBoxOutput.Text = $"Checked: {newCount} item{(newCount != 1 ? "s" : "")}";
+        }
     }
 
     private void OnTextBoxChanged(object? sender, EventArgs e)
@@ -363,3 +459,4 @@ public class ControlsDemoForm : Form
         }
     }
 }
+

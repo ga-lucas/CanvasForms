@@ -100,6 +100,10 @@
     // Render queue for keyboard input
     private bool _renderPending = false;
 
+    // Coalescing for control invalidations
+    private bool _renderQueued = false;
+    private bool _renderRequested = false;
+
     // Touch state
     private double _lastTouchX = 0;
     private double _lastTouchY = 0;
@@ -144,14 +148,42 @@
             Form.TextMeasurementService = new TextMeasurementService(JSRuntime);
 
             // Set RequestRender and propagate to all children
-            var renderFunc = async () => 
+            var renderFunc = () =>
             {
-                // Only render if canvas ref is still valid and form is still visible
-                if (_canvasRef.Id != null && Form?.Visible == true)
+                // Coalesce multiple invalidations into at most one render per tick.
+                // This significantly reduces flicker when controls trigger multiple Invalidate() calls
+                // during a single input sequence (mouse down/up, focus change, CheckedChanged, etc.).
+                _renderRequested = true;
+                if (_renderQueued)
                 {
-                    await RenderForm();
+                    return Task.CompletedTask;
                 }
+
+                _renderQueued = true;
+
+                _ = InvokeAsync(async () =>
+                {
+                    // Process renders until no more invalidations were requested.
+                    while (_renderRequested)
+                    {
+                        _renderRequested = false;
+
+                        // Yield so multiple invalidations within the same call stack batch together.
+                        await Task.Yield();
+
+                        // Only render if canvas ref is still valid and form is still visible
+                        if (_canvasRef.Id != null && Form?.Visible == true)
+                        {
+                            await RenderForm();
+                        }
+                    }
+
+                    _renderQueued = false;
+                });
+
+                return Task.CompletedTask;
             };
+
             Form.PropagateRequestRender(renderFunc);
 
             _dotNetRef = DotNetObjectReference.Create(this);

@@ -69,16 +69,28 @@ public class CheckBox : ButtonBase
             var checkColor = Enabled ? Color.FromArgb(0, 120, 215) : Color.FromArgb(109, 109, 109);
             var pen = new Pen(checkColor, 2);
 
-            // Draw checkmark (simple lines)
-            g.DrawLine(pen, 2, boxSize / 2, boxSize / 2 - 1, boxSize - 3);
-            g.DrawLine(pen, boxSize / 2 - 1, boxSize - 3, boxSize - 2, 2);
+            // Calculate checkmark position relative to box bounds
+            var boxY = boxBounds.Y;
+            var x1 = boxBounds.X + 3;
+            var y1 = boxY + boxSize / 2;
+            var x2 = boxBounds.X + boxSize / 2 - 1;
+            var y2 = boxY + boxSize - 3;
+            var x3 = boxBounds.X + boxSize - 3;
+            var y3 = boxY + 3;
+
+            // Draw checkmark (two lines forming a check)
+            g.DrawLine(pen, x1, y1, x2, y2);
+            g.DrawLine(pen, x2, y2, x3, y3);
         }
 
         // Draw text
         if (!string.IsNullOrEmpty(Text))
         {
             var textColor = Enabled ? ForeColor : Color.FromArgb(109, 109, 109);
-            g.DrawString(Text, boxSize + 4, (Height - 14) / 2, textColor);
+            // Align text vertically with the checkbox - account for font baseline being 'top'
+            // Center the text vertically by positioning it at (Height - fontSize) / 2
+            var textY = (Height - 14) / 2 + 2; // +2 to account for typical font baseline offset
+            g.DrawString(Text, boxSize + 4, textY, textColor);
         }
 
         // Draw focus rectangle if focused

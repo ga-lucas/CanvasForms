@@ -75,7 +75,9 @@ public class RadioButton : ButtonBase
         if (!string.IsNullOrEmpty(Text))
         {
             var textColor = Enabled ? ForeColor : Color.FromArgb(109, 109, 109);
-            g.DrawString(Text, circleSize + 4, (Height - 14) / 2, textColor);
+            // Align text vertically with the radio button - account for font baseline being 'top'
+            var textY = (Height - 14) / 2 + 2; // +2 to account for typical font baseline offset
+            g.DrawString(Text, circleSize + 4, textY, textColor);
         }
 
         // Draw focus rectangle if focused

@@ -15,12 +15,14 @@ public class TextBox : TextBoxBase
     private AutoCompleteMode _autoCompleteMode = AutoCompleteMode.None;
     private AutoCompleteSource _autoCompleteSource = AutoCompleteSource.None;
     private bool _shortcutsEnabled = true;
+    private AutoCompletePanel? _autoCompletePanel;
 
     public TextBox()
     {
         Width = 100;
         Height = 23;
         Font = new Font("Arial", 12);
+        _autoCompletePanel = new AutoCompletePanel(this);
     }
 
     #region Properties
@@ -241,6 +243,38 @@ public class TextBox : TextBoxBase
         base.OnPaint(e);
     }
 
+    /// <summary>
+    /// Paint without autocomplete (called by Form to paint control layer)
+    /// </summary>
+    internal void PaintWithoutAutoComplete(PaintEventArgs e)
+    {
+        OnPaint(e);
+    }
+
+    /// <summary>
+    /// Paint only the autocomplete panel (called by Form to paint on top)
+    /// </summary>
+    internal void PaintAutoCompleteOnly(PaintEventArgs e)
+    {
+        if (_autoCompletePanel?.IsVisible == true)
+        {
+            _autoCompletePanel.Paint(e.Graphics);
+        }
+    }
+
+    /// <summary>
+    /// Gets whether autocomplete is visible
+    /// </summary>
+    internal bool HasVisibleAutoComplete => _autoCompletePanel?.IsVisible == true;
+
+    /// <summary>
+    /// Gets the bounds of the autocomplete panel relative to this TextBox
+    /// </summary>
+    internal Rectangle GetAutoCompletePanelBounds()
+    {
+        return _autoCompletePanel?.GetBounds() ?? Rectangle.Empty;
+    }
+
     private void DrawBorder(Graphics g, Rectangle bounds, bool hasFocus)
     {
         switch (BorderStyle)
@@ -383,6 +417,56 @@ public class TextBox : TextBoxBase
         return text;
     }
 
+    private void UpdateAutoComplete()
+    {
+        if (_autoCompleteMode == AutoCompleteMode.None || 
+            _autoCompleteSource == AutoCompleteSource.None ||
+            string.IsNullOrWhiteSpace(Text))
+        {
+            _autoCompletePanel?.Hide();
+            return;
+        }
+
+        // Get suggestions based on source
+        var suggestions = GetAutoCompleteSuggestions(Text);
+
+        if (suggestions.Any())
+        {
+            _autoCompletePanel?.Show(suggestions, Text);
+        }
+        else
+        {
+            _autoCompletePanel?.Hide();
+        }
+    }
+
+    private IEnumerable<string> GetAutoCompleteSuggestions(string text)
+    {
+        if (_autoCompleteSource == AutoCompleteSource.CustomSource)
+        {
+            return _autoCompleteCustomSource
+                .Where(s => s.StartsWith(text, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(s => s)
+                .Take(20);
+        }
+
+        // Other sources would be implemented here (FileSystem, HistoryList, etc.)
+        return Enumerable.Empty<string>();
+    }
+
+    internal void AcceptAutoCompleteSuggestion(string suggestion)
+    {
+        if (_autoCompleteMode == AutoCompleteMode.Suggest || 
+            _autoCompleteMode == AutoCompleteMode.SuggestAppend)
+        {
+            Text = suggestion;
+            _caretPosition = suggestion.Length;
+            _selectionStart = _caretPosition;
+            _selectionLength = 0;
+            Invalidate();
+        }
+    }
+
     #endregion
 
     #region Keyboard Input
@@ -447,6 +531,7 @@ public class TextBox : TextBoxBase
             _caretPosition++;
             Modified = true;
             OnTextChanged(EventArgs.Empty);
+            UpdateAutoComplete();
             e.Handled = true;
             Invalidate();
         }
@@ -460,6 +545,16 @@ public class TextBox : TextBoxBase
         {
             base.OnKeyDown(e);
             return;
+        }
+
+        // Let autocomplete panel handle keys first if it's visible
+        if (_autoCompletePanel?.IsVisible == true)
+        {
+            if (_autoCompletePanel.HandleKeyDown(e))
+            {
+                e.Handled = true;
+                return;
+            }
         }
 
         var handled = false;
@@ -653,6 +748,22 @@ public class TextBox : TextBoxBase
             return;
         }
 
+        // Check if clicking on autocomplete panel
+        if (_autoCompletePanel?.HandleMouseDown(e) == true)
+        {
+            return;
+        }
+
+        // Close autocomplete if clicking outside
+        if (_autoCompletePanel?.IsVisible == true)
+        {
+            var panelBounds = _autoCompletePanel.GetBounds();
+            if (e.Y < panelBounds.Y || e.Y >= panelBounds.Bottom)
+            {
+                _autoCompletePanel.Hide();
+            }
+        }
+
         var borderWidth = GetBorderWidth();
         const int textPadding = 3;
         var textBounds = new Rectangle(
@@ -705,6 +816,33 @@ public class TextBox : TextBoxBase
         }
 
         base.OnMouseDown(e);
+    }
+
+    protected internal override void OnMouseMove(MouseEventArgs e)
+    {
+        // Let autocomplete panel handle mouse move
+        _autoCompletePanel?.HandleMouseMove(e);
+
+        base.OnMouseMove(e);
+    }
+
+    protected internal override void OnMouseUp(MouseEventArgs e)
+    {
+        // Notify autocomplete panel
+        _autoCompletePanel?.HandleMouseUp();
+
+        base.OnMouseUp(e);
+    }
+
+    protected override void OnMouseWheel(MouseEventArgs e)
+    {
+        // Let autocomplete panel handle mouse wheel if visible
+        if (_autoCompletePanel?.HandleMouseWheel(e) == true)
+        {
+            return;
+        }
+
+        base.OnMouseWheel(e);
     }
 
     #endregion

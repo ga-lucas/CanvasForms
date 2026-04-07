@@ -64,7 +64,7 @@ public class Button : ButtonBase
 
             // Simple text centering (approximate)
             var textX = (Width - (Text.Length * 7)) / 2;
-            var textY = (Height - 14) / 2;
+            var textY = (Height - 14) / 2 + 2; // +2 for baseline offset
 
             using var textBrush = new SolidBrush(textColor);
             g.DrawString(Text, "Arial", 12, textBrush, textX, textY);

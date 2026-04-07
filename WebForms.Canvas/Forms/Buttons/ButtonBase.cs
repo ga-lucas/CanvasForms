@@ -61,13 +61,14 @@ public abstract class ButtonBase : Control
 
         if (Enabled && wasPressed && e.Button == MouseButtons.Left)
         {
-            Invalidate();
-
             // Only fire click if mouse is still over button
             if (ContainsPoint(e.X, e.Y))
             {
                 OnClick(EventArgs.Empty);
             }
+
+            // Single invalidate for mouse-up (pressed -> normal) and any state changes from click.
+            Invalidate();
         }
 
         base.OnMouseUp(e);
@@ -105,6 +106,7 @@ public abstract class ButtonBase : Control
         {
             _isPressed = false;
             OnClick(EventArgs.Empty);
+            // Single invalidate for key-up (pressed -> normal) and any state changes from click.
             Invalidate();
             e.Handled = true;
         }

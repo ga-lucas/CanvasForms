@@ -43,11 +43,12 @@ public class Label : Control
         // Approximate character width and height
         const int charWidth = 7;
         const int charHeight = 14;
+        const int baselineOffset = 2; // Offset to account for 'top' baseline in canvas
 
         var textWidth = Text.Length * charWidth;
         var textHeight = charHeight;
 
-        return TextAlign switch
+        var (baseX, baseY) = TextAlign switch
         {
             ContentAlignment.TopLeft => (0, 0),
             ContentAlignment.TopCenter => ((Width - textWidth) / 2, 0),
@@ -60,6 +61,9 @@ public class Label : Control
             ContentAlignment.BottomRight => (Width - textWidth, Height - textHeight),
             _ => (0, 0)
         };
+
+        // Add baseline offset to Y coordinate for better vertical alignment
+        return (baseX, baseY + baselineOffset);
     }
 }
 

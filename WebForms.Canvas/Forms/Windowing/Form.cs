@@ -178,10 +178,14 @@ public class Form : Control
                 new Rectangle(0, 0, control.Width, control.Height)
             );
 
-            // Let control paint itself (but skip drop-downs for ComboBox)
+            // Let control paint itself (but skip drop-downs for ComboBox and autocomplete for TextBox)
             if (control is ComboBox comboBox)
             {
                 comboBox.PaintWithoutDropDown(controlPaintArgs);
+            }
+            else if (control is TextBox textBox)
+            {
+                textBox.PaintWithoutAutoComplete(controlPaintArgs);
             }
             else
             {
@@ -206,6 +210,26 @@ public class Form : Control
                     new Rectangle(0, 0, control.Width, control.Height)
                 );
                 comboBox.PaintDropDownOnly(dropDownPaintArgs);
+
+                // Restore
+                g.TranslateTransform(-control.Left, -control.Top);
+            }
+        }
+
+        // Paint all TextBox autocomplete panels on top of everything
+        foreach (var control in Controls)
+        {
+            if (control is TextBox textBox && textBox.HasVisibleAutoComplete && control.Visible)
+            {
+                // Translate to control position
+                g.TranslateTransform(control.Left, control.Top);
+
+                // Paint just the autocomplete
+                var autoCompletePaintArgs = new PaintEventArgs(
+                    g,
+                    new Rectangle(0, 0, control.Width, control.Height)
+                );
+                textBox.PaintAutoCompleteOnly(autoCompletePaintArgs);
 
                 // Restore
                 g.TranslateTransform(-control.Left, -control.Top);
@@ -336,6 +360,16 @@ public class Form : Control
 
             return x >= control.Left && x < control.Left + dropDownWidth &&
                    y >= control.Top + control.Height && y < control.Top + control.Height + dropDownHeight;
+        }
+
+        // Special case: TextBox with autocomplete panel open
+        if (control is TextBox textBox && textBox.HasVisibleAutoComplete)
+        {
+            // Check if clicking in autocomplete panel area (below the control)
+            var panelBounds = textBox.GetAutoCompletePanelBounds();
+
+            return x >= control.Left + panelBounds.X && x < control.Left + panelBounds.Right &&
+                   y >= control.Top + panelBounds.Y && y < control.Top + panelBounds.Bottom;
         }
 
         return false;
