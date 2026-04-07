@@ -14,6 +14,9 @@ public abstract class TextBoxBase : Control
     private bool _hideSelection = true;
     private bool _modified = false;
     private BorderStyle _borderStyle = BorderStyle.Fixed3D;
+    private ScrollBars _scrollBars = ScrollBars.None;
+    private bool _autoSize = true;
+    private Font _font;
 
     // Selection state
     protected int _selectionStart = 0;
@@ -37,10 +40,58 @@ public abstract class TextBoxBase : Control
         TabStop = true;
         BackColor = Color.White;
         ForeColor = Color.Black;
-        Font = new Font("Arial", 12);
+        _font = new Font("Arial", 12);
     }
 
     #region Properties
+
+    /// <summary>
+    /// Gets or sets the font of the text
+    /// </summary>
+    public new Font Font
+    {
+        get => _font;
+        set
+        {
+            if (_font != value)
+            {
+                _font = value;
+                Invalidate();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets whether the control automatically sizes (stub)
+    /// </summary>
+    public new bool AutoSize
+    {
+        get => _autoSize;
+        set
+        {
+            if (_autoSize != value)
+            {
+                _autoSize = value;
+                Invalidate();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets which scroll bars should appear (stub)
+    /// </summary>
+    public ScrollBars ScrollBars
+    {
+        get => _scrollBars;
+        set
+        {
+            if (_scrollBars != value)
+            {
+                _scrollBars = value;
+                Invalidate();
+            }
+        }
+    }
 
     /// <summary>
     /// Gets or sets whether pressing ENTER creates a new line
@@ -48,7 +99,14 @@ public abstract class TextBoxBase : Control
     public bool AcceptsReturn
     {
         get => _acceptsReturn;
-        set => _acceptsReturn = value;
+        set
+        {
+            if (_acceptsReturn != value)
+            {
+                _acceptsReturn = value;
+                OnAcceptsTabChanged(EventArgs.Empty);
+            }
+        }
     }
 
     /// <summary>
@@ -57,7 +115,14 @@ public abstract class TextBoxBase : Control
     public bool AcceptsTab
     {
         get => _acceptsTab;
-        set => _acceptsTab = value;
+        set
+        {
+            if (_acceptsTab != value)
+            {
+                _acceptsTab = value;
+                OnAcceptsTabChanged(EventArgs.Empty);
+            }
+        }
     }
 
     /// <summary>
@@ -71,6 +136,7 @@ public abstract class TextBoxBase : Control
             if (_borderStyle != value)
             {
                 _borderStyle = value;
+                OnBorderStyleChanged(EventArgs.Empty);
                 Invalidate();
             }
         }
@@ -92,15 +158,38 @@ public abstract class TextBoxBase : Control
             if (_hideSelection != value)
             {
                 _hideSelection = value;
+                OnHideSelectionChanged(EventArgs.Empty);
                 Invalidate();
             }
         }
     }
 
     /// <summary>
-    /// Gets the number of lines in the text
+    /// Gets the lines of text in the control as a string array
     /// </summary>
-    public virtual int Lines => Text.Split('\n').Length;
+    public virtual string[] Lines
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(Text))
+                return Array.Empty<string>();
+
+            // Split by line breaks, handling different line ending styles
+            return Text.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+        }
+        set
+        {
+            if (value == null || value.Length == 0)
+            {
+                Text = string.Empty;
+            }
+            else
+            {
+                Text = string.Join(Environment.NewLine, value);
+            }
+            Invalidate();
+        }
+    }
 
     /// <summary>
     /// Gets or sets the maximum number of characters
@@ -122,7 +211,14 @@ public abstract class TextBoxBase : Control
     public bool Modified
     {
         get => _modified;
-        set => _modified = value;
+        set
+        {
+            if (_modified != value)
+            {
+                _modified = value;
+                OnModifiedChanged(EventArgs.Empty);
+            }
+        }
     }
 
     /// <summary>
@@ -136,6 +232,7 @@ public abstract class TextBoxBase : Control
             if (_multiline != value)
             {
                 _multiline = value;
+                OnMultilineChanged(EventArgs.Empty);
                 Invalidate();
             }
         }
@@ -152,6 +249,7 @@ public abstract class TextBoxBase : Control
             if (_readOnly != value)
             {
                 _readOnly = value;
+                OnReadOnlyChanged(EventArgs.Empty);
                 Invalidate();
             }
         }
@@ -173,7 +271,7 @@ public abstract class TextBoxBase : Control
         }
         set
         {
-            if (ReadOnly) return;
+            if (_readOnly) return;
 
             SaveUndoState();
 
@@ -260,7 +358,7 @@ public abstract class TextBoxBase : Control
     /// </summary>
     public void AppendText(string text)
     {
-        if (ReadOnly) return;
+        if (_readOnly) return;
 
         SaveUndoState();
         Text += text;
@@ -275,7 +373,7 @@ public abstract class TextBoxBase : Control
     /// </summary>
     public void Clear()
     {
-        if (ReadOnly) return;
+        if (_readOnly) return;
 
         SaveUndoState();
         Text = string.Empty;
@@ -314,7 +412,7 @@ public abstract class TextBoxBase : Control
     /// </summary>
     public void Cut()
     {
-        if (ReadOnly || _selectionLength == 0) return;
+        if (_readOnly || _selectionLength == 0) return;
 
         Copy();
         SaveUndoState();
@@ -326,7 +424,7 @@ public abstract class TextBoxBase : Control
     /// </summary>
     public void Paste()
     {
-        if (ReadOnly) return;
+        if (_readOnly) return;
 
         if (!string.IsNullOrEmpty(ClipboardText))
         {
@@ -389,6 +487,195 @@ public abstract class TextBoxBase : Control
         Invalidate();
     }
 
+    /// <summary>
+    /// Gets the character index of the first character of a given line
+    /// </summary>
+    public int GetFirstCharIndexFromLine(int lineNumber)
+    {
+        var lines = Lines;
+        if (lineNumber < 0 || lineNumber >= lines.Length)
+            return -1;
+
+        int charIndex = 0;
+        for (int i = 0; i < lineNumber; i++)
+        {
+            charIndex += lines[i].Length + Environment.NewLine.Length;
+        }
+        return charIndex;
+    }
+
+    /// <summary>
+    /// Gets the line number from a character position
+    /// </summary>
+    public int GetLineFromCharIndex(int index)
+    {
+        if (index < 0 || index > Text.Length)
+            return 0;
+
+        var textUpToIndex = Text.Substring(0, index);
+        return textUpToIndex.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None).Length - 1;
+    }
+
+    /// <summary>
+    /// Gets the character index of the first character of the current line
+    /// </summary>
+    public int GetFirstCharIndexOfCurrentLine()
+    {
+        var lineNumber = GetLineFromCharIndex(_caretPosition);
+        return GetFirstCharIndexFromLine(lineNumber);
+    }
+
+    /// <summary>
+    /// Gets the pixel position of the character at the specified index
+    /// </summary>
+    public Point GetPositionFromCharIndex(int index)
+    {
+        if (index < 0 || index > Text.Length)
+            return new Point(0, 0);
+
+        // Get the form's text measurement service
+        var measureService = (Parent as Form)?.TextMeasurementService;
+        if (measureService == null || _font == null)
+            return new Point(0, 0);
+
+        var borderWidth = GetBorderWidth();
+        const int textPadding = 3;
+
+        if (!_multiline)
+        {
+            // Single-line: calculate horizontal position only
+            var textBeforeIndex = index > 0 ? Text.Substring(0, index) : "";
+            var width = measureService.MeasureTextEstimate(textBeforeIndex, _font.Family, (int)_font.Size);
+
+            return new Point(
+                borderWidth + textPadding + width - _scrollOffsetX,
+                borderWidth + textPadding
+            );
+        }
+        else
+        {
+            // Multi-line: calculate both line number and position within line
+            var lineNumber = GetLineFromCharIndex(index);
+            var lines = Lines;
+
+            if (lineNumber >= lines.Length)
+                return new Point(borderWidth + textPadding, borderWidth + textPadding);
+
+            // Get character position within the line
+            var firstCharOfLine = GetFirstCharIndexFromLine(lineNumber);
+            var positionInLine = index - firstCharOfLine;
+
+            // Calculate horizontal position
+            var textBeforeInLine = positionInLine > 0 && positionInLine <= lines[lineNumber].Length
+                ? lines[lineNumber].Substring(0, positionInLine)
+                : "";
+            var width = measureService.MeasureTextEstimate(textBeforeInLine, _font.Family, (int)_font.Size);
+
+            // Calculate vertical position (line number * line height)
+            var lineHeight = (int)_font.Size + 4; // Font size + padding
+            var y = borderWidth + textPadding + (lineNumber * lineHeight) - _scrollOffsetY;
+
+            return new Point(
+                borderWidth + textPadding + width - _scrollOffsetX,
+                y
+            );
+        }
+    }
+
+    /// <summary>
+    /// Gets the character index from a pixel position
+    /// </summary>
+    public int GetCharIndexFromPosition(Point pt)
+    {
+        // Get the form's text measurement service
+        var measureService = (Parent as Form)?.TextMeasurementService;
+        if (measureService == null || _font == null)
+            return 0;
+
+        var borderWidth = GetBorderWidth();
+        const int textPadding = 3;
+
+        // Adjust for border and scroll offset
+        var relativeX = pt.X - borderWidth - textPadding + _scrollOffsetX;
+        var relativeY = pt.Y - borderWidth - textPadding + _scrollOffsetY;
+
+        if (!_multiline)
+        {
+            // Single-line: find character at X position
+            if (string.IsNullOrEmpty(Text))
+                return 0;
+
+            // Binary search for closest character position
+            int closestIndex = 0;
+            int minDistance = int.MaxValue;
+
+            for (int i = 0; i <= Text.Length; i++)
+            {
+                var textUpToIndex = i > 0 ? Text.Substring(0, i) : "";
+                var width = measureService.MeasureTextEstimate(textUpToIndex, _font.Family, (int)_font.Size);
+                var distance = Math.Abs(width - relativeX);
+
+                if (distance < minDistance)
+                {
+                    minDistance = distance;
+                    closestIndex = i;
+                }
+                else
+                {
+                    // Distance is increasing, we've passed the closest point
+                    break;
+                }
+            }
+
+            return closestIndex;
+        }
+        else
+        {
+            // Multi-line: determine line number, then position within line
+            var lineHeight = (int)_font.Size + 4;
+            var lineNumber = Math.Max(0, relativeY / lineHeight);
+
+            var lines = Lines;
+            if (lineNumber >= lines.Length)
+                lineNumber = lines.Length - 1;
+
+            if (lineNumber < 0 || lines.Length == 0)
+                return 0;
+
+            // Get the line text
+            var lineText = lines[lineNumber];
+            if (string.IsNullOrEmpty(lineText))
+            {
+                // Empty line - return start of line
+                return GetFirstCharIndexFromLine(lineNumber);
+            }
+
+            // Find character position within the line
+            int closestPosInLine = 0;
+            int minDistance = int.MaxValue;
+
+            for (int i = 0; i <= lineText.Length; i++)
+            {
+                var textUpToPos = i > 0 ? lineText.Substring(0, i) : "";
+                var width = measureService.MeasureTextEstimate(textUpToPos, _font.Family, (int)_font.Size);
+                var distance = Math.Abs(width - relativeX);
+
+                if (distance < minDistance)
+                {
+                    minDistance = distance;
+                    closestPosInLine = i;
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            // Convert line position to absolute character index
+            return GetFirstCharIndexFromLine(lineNumber) + closestPosInLine;
+        }
+    }
+
     #endregion
 
     #region Protected Methods
@@ -422,7 +709,7 @@ public abstract class TextBoxBase : Control
     /// </summary>
     protected int GetBorderWidth()
     {
-        return BorderStyle switch
+        return _borderStyle switch
         {
             BorderStyle.None => 0,
             BorderStyle.FixedSingle => 1,
@@ -439,6 +726,116 @@ public abstract class TextBoxBase : Control
         // Override in derived classes for special character handling
         return !char.IsControl(charCode) || charCode == '\t' || charCode == '\r' || charCode == '\n';
     }
+
+    /// <summary>
+    /// Checks if a key is an input key (stub)
+    /// </summary>
+    protected virtual bool IsInputKey(Keys keyData)
+    {
+        // Stub: Determines if a key is an input key
+        var key = keyData & ~(Keys.Shift | Keys.Control | Keys.Alt);
+
+        switch (key)
+        {
+            case Keys.Tab:
+                return _acceptsTab;
+            case Keys.Enter:
+                return _acceptsReturn && _multiline;
+            case Keys.Left:
+            case Keys.Right:
+            case Keys.Up:
+            case Keys.Down:
+            case Keys.Home:
+            case Keys.End:
+            case Keys.PageUp:
+            case Keys.PageDown:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>
+    /// Raises the AcceptsTabChanged event
+    /// </summary>
+    protected virtual void OnAcceptsTabChanged(EventArgs e)
+    {
+        AcceptsTabChanged?.Invoke(this, e);
+    }
+
+    /// <summary>
+    /// Raises the BorderStyleChanged event
+    /// </summary>
+    protected virtual void OnBorderStyleChanged(EventArgs e)
+    {
+        BorderStyleChanged?.Invoke(this, e);
+    }
+
+    /// <summary>
+    /// Raises the HideSelectionChanged event
+    /// </summary>
+    protected virtual void OnHideSelectionChanged(EventArgs e)
+    {
+        HideSelectionChanged?.Invoke(this, e);
+    }
+
+    /// <summary>
+    /// Raises the ModifiedChanged event
+    /// </summary>
+    protected virtual void OnModifiedChanged(EventArgs e)
+    {
+        ModifiedChanged?.Invoke(this, e);
+    }
+
+    /// <summary>
+    /// Raises the MultilineChanged event
+    /// </summary>
+    protected virtual void OnMultilineChanged(EventArgs e)
+    {
+        MultilineChanged?.Invoke(this, e);
+    }
+
+    /// <summary>
+    /// Raises the ReadOnlyChanged event
+    /// </summary>
+    protected virtual void OnReadOnlyChanged(EventArgs e)
+    {
+        ReadOnlyChanged?.Invoke(this, e);
+    }
+
+    #endregion
+
+    #region Events
+
+    /// <summary>
+    /// Occurs when AcceptsTab property changes
+    /// </summary>
+    public event EventHandler? AcceptsTabChanged;
+
+    /// <summary>
+    /// Occurs when BorderStyle property changes
+    /// </summary>
+    public event EventHandler? BorderStyleChanged;
+
+    /// <summary>
+    /// Occurs when HideSelection property changes
+    /// </summary>
+    public event EventHandler? HideSelectionChanged;
+
+    /// <summary>
+    /// Occurs when Modified property changes
+    /// </summary>
+    public event EventHandler? ModifiedChanged;
+
+    /// <summary>
+    /// Occurs when Multiline property changes
+    /// </summary>
+    public event EventHandler? MultilineChanged;
+
+    /// <summary>
+    /// Occurs when ReadOnly property changes
+    /// </summary>
+    public event EventHandler? ReadOnlyChanged;
 
     #endregion
 
@@ -458,4 +855,15 @@ public enum BorderStyle
     None = 0,
     FixedSingle = 1,
     Fixed3D = 2
+}
+
+/// <summary>
+/// Specifies which scroll bars will be visible on a control
+/// </summary>
+public enum ScrollBars
+{
+    None = 0,
+    Horizontal = 1,
+    Vertical = 2,
+    Both = 3
 }

@@ -11,6 +11,10 @@ public class TextBox : TextBoxBase
     private HorizontalAlignment _textAlign = HorizontalAlignment.Left;
     private CharacterCasing _characterCasing = CharacterCasing.Normal;
     private bool _useSystemPasswordChar = false;
+    private string[] _autoCompleteCustomSource = Array.Empty<string>();
+    private AutoCompleteMode _autoCompleteMode = AutoCompleteMode.None;
+    private AutoCompleteSource _autoCompleteSource = AutoCompleteSource.None;
+    private bool _shortcutsEnabled = true;
 
     public TextBox()
     {
@@ -19,7 +23,7 @@ public class TextBox : TextBoxBase
         Font = new Font("Arial", 12);
     }
 
-    public Font Font { get; set; }
+    #region Properties
 
     /// <summary>
     /// Gets or sets the character used for password masking
@@ -64,6 +68,7 @@ public class TextBox : TextBoxBase
             if (_textAlign != value)
             {
                 _textAlign = value;
+                OnTextAlignChanged(EventArgs.Empty);
                 Invalidate();
             }
         }
@@ -84,6 +89,93 @@ public class TextBox : TextBoxBase
             }
         }
     }
+
+    /// <summary>
+    /// Gets or sets the auto-complete custom source (stub)
+    /// </summary>
+    public string[] AutoCompleteCustomSource
+    {
+        get => _autoCompleteCustomSource;
+        set => _autoCompleteCustomSource = value ?? Array.Empty<string>();
+    }
+
+    /// <summary>
+    /// Gets or sets the auto-complete mode (stub)
+    /// </summary>
+    public AutoCompleteMode AutoCompleteMode
+    {
+        get => _autoCompleteMode;
+        set => _autoCompleteMode = value;
+    }
+
+    /// <summary>
+    /// Gets or sets the auto-complete source (stub)
+    /// </summary>
+    public AutoCompleteSource AutoCompleteSource
+    {
+        get => _autoCompleteSource;
+        set => _autoCompleteSource = value;
+    }
+
+    /// <summary>
+    /// Gets or sets whether shortcuts are enabled
+    /// </summary>
+    public bool ShortcutsEnabled
+    {
+        get => _shortcutsEnabled;
+        set => _shortcutsEnabled = value;
+    }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether text in the text box is read-only
+    /// Overridden to ensure single-line default behavior
+    /// </summary>
+    public new bool Multiline
+    {
+        get => base.Multiline;
+        set
+        {
+            if (base.Multiline != value)
+            {
+                base.Multiline = value;
+                // Adjust height for single-line
+                if (!value && Height != 23)
+                {
+                    Height = 23;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets the preferred height for a text box (stub)
+    /// </summary>
+    public int PreferredHeight => 23;
+
+    #endregion
+
+    #region Events
+
+    /// <summary>
+    /// Occurs when the TextAlign property changes
+    /// </summary>
+    public event EventHandler? TextAlignChanged;
+
+    #endregion
+
+    #region Methods
+
+    /// <summary>
+    /// Raises the TextAlignChanged event
+    /// </summary>
+    protected virtual void OnTextAlignChanged(EventArgs e)
+    {
+        TextAlignChanged?.Invoke(this, e);
+    }
+
+    #endregion
+
+    #region Painting
 
     protected internal override void OnPaint(PaintEventArgs e)
     {
@@ -126,10 +218,18 @@ public class TextBox : TextBoxBase
         if (!string.IsNullOrEmpty(displayText))
         {
             var textColor = Enabled ? ForeColor : Color.FromArgb(109, 109, 109);
-            var textX = textBounds.X - _scrollOffsetX;
+            var textX = CalculateTextX(textBounds, displayText, measureService);
             var textY = textBounds.Y;
 
-            g.DrawString(displayText, Font, textColor, textX, textY);
+            // Draw selection if any
+            if (_selectionLength > 0 && hasFocus && measureService != null)
+            {
+                DrawTextWithSelection(g, displayText, textX, textY, textColor, measureService);
+            }
+            else
+            {
+                g.DrawString(displayText, Font, textColor, textX, textY);
+            }
         }
 
         // Draw caret if focused
@@ -163,6 +263,54 @@ public class TextBox : TextBoxBase
         }
     }
 
+    private int CalculateTextX(Rectangle textBounds, string displayText, TextMeasurementService? measureService)
+    {
+        if (_textAlign == HorizontalAlignment.Left || measureService == null)
+        {
+            return textBounds.X - _scrollOffsetX;
+        }
+
+        var textWidth = measureService.MeasureTextEstimate(displayText, Font.Family, (int)Font.Size);
+
+        return _textAlign switch
+        {
+            HorizontalAlignment.Center => textBounds.X + (textBounds.Width - textWidth) / 2,
+            HorizontalAlignment.Right => textBounds.Right - textWidth,
+            _ => textBounds.X - _scrollOffsetX
+        };
+    }
+
+    private void DrawTextWithSelection(Graphics g, string displayText, int textX, int textY, Color textColor, TextMeasurementService measureService)
+    {
+        if (_selectionStart >= displayText.Length)
+        {
+            g.DrawString(displayText, Font, textColor, textX, textY);
+            return;
+        }
+
+        var selEnd = Math.Min(_selectionStart + _selectionLength, displayText.Length);
+        var textBeforeSelection = _selectionStart > 0 ? displayText.Substring(0, _selectionStart) : "";
+        var selectedText = displayText.Substring(_selectionStart, selEnd - _selectionStart);
+        var textAfterSelection = selEnd < displayText.Length ? displayText.Substring(selEnd) : "";
+
+        var widthBefore = measureService.MeasureTextEstimate(textBeforeSelection, Font.Family, (int)Font.Size);
+        var widthSelected = measureService.MeasureTextEstimate(selectedText, Font.Family, (int)Font.Size);
+
+        // Draw selection background
+        using var selBrush = new SolidBrush(Color.FromArgb(0, 120, 215));
+        g.FillRectangle(selBrush, textX + widthBefore, textY, widthSelected, Height - 6);
+
+        // Draw text parts
+        if (!string.IsNullOrEmpty(textBeforeSelection))
+            g.DrawString(textBeforeSelection, Font, textColor, textX, textY);
+
+        if (!string.IsNullOrEmpty(selectedText))
+            g.DrawString(selectedText, Font, Color.White, textX + widthBefore, textY);
+
+        if (!string.IsNullOrEmpty(textAfterSelection))
+            g.DrawString(textAfterSelection, Font, textColor, textX + widthBefore + widthSelected, textY);
+    }
+
     private void DrawCaret(Graphics g, string displayText, Rectangle textBounds, TextMeasurementService? measureService)
     {
         if (measureService == null) return;
@@ -172,7 +320,7 @@ public class TextBox : TextBoxBase
             : "";
 
         var width = measureService.MeasureTextEstimate(textBeforeCaret, Font.Family, (int)Font.Size);
-        var caretX = textBounds.X - _scrollOffsetX + width;
+        var caretX = CalculateTextX(textBounds, displayText, measureService) + width;
 
         // Only draw if visible
         if (caretX >= textBounds.X && caretX <= textBounds.Right)
@@ -184,7 +332,7 @@ public class TextBox : TextBoxBase
 
     private void UpdateScrollPosition(string displayText, TextMeasurementService measureService, int visibleWidth)
     {
-        if (string.IsNullOrEmpty(displayText))
+        if (string.IsNullOrEmpty(displayText) || _textAlign != HorizontalAlignment.Left)
         {
             _scrollOffsetX = 0;
             return;
@@ -235,6 +383,10 @@ public class TextBox : TextBoxBase
         return text;
     }
 
+    #endregion
+
+    #region Keyboard Input
+
     protected internal override void OnKeyPress(KeyPressEventArgs e)
     {
         if (ReadOnly || !Enabled)
@@ -284,7 +436,14 @@ public class TextBox : TextBoxBase
                 _selectionLength = 0;
             }
 
-            Text = Text.Insert(_caretPosition, c.ToString());
+            var charToInsert = _characterCasing switch
+            {
+                CharacterCasing.Upper => char.ToUpper(c),
+                CharacterCasing.Lower => char.ToLower(c),
+                _ => c
+            };
+
+            Text = Text.Insert(_caretPosition, charToInsert.ToString());
             _caretPosition++;
             Modified = true;
             OnTextChanged(EventArgs.Empty);
@@ -305,34 +464,56 @@ public class TextBox : TextBoxBase
 
         var handled = false;
 
+        // Check if shortcuts are enabled for Ctrl combinations
+        if (!_shortcutsEnabled && e.Control && 
+            (e.KeyCode == Keys.A || e.KeyCode == Keys.C || e.KeyCode == Keys.X || 
+             e.KeyCode == Keys.V || e.KeyCode == Keys.Z))
+        {
+            e.Handled = true;
+            base.OnKeyDown(e);
+            return;
+        }
+
         switch (e.KeyCode)
         {
             case Keys.Left:
-                if (_caretPosition > 0)
+                if (e.Control)
+                {
+                    // Ctrl+Left: Move to previous word
+                    _caretPosition = GetPreviousWordPosition();
+                }
+                else if (_caretPosition > 0)
                 {
                     _caretPosition--;
-                    if (!e.Shift)
-                    {
-                        _selectionStart = _caretPosition;
-                        _selectionLength = 0;
-                    }
-                    handled = true;
-                    Invalidate();
                 }
+
+                if (!e.Shift)
+                {
+                    _selectionStart = _caretPosition;
+                    _selectionLength = 0;
+                }
+                handled = true;
+                Invalidate();
                 break;
 
             case Keys.Right:
-                if (_caretPosition < Text.Length)
+                if (e.Control)
+                {
+                    // Ctrl+Right: Move to next word
+                    _caretPosition = GetNextWordPosition();
+                }
+                else if (_caretPosition < Text.Length)
                 {
                     _caretPosition++;
-                    if (!e.Shift)
-                    {
-                        _selectionStart = _caretPosition;
-                        _selectionLength = 0;
-                    }
-                    handled = true;
-                    Invalidate();
                 }
+
+                if (!e.Shift)
+                {
+                    _selectionStart = _caretPosition;
+                    _selectionLength = 0;
+                }
+                handled = true;
+                Invalidate();
                 break;
 
             case Keys.Home:
@@ -425,7 +606,111 @@ public class TextBox : TextBoxBase
 
         base.OnKeyDown(e);
     }
+
+    private int GetPreviousWordPosition()
+    {
+        if (_caretPosition == 0) return 0;
+
+        var pos = _caretPosition - 1;
+
+        // Skip whitespace
+        while (pos > 0 && char.IsWhiteSpace(Text[pos]))
+            pos--;
+
+        // Skip word characters
+        while (pos > 0 && !char.IsWhiteSpace(Text[pos - 1]))
+            pos--;
+
+        return pos;
+    }
+
+    private int GetNextWordPosition()
+    {
+        if (_caretPosition >= Text.Length) return Text.Length;
+
+        var pos = _caretPosition;
+
+        // Skip current word
+        while (pos < Text.Length && !char.IsWhiteSpace(Text[pos]))
+            pos++;
+
+        // Skip whitespace
+        while (pos < Text.Length && char.IsWhiteSpace(Text[pos]))
+            pos++;
+
+        return pos;
+    }
+
+    #endregion
+
+    #region Mouse Input
+
+    protected internal override void OnMouseDown(MouseEventArgs e)
+    {
+        if (!Enabled)
+        {
+            base.OnMouseDown(e);
+            return;
+        }
+
+        var borderWidth = GetBorderWidth();
+        const int textPadding = 3;
+        var textBounds = new Rectangle(
+            borderWidth + textPadding,
+            borderWidth + textPadding,
+            Width - (borderWidth * 2) - (textPadding * 2),
+            Height - (borderWidth * 2) - (textPadding * 2)
+        );
+
+        // Check if click is within text area
+        if (e.X >= textBounds.X && e.X < textBounds.Right &&
+            e.Y >= textBounds.Y && e.Y < textBounds.Bottom)
+        {
+            var displayText = GetDisplayText();
+            var measureService = (Parent as Form)?.TextMeasurementService;
+
+            if (measureService != null && !string.IsNullOrEmpty(displayText))
+            {
+                // Calculate click position relative to text start (accounting for scroll and alignment)
+                var textX = CalculateTextX(textBounds, displayText, measureService);
+                var clickX = e.X - textX;
+
+                // Find the character position closest to the click
+                var closestPosition = 0;
+                var minDistance = int.MaxValue;
+
+                for (int i = 0; i <= displayText.Length; i++)
+                {
+                    var textUpToPosition = i > 0 ? displayText.Substring(0, i) : "";
+                    var width = measureService.MeasureTextEstimate(textUpToPosition, Font.Family, (int)Font.Size);
+
+                    var distance = Math.Abs(width - clickX);
+                    if (distance < minDistance)
+                    {
+                        minDistance = distance;
+                        closestPosition = i;
+                    }
+                    else
+                    {
+                        // Distance is increasing, we've passed the closest point
+                        break;
+                    }
+                }
+
+                _caretPosition = closestPosition;
+                _selectionStart = closestPosition;
+                _selectionLength = 0;
+                Invalidate();
+            }
+        }
+
+        base.OnMouseDown(e);
+    }
+
+    #endregion
 }
+
+#region Enums
 
 /// <summary>
 /// Specifies the horizontal alignment of text
@@ -446,3 +731,32 @@ public enum CharacterCasing
     Upper = 1,
     Lower = 2
 }
+
+/// <summary>
+/// Specifies the auto-complete mode (stub)
+/// </summary>
+public enum AutoCompleteMode
+{
+    None = 0,
+    Suggest = 1,
+    Append = 2,
+    SuggestAppend = 3
+}
+
+/// <summary>
+/// Specifies the auto-complete source (stub)
+/// </summary>
+public enum AutoCompleteSource
+{
+    None = 0,
+    FileSystem = 1,
+    HistoryList = 2,
+    RecentlyUsedList = 3,
+    AllUrl = 4,
+    AllSystemSources = 5,
+    FileSystemDirectories = 6,
+    CustomSource = 7,
+    ListItems = 8
+}
+
+#endregion
