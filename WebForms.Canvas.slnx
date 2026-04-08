@@ -1,7 +1,13 @@
 <Solution>
-  <Project Path="Canvas.Windows.Forms.ILTranslator/Canvas.Windows.Forms.ILTranslator.csproj" />
-  <Project Path="Canvas.Windows.Forms.RemoteProtocol/Canvas.Windows.Forms.RemoteProtocol.csproj" />
+  <Project Path="Canvas.Windows.Forms.ILTranslator/Canvas.Windows.Forms.ILTranslator.csproj">
+    <Build Solution="Debug|*" Project="false" />
+  </Project>
+  <Project Path="Canvas.Windows.Forms.RemoteProtocol/Canvas.Windows.Forms.RemoteProtocol.csproj">
+    <Build Solution="Debug|*" Project="false" />
+  </Project>
   <Project Path="WebForms.Canvas.Host/Canvas.Windows.Forms.Host.csproj" />
   <Project Path="WebForms.Canvas.Tests/Canvas.Windows.Forms.Tests.csproj" />
   <Project Path="WebForms.Canvas/Canvas.Windows.Forms.csproj" />
-  <Project Path="Canvas.Windows.Forms.Host.Server/Canvas.Windows.Forms.Host.Server.csproj" />`n</Solution>
+  <Project Path="Canvas.Windows.Forms.Host.Server/Canvas.Windows.Forms.Host.Server.csproj">
+    <Build Solution="Debug|*" Project="false" />
+  </Project>`n</Solution>
