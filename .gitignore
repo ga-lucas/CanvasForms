@@ -405,5 +405,12 @@ FodyWeavers.xsd
 
 # Blazor specific
 **/wwwroot/service-worker-assets.js
-/Canvas.Windows.Forms.Host.Server/.apps/
+
+# CanvasForms - installed app binaries (uploaded + translated), never commit these
+/Canvas.Windows.Forms.Host.Server/.apps/**
+!/Canvas.Windows.Forms.Host.Server/.apps/.gitkeep
 /_translated
+
+# _pub is a publish output directory - all build artifacts should be ignored
+/_pub/
+
