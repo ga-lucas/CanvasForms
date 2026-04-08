@@ -22,8 +22,10 @@ var app = builder.Build();
 // Configure middleware - order matters!
 app.UseRouting();
 app.UseWebSockets();
-app.UseBlazorFrameworkFiles();
+// MapStaticAssets replaces both UseBlazorFrameworkFiles and UseStaticFiles in .NET 9+
+// UseStaticFiles is kept only for dynamic/runtime assets (e.g. installed app downloads)
 app.UseStaticFiles();
+app.MapStaticAssets();
 
 // Wire up desktop change notifications via SignalR
 var runtime = app.Services.GetRequiredService<AppRuntime>();
