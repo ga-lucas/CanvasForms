@@ -1,199 +1,202 @@
-# Canvas.Windows.Forms
+# CanvasForms
 
-WinForms-style UI framework rendered to an HTML `<canvas>` using Blazor WebAssembly. The goal is **maximum compatibility with the WinForms API surface/behavior**, while mapping rendering and input to the browser.
+Run WinForms applications in the browser. The UI runs as Blazor WebAssembly on the client, rendered to an HTML `<canvas>`. Server resources (databases, files, etc.) are accessed via a lightweight ASP.NET Core host — no Windows required on the client.
 
-## What this repo contains
+> **Scope:** Local-network / same-machine use (Mode A). Not currently designed for public internet exposure.
 
-- **Canvas.Windows.Forms** (`net10.0` Razor Class Library): the WinForms-like API (types live under `System.Windows.Forms`) plus a lightweight drawing layer (`Canvas.Windows.Forms.Drawing`).
-- **Canvas.Windows.Forms.Host** (`net10.0` Blazor WebAssembly): a runnable demo host that boots a desktop-like surface and shows sample forms.
-- **Canvas.Windows.Forms.Tests** (`net10.0`): tests and documentation tracking WinForms API completeness (especially `Control`).
+---
+
+## How it works
+
+```
+┌─────────────────────────────────────────────┐
+│  Browser (WASM)                             │
+│                                             │
+│  Translated WinForms app                   │
+│  ↓ uses                                     │
+│  Canvas.Windows.Forms (WinForms API shim)   │
+│  ↓ renders via                              │
+│  HTML <canvas>  ←  FormRenderer / Desktop   │
+│                                             │
+│  ↕ HTTP/SignalR for data only               │
+└─────────────────────────────────────────────┘
+         ↕
+┌─────────────────────────────────────────────┐
+│  Server (ASP.NET Core)                      │
+│                                             │
+│  - Serves translated app assemblies         │
+│  - Manages installed app registry           │
+│  - Provides data APIs (DB, files, etc.)     │
+└─────────────────────────────────────────────┘
+```
+
+WinForms apps are **translated at install time** using the IL Translator — `System.Windows.Forms` references are rewritten to `Canvas.Windows.Forms`. The translated assemblies are then loaded dynamically in the browser via `Assembly.Load(bytes)` and run entirely client-side.
+
+---
+
+## Projects
+
+| Project | Type | Purpose |
+|---------|------|---------|
+| `Canvas.Windows.Forms` | Razor Class Library (net10.0) | WinForms API shim + canvas renderer. Types live under `System.Windows.Forms`. |
+| `Canvas.Windows.Forms.Host` | Blazor WebAssembly (net10.0) | Client app — Desktop surface, OS shell, loads and runs translated apps. |
+| `Canvas.Windows.Forms.Host.Server` | ASP.NET Core (net10.0) | Server host — serves the WASM client, manages installed apps, provides data APIs. |
+| `Canvas.Windows.Forms.ILTranslator` | Console app (net10.0) | Translates WinForms assemblies to use the Canvas shim via Mono.Cecil IL rewriting. |
+| `Canvas.Windows.Forms.RemoteProtocol` | Class Library (net10.0) | Shared types for app metadata and desktop snapshots. |
+| `Canvas.Windows.Forms.Tests` | Test project (net10.0) | WinForms API compatibility tracking and unit tests. |
+
+---
 
 ## Quick start
 
 ### Prerequisites
 
 - .NET SDK **10.0**
-- Visual Studio 2026+ (or any editor that can build/run Blazor WebAssembly)
+- Visual Studio 2026+ (or any editor that supports Blazor WebAssembly)
 
-### Run the demo
+### Run
 
-1. Open the solution.
-2. Set **Canvas.Windows.Forms.Host** as the startup project.
-3. Run (F5).
+1. Set **`Canvas.Windows.Forms.Host.Server`** as the startup project.
+2. Run (`F5`).
+3. Open `http://localhost:5001` in a browser.
 
-The host renders a **Desktop** surface and opens `WelcomeForm`.
+The OS shell launches, opens the demo **WelcomeForm**, and shows a Start menu.
 
-## How it works (high level)
+---
 
-### Desktop + FormManager
+## Installing a WinForms app
 
-The `Desktop` component hosts a `FormManager` that tracks open forms, z-order, activation, and taskbar buttons.
+1. Click **Start → Install App...**
+2. Upload the app's `.exe` and `.dll` files.
+3. The server translates the assemblies (rewrites `System.Windows.Forms` → `Canvas.Windows.Forms`).
+4. The app appears in the Start menu — click to launch it in the browser.
 
-### Rendering pipeline
+Installed apps are stored in `Canvas.Windows.Forms.Host.Server/.apps/` (excluded from git).
 
-- `FormRenderer` draws the window chrome (title bar, border, min/max/close buttons) and then renders the client area.
-- User code draws via `Paint` handlers using `Canvas.Windows.Forms.Drawing.Graphics`.
-- Drawing commands are sent to JavaScript and executed on the canvas.
+---
 
-### Input
+## Architecture details
 
-Mouse, keyboard, and touch events are captured by Blazor and translated into WinForms-style events on `Form`/`Control`.
+### UI runs in the browser
 
-## Usage
+The `Desktop` Blazor component manages open windows — dragging, resizing, minimize/maximize/close, taskbar, z-order. `FormRenderer` draws each window's chrome and client area to a `<canvas>` element. All window management logic runs as WASM on the client with no server round-trips.
 
-### Add the desktop surface (Blazor)
+### WinForms API shim
 
-In a page like `Pages/Home.razor`:
+`Canvas.Windows.Forms` implements the `System.Windows.Forms` namespace so that translated apps compile and run without modification:
 
-```razor
-@page "/"
-@using Canvas.Windows.Forms
-@using Canvas.Windows.Forms.Components
-@using Canvas.Windows.Forms.Samples
-@using System.Windows.Forms
+- `Control`, `Form`, `ContainerControl`, `ScrollableControl`
+- `Button`, `CheckBox`, `RadioButton`
+- `Label`, `TextBox`, `TextBoxBase`
+- `ListBox`, `CheckedListBox`, `ComboBox`, `ListControl`
+- `PictureBox`, `DateTimePicker`
+- `Padding`, `Anchor`, `Dock`, layout engine
+- `FormClosing` / `FormClosed` events with `CloseReason` and cancellation support
+- `Control.Invoke` / `BeginInvoke` shims (no-op — WASM is single-threaded)
+- `PointToScreen` / `PointToClient` / `RectangleToScreen` / `SetBounds`
 
-<Desktop @ref="_desktop" TaskbarHeight="32" />
+### IL Translator
 
-@code {
-    private Desktop? _desktop;
+`Canvas.Windows.Forms.ILTranslator` rewrites assemblies at the IL level using Mono.Cecil:
 
-    protected override void OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender && _desktop != null)
-        {
-            var mainForm = new WelcomeForm();
-            _desktop.FormManager.MainForm = mainForm;
-            Application.Run(mainForm);
-        }
-
-        return Task.CompletedTask;
-    }
-}
+```
+input.dll  →  [rewrite System.Windows.Forms → Canvas.Windows.Forms]  →  output.dll
 ```
 
-### Create a form and draw
+Usage:
+```
+Canvas.Windows.Forms.ILTranslator <input-assembly> <output-assembly>
+```
+
+The server runs this automatically when an app is installed via the UI.
+
+### Drawing pipeline
+
+```
+Paint event  →  Graphics commands  →  canvas-renderer.js  →  HTMLCanvasElement
+```
+
+Drawing commands are buffered and dispatched to the JS renderer via Blazor JS interop.
+
+---
+
+## Creating a form
 
 ```csharp
 using Canvas.Windows.Forms.Drawing;
 using System.Windows.Forms;
 
-public class MyDrawingForm : Form
+public class MyForm : Form
 {
-    public MyDrawingForm()
+    public MyForm()
     {
-        Text = "My Drawing";
-        Width = 800;
-        Height = 600;
-        BackColor = Color.White;
+        Text = "Hello CanvasForms";
+        Width = 600;
+        Height = 400;
 
-        Paint += OnPaint;
+        var btn = new Button { Text = "Click me", Left = 20, Top = 20 };
+        btn.Click += (s, e) => btn.Text = "Clicked!";
+        Controls.Add(btn);
     }
 
-    private void OnPaint(object? sender, PaintEventArgs e)
+    protected override void OnPaint(PaintEventArgs e)
     {
-        var g = e.Graphics;
-        using var pen = new Pen(Color.Red, 2);
-        g.DrawRectangle(pen, 50, 50, 200, 100);
+        using var pen = new Pen(Color.SteelBlue, 2);
+        e.Graphics.DrawRectangle(pen, 20, 60, 200, 100);
     }
 }
 ```
 
-### Open forms (WinForms-style)
+Launching from the OS page:
 
 ```csharp
-Application.FormManager?.ShowOrCreateForm<ControlsDemoForm>();
+Application.Run(new MyForm());
 ```
 
-More details: `APPLICATION_FORMMANAGER.md`.
+Handling close cancellation:
 
-## Implemented features (selected)
+```csharp
+FormClosing += (s, e) =>
+{
+    if (hasUnsavedChanges)
+        e.Cancel = true; // prevents close
+};
+```
 
-### Windowing / desktop
+---
 
-- Desktop surface with taskbar buttons
-- Multiple windows with z-ordering / activation
-- Drag to move, resize handles
-- Minimize / maximize / close
-- Min/Max size constraints
+## WinForms compatibility
 
-### Controls
+The goal is maximum API-surface compatibility. Some members are stubs (e.g. `Handle`, `AllowDrop`, IME) — they exist so translated apps compile, but have no browser equivalent.
 
-Implemented controls (see `WebForms.Canvas/Forms/...` in the `Canvas.Windows.Forms` project):
+See `COMPATIBILITY_REVIEW.md` for a full per-control breakdown, and the test project for property-level tracking:
 
-- **Windowing**
-  - `Form`
-
-- **Core**
-  - `Control` (base type)
-
-- **Text**
-  - `Label`
-  - `TextBox` (`TextBoxBase`)
-
-- **Buttons**
-  - `Button` (`ButtonBase`)
-  - `CheckBox`
-  - `RadioButton`
-
-- **Lists**
-  - `ListControl` (base type)
-  - `ListBox`
-  - `CheckedListBox`
-  - `ComboBox`
-
-- **Display**
-  - `PictureBox` (URL-based image loading)
-
-- **Other**
-  - `DateTimePicker` (simplified)
-
-Docs: `WebForms.Canvas/Docs/PictureBox.md`.
-
-### Layout
-
-- Docking and anchoring (`Dock`, `Anchor`)
-
-### Drawing
-
-- Shapes (lines/rectangles/ellipses)
-- Fill operations
-- Text rendering
-- Command-buffered rendering to JS canvas
-
-## WinForms compatibility notes
-
-This project prioritizes matching the **WinForms SDK API surface**. Some APIs exist primarily for compatibility in a browser/canvas environment.
-
-The test project tracks `Control` property parity:
-
-- ✅ **102/102 `Control` properties implemented** (API completeness)
-- ⚠️ Not all properties are fully functional yet (some are stubs by design)
-
-See:
-
-- `Canvas.Windows.Forms.Tests/README.md`
 - `Canvas.Windows.Forms.Tests/PROPERTY_COMPLETENESS.md`
 - `Canvas.Windows.Forms.Tests/PROPERTY_FUNCTIONALITY.md`
 
-## Limitations (current)
+---
 
-- No HWND/real window handles (`Handle` and related APIs are compatibility-oriented)
-- No P/Invoke / native Windows APIs
-- No Visual Studio WinForms designer
-- Browser runtime constraints (single-threaded UI model)
+## Limitations
+
+- No HWND / native Windows handles
+- No P/Invoke or native Windows APIs
+- No Visual Studio WinForms designer support
+- Single-threaded (WASM) — `InvokeRequired` always returns `false`
+- Local-network scope only (no internet/auth hardening yet)
+
+---
 
 ## Repo docs
 
-- `APPLICATION_FORMMANAGER.md` – Application + FormManager model
-- `EXTENDING.md` – extending drawing primitives and features
-- `WebForms.Canvas/Docs/PictureBox.md` – PictureBox specifics
+| File | Contents |
+|------|----------|
+| `COMPATIBILITY_REVIEW.md` | Per-control WinForms API compatibility review |
+| `APPLICATION_FORMMANAGER.md` | `Application` + `FormManager` model |
+| `EXTENDING.md` | Extending drawing primitives and controls |
+| `WebForms.Canvas/Docs/PictureBox.md` | `PictureBox` specifics |
 
-## Roadmap (short)
-
-- Focus management and tab order
-- Continue aligning control behavior with WinForms
-- More controls and richer drawing primitives
+---
 
 ## License
 
-No license file is currently included in the repository.
+No license file is currently included in this repository.
