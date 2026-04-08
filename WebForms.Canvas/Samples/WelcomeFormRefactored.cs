@@ -95,7 +95,7 @@ public class WelcomeFormRefactored : Form
         btnDockingDemo.Click += (s, e) =>
         {
             // Simple! Just one line to show or create the form
-            Application.FormManager?.ShowOrCreateForm<DockingDemoForm>();
+           Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<DockingDemoForm>();
         };
         Controls.Add(btnDockingDemo);
 
@@ -111,7 +111,7 @@ public class WelcomeFormRefactored : Form
         };
         btnControlsDemo.Click += (s, e) =>
         {
-            Application.FormManager?.ShowOrCreateForm<ControlsDemoForm>();
+          Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<ControlsDemoForm>();
         };
         Controls.Add(btnControlsDemo);
 
@@ -127,7 +127,7 @@ public class WelcomeFormRefactored : Form
         };
         btnInteractive.Click += (s, e) =>
         {
-            Application.FormManager?.ShowOrCreateForm<InteractiveForm>();
+           Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<InteractiveForm>();
         };
         Controls.Add(btnInteractive);
 
@@ -143,7 +143,7 @@ public class WelcomeFormRefactored : Form
         };
         btnDrawingSample.Click += (s, e) =>
         {
-            Application.FormManager?.ShowOrCreateForm<SampleDrawingForm>();
+         Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<SampleDrawingForm>();
         };
         Controls.Add(btnDrawingSample);
 
@@ -159,7 +159,7 @@ public class WelcomeFormRefactored : Form
         };
         btnListBoxDemo.Click += (s, e) =>
         {
-            Application.FormManager?.ShowOrCreateForm<ListBoxDemoForm>();
+           Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<ListBoxDemoForm>();
         };
         Controls.Add(btnListBoxDemo);
 
@@ -176,7 +176,7 @@ public class WelcomeFormRefactored : Form
         btnExit.Click += (s, e) =>
         {
             // Close all forms and exit
-            Application.Exit();
+         System.Windows.Forms.Application.Exit();
         };
         Controls.Add(btnExit);
 

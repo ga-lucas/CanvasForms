@@ -23,6 +23,57 @@ public class CancelEventArgs : EventArgs
 }
 
 /// <summary>
+/// Specifies the reason that a form was closed
+/// </summary>
+public enum CloseReason
+{
+    None = 0,
+    WindowsShutDown = 1,
+    MdiFormClosing = 2,
+    UserClosing = 3,
+    TaskManagerClosing = 4,
+    FormOwnerClosing = 5,
+    ApplicationExitCall = 6
+}
+
+/// <summary>
+/// Provides data for the FormClosing event
+/// </summary>
+public class FormClosingEventArgs : CancelEventArgs
+{
+    public CloseReason CloseReason { get; }
+
+    public FormClosingEventArgs(CloseReason closeReason, bool cancel = false)
+        : base(cancel)
+    {
+        CloseReason = closeReason;
+    }
+}
+
+/// <summary>
+/// Provides data for the FormClosed event
+/// </summary>
+public class FormClosedEventArgs : EventArgs
+{
+    public CloseReason CloseReason { get; }
+
+    public FormClosedEventArgs(CloseReason closeReason)
+    {
+        CloseReason = closeReason;
+    }
+}
+
+/// <summary>
+/// Represents the method that handles FormClosing events
+/// </summary>
+public delegate void FormClosingEventHandler(object? sender, FormClosingEventArgs e);
+
+/// <summary>
+/// Represents the method that handles FormClosed events
+/// </summary>
+public delegate void FormClosedEventHandler(object? sender, FormClosedEventArgs e);
+
+/// <summary>
 /// Provides data for the PreviewKeyDown event
 /// </summary>
 public class PreviewKeyDownEventArgs : EventArgs

@@ -1,5 +1,8 @@
 using System.Windows.Forms;
 using Canvas.Windows.Forms.Drawing;
+using SysPoint = System.Drawing.Point;
+using SysSize = System.Drawing.Size;
+using SysRectangle = System.Drawing.Rectangle;
 
 namespace Canvas.Windows.Forms.Tests;
 
@@ -32,17 +35,17 @@ public class ControlPropertyFunctionalityTests
         Assert.Equal(110, control.Right); // Left + Width
         Assert.Equal(70, control.Bottom); // Top + Height
 
-        // Location and Size
-        control.Location = new Point(5, 15);
+        // Location and Size (use System.Drawing types)
+        control.Location = new SysPoint(5, 15);
         Assert.Equal(5, control.Left);
         Assert.Equal(15, control.Top);
 
-        control.Size = new Size(200, 100);
+        control.Size = new SysSize(200, 100);
         Assert.Equal(200, control.Width);
         Assert.Equal(100, control.Height);
 
         // Bounds
-        control.Bounds = new Rectangle(0, 0, 300, 150);
+        control.Bounds = new SysRectangle(0, 0, 300, 150);
         Assert.Equal(0, control.Left);
         Assert.Equal(0, control.Top);
         Assert.Equal(300, control.Width);
@@ -378,7 +381,7 @@ public class ControlPropertyFunctionalityTests
         // Would need to be set manually based on browser events (internal setters)
         Assert.Equal(Keys.None, Control.ModifierKeys);
         Assert.Equal(MouseButtons.None, Control.MouseButtons);
-        Assert.Equal(Point.Empty, Control.MousePosition);
+        Assert.Equal(SysPoint.Empty, Control.MousePosition);
 
         // Note: These have internal setters and would be set by the framework,
         // not by user code - they're read-only from external perspective
