@@ -405,7 +405,5 @@ FodyWeavers.xsd
 
 # Blazor specific
 **/wwwroot/service-worker-assets.js
-/Canvas.Windows.Forms.Host.Server/.apps/d80548f8/translated
-/Canvas.Windows.Forms.Host.Server/.apps/d80548f8/uploaded
+/Canvas.Windows.Forms.Host.Server/.apps/
 /_translated
-/Canvas.Windows.Forms.Host.Server/.apps/d80548f8
