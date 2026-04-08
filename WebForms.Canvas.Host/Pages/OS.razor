@@ -1,0 +1,488 @@
+@page "/"
+@using Canvas.Windows.Forms
+@using Canvas.Windows.Forms.Samples
+@using Canvas.Windows.Forms.Components
+@using Canvas.Windows.Forms.RemoteProtocol
+@using System.Windows.Forms
+@using System.Reflection
+@using System.Runtime.Loader
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+<PageTitle>CanvasForms OS</PageTitle>
+
+@* Main desktop using existing Desktop component *@
+<Desktop @ref="_desktop" TaskbarHeight="36" TaskbarLeftPadding="80" />
+
+@* Start button overlay - positioned over the taskbar *@
+<div style="position: fixed; top: 2px; left: 8px; z-index: 10001;">
+    <button class="start-btn" @onclick="ToggleStartMenu"
+            style="background: linear-gradient(180deg, #4CAF50 0%, #388E3C 100%);
+                   color: white; border: 1px solid #2E7D32; padding: 4px 12px; 
+                   border-radius: 3px; font-weight: 600; cursor: pointer; font-size: 13px;">
+        ▶ Start
+    </button>
+</div>
+
+@* Start menu *@
+@if (_showStartMenu)
+{
+    <div class="start-menu" @onclick:stopPropagation="true"
+         style="position: fixed; top: 42px; left: 8px; background: white; 
+                border: 1px solid #a0a0a0; min-width: 280px; z-index: 10002; 
+                box-shadow: 2px 2px 12px rgba(0,0,0,0.25);">
+
+        <div style="padding: 8px 12px; border-bottom: 1px solid #e0e0e0; font-weight: 600; background: linear-gradient(180deg, #4a90e2 0%, #357abd 100%); color: white;">
+            CanvasForms OS
+        </div>
+
+        @* Demo app *@
+        <div class="menu-item" @onclick="LaunchWelcomeForm">
+            <span class="menu-icon">🖥️</span>
+            <div class="menu-text">
+                <div class="menu-title">Demo App</div>
+                <div class="menu-desc">Canvas.Windows.Forms sample application</div>
+            </div>
+        </div>
+
+        @* Installed apps section *@
+        @if (_installedApps.Count > 0)
+        {
+            <div style="padding: 4px 8px; font-size: 11px; color: #666; background: #fafafa; border-top: 1px solid #e0e0e0; border-bottom: 1px solid #eee;">
+                Installed Apps
+            </div>
+
+            @foreach (var app in _installedApps)
+            {
+                <div class="menu-item" style="justify-content: space-between;">
+                    <div style="display: flex; align-items: center; gap: 8px; flex: 1;" @onclick="() => LaunchInstalledApp(app)">
+                        <span class="menu-icon">📦</span>
+                        <div class="menu-text">
+                            <div class="menu-title">@app.Name</div>
+                            <div class="menu-desc">@app.UploadedAtUtc.ToLocalTime().ToString("g")</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-outline-danger" style="padding: 2px 6px; font-size: 10px;" 
+                            @onclick="() => UninstallApp(app.AppId)" @onclick:stopPropagation="true">✕</button>
+                </div>
+            }
+        }
+
+        @* Install app option *@
+        <div style="border-top: 1px solid #e0e0e0;"></div>
+        <div class="menu-item" @onclick="ShowInstallDialog">
+            <span class="menu-icon">📤</span>
+            <div class="menu-text">
+                <div class="menu-title">Install App...</div>
+                <div class="menu-desc">Upload & translate WinForms app</div>
+            </div>
+        </div>
+    </div>
+
+    @* Click-away backdrop *@
+    <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 10001;" @onclick="CloseStartMenu"></div>
+}
+
+@* Install dialog *@
+@if (_showInstallDialog)
+{
+    <div class="dialog-backdrop" @onclick="CloseInstallDialog">
+        <div class="dialog-content" @onclick:stopPropagation="true">
+            <h4 style="margin: 0 0 16px; color: #333;">Install WinForms App</h4>
+
+            <div style="margin-bottom: 12px;">
+                <label style="display: block; margin-bottom: 4px; font-weight: 500;">App Name</label>
+                <input type="text" @bind="_installName" class="form-control" placeholder="My App" />
+            </div>
+
+            <div style="margin-bottom: 12px;">
+                <label style="display: block; margin-bottom: 4px; font-weight: 500;">Files (.exe, .dll)</label>
+                <InputFile OnChange="OnFilesSelected" multiple class="form-control" />
+                <div style="font-size: 11px; color: #666; margin-top: 4px;">
+                    Upload the app's .exe/.dll and all dependencies
+                </div>
+            </div>
+
+            @if (_selectedFiles.Count > 0)
+            {
+                <div style="margin-bottom: 12px; font-size: 12px; color: #333;">
+                    Selected: @_selectedFiles.Count file(s)
+                </div>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(_installError))
+            {
+                <div style="margin-bottom: 12px; color: #c00; font-size: 13px; padding: 8px; background: #fee; border-radius: 4px;">
+                    @_installError
+                </div>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(_installStatus))
+            {
+                <div style="margin-bottom: 12px; color: #060; font-size: 13px; padding: 8px; background: #efe; border-radius: 4px;">
+                    @_installStatus
+                </div>
+            }
+
+            <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                <button class="btn btn-outline-secondary" @onclick="CloseInstallDialog" disabled="@_installing">Cancel</button>
+                <button class="btn btn-primary" @onclick="InstallApp" disabled="@(_installing || _selectedFiles.Count == 0)">
+                    @(_installing ? "Installing..." : "Install")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private Desktop? _desktop;
+    private bool _showStartMenu;
+    private bool _showInstallDialog;
+
+    // Install dialog state
+    private string _installName = "";
+    private List<IBrowserFile> _selectedFiles = new();
+    private bool _installing;
+    private string? _installError;
+    private string? _installStatus;
+
+    // Installed apps
+    private List<InstalledApp> _installedApps = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshInstalledApps();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && _desktop != null)
+        {
+            // Launch welcome form by default
+            LaunchWelcomeForm();
+            StateHasChanged();
+        }
+    }
+
+    // ============ Start Menu ============
+
+    private void ToggleStartMenu() => _showStartMenu = !_showStartMenu;
+    private void CloseStartMenu() => _showStartMenu = false;
+
+    // ============ Demo App Launchers ============
+
+    private void LaunchWelcomeForm()
+    {
+        _showStartMenu = false;
+        if (_desktop == null) return;
+
+        var form = new WelcomeForm
+        {
+            Left = 100 + Random.Shared.Next(100),
+            Top = 50 + Random.Shared.Next(50),
+        };
+        _desktop.FormManager.MainForm ??= form;
+        Application.Run(form);
+    }
+
+    // ============ Installed Apps ============
+
+    private async Task RefreshInstalledApps()
+    {
+        try
+        {
+            _installedApps = await Http.GetFromJsonAsync<List<InstalledApp>>("/api/apps") ?? new();
+        }
+        catch
+        {
+            _installedApps = new();
+        }
+    }
+
+    private async Task LaunchInstalledApp(InstalledApp app)
+    {
+        _showStartMenu = false;
+        if (_desktop == null) return;
+
+        try
+        {
+            Console.WriteLine($"[OS] Loading app: {app.Name} ({app.AppId})");
+
+            // Get list of files for this app
+            var filesResponse = await Http.GetFromJsonAsync<AppFilesResponse>($"/api/apps/{app.AppId}/files");
+            if (filesResponse == null || filesResponse.Files.Count == 0)
+            {
+                ShowError($"No assembly files found for app '{app.Name}'");
+                return;
+            }
+
+            Console.WriteLine($"[OS] Found {filesResponse.Files.Count} files, entry: {filesResponse.EntryAssembly}");
+
+            // Load all assemblies
+            var loadedAssemblies = new Dictionary<string, Assembly>();
+
+            foreach (var fileName in filesResponse.Files)
+            {
+                try
+                {
+                    Console.WriteLine($"[OS] Downloading: {fileName}");
+                    var bytes = await Http.GetByteArrayAsync($"/api/apps/{app.AppId}/files/{fileName}");
+
+                    Console.WriteLine($"[OS] Loading assembly: {fileName} ({bytes.Length} bytes)");
+                    var assembly = Assembly.Load(bytes);
+                    loadedAssemblies[fileName] = assembly;
+                    Console.WriteLine($"[OS] Loaded: {assembly.FullName}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[OS] Failed to load {fileName}: {ex.Message}");
+                    // Continue loading other assemblies - some may be dependencies that are already loaded
+                }
+            }
+
+            // Find the entry assembly
+            if (!loadedAssemblies.TryGetValue(filesResponse.EntryAssembly, out var entryAssembly))
+            {
+                ShowError($"Entry assembly '{filesResponse.EntryAssembly}' not loaded");
+                return;
+            }
+
+            // Find a Form type to instantiate
+            var formType = entryAssembly.GetTypes()
+                .FirstOrDefault(t => typeof(Form).IsAssignableFrom(t) && !t.IsAbstract && t.GetConstructor(Type.EmptyTypes) != null);
+
+            if (formType == null)
+            {
+                // Try to find and invoke Main method
+                var entryPoint = entryAssembly.EntryPoint;
+                if (entryPoint != null)
+                {
+                    Console.WriteLine($"[OS] Invoking entry point: {entryPoint.DeclaringType?.Name}.{entryPoint.Name}");
+                    try
+                    {
+                        var parameters = entryPoint.GetParameters();
+                        var args = parameters.Length == 0 ? null : new object?[] { Array.Empty<string>() };
+                        entryPoint.Invoke(null, args);
+
+                        // Check if a form was created via Application.Run
+                        var openForm = CanvasApplication.OpenForms.LastOrDefault();
+                        if (openForm != null)
+                        {
+                            Console.WriteLine($"[OS] App created form: {openForm.Text}");
+                            return; // Form should already be running
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[OS] Entry point failed: {ex.Message}");
+                    }
+                }
+
+                ShowError($"No Form type found in '{app.Name}'.\nThe app must have a class that inherits from Form.");
+                return;
+            }
+
+            Console.WriteLine($"[OS] Creating form: {formType.FullName}");
+            var form = (Form)Activator.CreateInstance(formType)!;
+            form.Left = 100 + Random.Shared.Next(150);
+            form.Top = 50 + Random.Shared.Next(100);
+
+            Application.Run(form);
+            Console.WriteLine($"[OS] App launched successfully: {form.Text}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[OS] Failed to launch app: {ex}");
+            ShowError($"Failed to launch '{app.Name}':\n{ex.Message}");
+        }
+    }
+
+    private void ShowError(string message)
+    {
+        var errorForm = new Form
+        {
+            Text = "Error",
+            Width = 400,
+            Height = 180,
+            Left = 200 + Random.Shared.Next(50),
+            Top = 150 + Random.Shared.Next(50),
+        };
+
+        var label = new Label
+        {
+            Text = message,
+            Left = 20,
+            Top = 20,
+            Width = 350,
+            Height = 100,
+        };
+        errorForm.Controls.Add(label);
+
+        var okButton = new Button
+        {
+            Text = "OK",
+            Left = 150,
+            Top = 110,
+            Width = 80,
+        };
+        okButton.Click += (s, e) => errorForm.Close();
+        errorForm.Controls.Add(okButton);
+
+        Application.Run(errorForm);
+    }
+
+    private record AppFilesResponse(string AppId, string EntryAssembly, List<string> Files);
+
+    private async Task UninstallApp(string appId)
+    {
+        try
+        {
+            await Http.DeleteAsync($"/api/apps/{appId}");
+            await RefreshInstalledApps();
+        }
+        catch { }
+    }
+
+    // ============ Install Dialog ============
+
+    private void ShowInstallDialog()
+    {
+        _showStartMenu = false;
+        _showInstallDialog = true;
+        _installName = "";
+        _selectedFiles.Clear();
+        _installError = null;
+        _installStatus = null;
+    }
+
+    private void CloseInstallDialog()
+    {
+        _showInstallDialog = false;
+    }
+
+    private void OnFilesSelected(InputFileChangeEventArgs e)
+    {
+        _selectedFiles = e.GetMultipleFiles(100).ToList();
+        _installError = null;
+
+        if (string.IsNullOrWhiteSpace(_installName) && _selectedFiles.Count > 0)
+        {
+            var exeFile = _selectedFiles.FirstOrDefault(f => f.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase));
+            if (exeFile != null)
+            {
+                _installName = Path.GetFileNameWithoutExtension(exeFile.Name);
+            }
+        }
+    }
+
+    private async Task InstallApp()
+    {
+        if (_selectedFiles.Count == 0) return;
+
+        _installing = true;
+        _installError = null;
+        _installStatus = "Uploading files...";
+        StateHasChanged();
+
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            content.Add(new StringContent(_installName ?? "Unnamed"), "name");
+
+            foreach (var file in _selectedFiles)
+            {
+                var stream = file.OpenReadStream(maxAllowedSize: 50 * 1024 * 1024);
+                content.Add(new StreamContent(stream), "files", file.Name);
+            }
+
+            _installStatus = "Translating app...";
+            StateHasChanged();
+
+            var response = await Http.PostAsync("/api/apps", content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                _installStatus = "App installed successfully!";
+                await RefreshInstalledApps();
+                await Task.Delay(1000);
+                CloseInstallDialog();
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                _installError = $"Installation failed: {error}";
+                _installStatus = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            _installError = $"Error: {ex.Message}";
+            _installStatus = null;
+        }
+        finally
+        {
+            _installing = false;
+        }
+    }
+}
+
+<style>
+    .start-btn:hover {
+        filter: brightness(1.1);
+    }
+
+    .menu-item {
+        padding: 8px 12px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        transition: background 0.1s;
+    }
+
+    .menu-item:hover {
+        background-color: #e3f2fd;
+    }
+
+    .menu-icon {
+        font-size: 20px;
+        width: 28px;
+        text-align: center;
+    }
+
+    .menu-text {
+        flex: 1;
+    }
+
+    .menu-title {
+        font-weight: 500;
+        color: #333;
+    }
+
+    .menu-desc {
+        font-size: 11px;
+        color: #666;
+    }
+
+    .dialog-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 10003;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .dialog-content {
+        background: white;
+        padding: 24px;
+        border-radius: 8px;
+        min-width: 420px;
+        max-width: 90vw;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+</style>

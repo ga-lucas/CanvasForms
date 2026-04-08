@@ -721,16 +721,16 @@ public abstract class TextBoxBase : Control
     /// <summary>
     /// Checks if a character should be accepted as input
     /// </summary>
-    protected virtual bool IsInputChar(char charCode)
+    protected override bool IsInputChar(char charCode)
     {
         // Override in derived classes for special character handling
         return !char.IsControl(charCode) || charCode == '\t' || charCode == '\r' || charCode == '\n';
     }
 
     /// <summary>
-    /// Checks if a key is an input key (stub)
+    /// Checks if a key is an input key
     /// </summary>
-    protected virtual bool IsInputKey(Keys keyData)
+    protected override bool IsInputKey(Keys keyData)
     {
         // Stub: Determines if a key is an input key
         var key = keyData & ~(Keys.Shift | Keys.Control | Keys.Alt);

@@ -86,6 +86,12 @@ public abstract class ListControl : Control
     public object? DataSource { get; set; }
 
     /// <summary>
+    /// Gets or sets a value indicating whether the control formats the display values of the items.
+    /// WinForms designers commonly set this to true.
+    /// </summary>
+    public bool FormattingEnabled { get; set; } = true;
+
+    /// <summary>
     /// Occurs when the selected index changes
     /// </summary>
     public event EventHandler? SelectedIndexChanged;

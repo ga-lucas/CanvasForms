@@ -6,6 +6,7 @@ public abstract class Control
 {
     private Control? _parent;
     private readonly List<Control> _controls = new();
+    private ControlCollection? _controlsCollection;
     private string _text = string.Empty;
 
     public string Name { get; set; } = string.Empty;
@@ -170,12 +171,12 @@ public abstract class Control
     public int FontHeight => Font.Height;
 
     // Size constraints
-    private Size _minimumSize = Size.Empty;
-    private Size _maximumSize = Size.Empty;
-    private Size _margin = new Size(3, 3);
-    private Size _padding = Size.Empty;
+    private Canvas.Windows.Forms.Drawing.Size _minimumSize = Canvas.Windows.Forms.Drawing.Size.Empty;
+    private Canvas.Windows.Forms.Drawing.Size _maximumSize = Canvas.Windows.Forms.Drawing.Size.Empty;
+    private Canvas.Windows.Forms.Drawing.Size _margin = new Canvas.Windows.Forms.Drawing.Size(3, 3);
+    private Canvas.Windows.Forms.Drawing.Size _padding = Canvas.Windows.Forms.Drawing.Size.Empty;
 
-    public Size MinimumSize
+    public Canvas.Windows.Forms.Drawing.Size MinimumSize
     {
         get => _minimumSize;
         set
@@ -188,7 +189,7 @@ public abstract class Control
         }
     }
 
-    public Size MaximumSize
+    public Canvas.Windows.Forms.Drawing.Size MaximumSize
     {
         get => _maximumSize;
         set
@@ -201,7 +202,7 @@ public abstract class Control
         }
     }
 
-    public Size Margin
+    public Canvas.Windows.Forms.Drawing.Size Margin
     {
         get => _margin;
         set
@@ -214,7 +215,7 @@ public abstract class Control
         }
     }
 
-    public Size Padding
+    public Canvas.Windows.Forms.Drawing.Size Padding
     {
         get => _padding;
         set
@@ -368,17 +369,13 @@ public abstract class Control
     public bool IsMirrored { get; protected set; } = false;
 
     // Accessibility
-    private AccessibleObject? _accessibilityObject;
     private string? _accessibleName;
     private string? _accessibleDescription;
     private string? _accessibleDefaultActionDescription;
     private AccessibleRole _accessibleRole = AccessibleRole.Default;
     private bool _isAccessible = false;
 
-    public AccessibleObject? AccessibilityObject
-    {
-        get => _accessibilityObject;
-    }
+    public AccessibleObject? AccessibilityObject => null;
 
     public string? AccessibleName
     {
@@ -471,11 +468,68 @@ public abstract class Control
     // Static input state properties
     public static Keys ModifierKeys { get; internal set; } = Keys.None;
     public static MouseButtons MouseButtons { get; internal set; } = MouseButtons.None;
-    public static Point MousePosition { get; internal set; } = Point.Empty;
+    public static System.Drawing.Point MousePosition { get; internal set; } = System.Drawing.Point.Empty;
 
-    // Thread safety (stubs for canvas-based controls)
+    // Thread safety (stubs for canvas-based controls - WASM is single-threaded)
     public bool InvokeRequired => false;
     public static bool CheckForIllegalCrossThreadCalls { get; set; } = false;
+
+    /// <summary>
+    /// Executes the specified delegate on the thread that owns the control.
+    /// In WASM this is a no-op since everything runs on the same thread.
+    /// </summary>
+    public object? Invoke(Delegate method)
+    {
+        return method.DynamicInvoke();
+    }
+
+    /// <summary>
+    /// Executes the specified delegate on the thread that owns the control.
+    /// In WASM this is a no-op since everything runs on the same thread.
+    /// </summary>
+    public object? Invoke(Delegate method, params object?[]? args)
+    {
+        return method.DynamicInvoke(args);
+    }
+
+    /// <summary>
+    /// Executes the specified delegate asynchronously on the thread that owns the control.
+    /// In WASM this executes immediately since everything runs on the same thread.
+    /// </summary>
+    public IAsyncResult BeginInvoke(Delegate method)
+    {
+        method.DynamicInvoke();
+        return new CompletedAsyncResult();
+    }
+
+    /// <summary>
+    /// Executes the specified delegate asynchronously on the thread that owns the control.
+    /// In WASM this executes immediately since everything runs on the same thread.
+    /// </summary>
+    public IAsyncResult BeginInvoke(Delegate method, params object?[]? args)
+    {
+        method.DynamicInvoke(args);
+        return new CompletedAsyncResult();
+    }
+
+    /// <summary>
+    /// Retrieves the return value of the asynchronous operation.
+    /// </summary>
+    public object? EndInvoke(IAsyncResult asyncResult)
+    {
+        return null;
+    }
+
+    // Simple IAsyncResult implementation for completed operations
+    private class CompletedAsyncResult : IAsyncResult
+    {
+        public bool IsCompleted => true;
+        public WaitHandle AsyncWaitHandle => new ManualResetEvent(true);
+        public object? AsyncState => null;
+        public bool CompletedSynchronously => true;
+    }
+
+
 
     // Events raising capability
     public bool CanRaiseEvents => true;
@@ -486,9 +540,9 @@ public abstract class Control
     public bool ScaleChildren => true;
 
     // Preferred size
-    public Size PreferredSize => GetPreferredSize(Size.Empty);
+    public System.Drawing.Size PreferredSize => GetPreferredSize(System.Drawing.Size.Empty);
 
-    protected virtual Size GetPreferredSize(Size proposedSize)
+    protected virtual System.Drawing.Size GetPreferredSize(System.Drawing.Size proposedSize)
     {
         return Size;
     }
@@ -514,29 +568,108 @@ public abstract class Control
     public static Font DefaultFont => new Font("Segoe UI", 9);
     public static Cursor DefaultCursor => Cursor.Default;
     public static ImeMode DefaultImeMode => ImeMode.NoControl;
-    public static Size DefaultMargin => new Size(3, 3);
-    public static Size DefaultMaximumSize => Size.Empty;
-    public static Size DefaultMinimumSize => Size.Empty;
-    public static Size DefaultPadding => Size.Empty;
-    public virtual Size DefaultSize => new Size(100, 20);
+    public static Canvas.Windows.Forms.Drawing.Size DefaultMargin => new Canvas.Windows.Forms.Drawing.Size(3, 3);
+    public static Canvas.Windows.Forms.Drawing.Size DefaultMaximumSize => Canvas.Windows.Forms.Drawing.Size.Empty;
+    public static Canvas.Windows.Forms.Drawing.Size DefaultMinimumSize => Canvas.Windows.Forms.Drawing.Size.Empty;
+    public static Canvas.Windows.Forms.Drawing.Size DefaultPadding => Canvas.Windows.Forms.Drawing.Size.Empty;
+    public virtual Canvas.Windows.Forms.Drawing.Size DefaultSize => new Canvas.Windows.Forms.Drawing.Size(100, 20);
 
     // Location and Size helpers
-    public Point Location
+    public System.Drawing.Point Location
     {
-        get => new Point(Left, Top);
+        get => new System.Drawing.Point(Left, Top);
         set { Left = value.X; Top = value.Y; }
     }
 
-    public Size Size
+    public System.Drawing.Size Size
     {
-        get => new Size(Width, Height);
+        get => new System.Drawing.Size(Width, Height);
         set { Width = value.Width; Height = value.Height; }
     }
 
-    public Rectangle Bounds
+    public System.Drawing.Rectangle Bounds
     {
-        get => new Rectangle(Left, Top, Width, Height);
+        get => new System.Drawing.Rectangle(Left, Top, Width, Height);
         set { Left = value.X; Top = value.Y; Width = value.Width; Height = value.Height; }
+    }
+
+    /// <summary>
+    /// Sets the bounds of the control.
+    /// </summary>
+    public void SetBounds(int x, int y, int width, int height)
+    {
+        SetBounds(x, y, width, height, BoundsSpecified.All);
+    }
+
+    /// <summary>
+    /// Sets the specified bounds of the control.
+    /// </summary>
+    public void SetBounds(int x, int y, int width, int height, BoundsSpecified specified)
+    {
+        if ((specified & BoundsSpecified.X) != 0) Left = x;
+        if ((specified & BoundsSpecified.Y) != 0) Top = y;
+        if ((specified & BoundsSpecified.Width) != 0) Width = width;
+        if ((specified & BoundsSpecified.Height) != 0) Height = height;
+    }
+
+    /// <summary>
+    /// Computes the location of the specified client point in screen coordinates.
+    /// Note: In canvas-based rendering, screen coordinates are relative to the browser viewport.
+    /// </summary>
+    public System.Drawing.Point PointToScreen(System.Drawing.Point p)
+    {
+        // Calculate position relative to top-level form
+        var offsetX = p.X;
+        var offsetY = p.Y;
+        var current = this;
+
+        while (current != null)
+        {
+            offsetX += current.Left;
+            offsetY += current.Top;
+            current = current.Parent;
+        }
+
+        return new System.Drawing.Point(offsetX, offsetY);
+    }
+
+    /// <summary>
+    /// Computes the location of the specified screen point in client coordinates.
+    /// Note: In canvas-based rendering, screen coordinates are relative to the browser viewport.
+    /// </summary>
+    public System.Drawing.Point PointToClient(System.Drawing.Point p)
+    {
+        // Calculate position relative to this control
+        var offsetX = p.X;
+        var offsetY = p.Y;
+        var current = this;
+
+        while (current != null)
+        {
+            offsetX -= current.Left;
+            offsetY -= current.Top;
+            current = current.Parent;
+        }
+
+        return new System.Drawing.Point(offsetX, offsetY);
+    }
+
+    /// <summary>
+    /// Computes the size and location of the specified client rectangle in screen coordinates.
+    /// </summary>
+    public System.Drawing.Rectangle RectangleToScreen(System.Drawing.Rectangle r)
+    {
+        var pt = PointToScreen(new System.Drawing.Point(r.X, r.Y));
+        return new System.Drawing.Rectangle(pt.X, pt.Y, r.Width, r.Height);
+    }
+
+    /// <summary>
+    /// Computes the size and location of the specified screen rectangle in client coordinates.
+    /// </summary>
+    public System.Drawing.Rectangle RectangleToClient(System.Drawing.Rectangle r)
+    {
+        var pt = PointToClient(new System.Drawing.Point(r.X, r.Y));
+        return new System.Drawing.Rectangle(pt.X, pt.Y, r.Width, r.Height);
     }
 
     // Parent/child relationships
@@ -566,7 +699,7 @@ public abstract class Control
         ParentChanged?.Invoke(this, e);
     }
 
-    public ControlCollection Controls => new ControlCollection(this, _controls);
+    public ControlCollection Controls => _controlsCollection ??= new ControlCollection(this, _controls);
 
     // ========== EVENTS ==========
 
@@ -1245,7 +1378,7 @@ public abstract class Control
     /// <summary>
     /// Gets the child control at the specified point
     /// </summary>
-    public Control? GetChildAtPoint(Point pt)
+    public Control? GetChildAtPoint(System.Drawing.Point pt)
     {
         return GetChildAtPoint(pt, GetChildAtPointSkip.None);
     }
@@ -1253,7 +1386,7 @@ public abstract class Control
     /// <summary>
     /// Gets the child control at the specified point, with skip options
     /// </summary>
-    public Control? GetChildAtPoint(Point pt, GetChildAtPointSkip skipValue)
+    public Control? GetChildAtPoint(System.Drawing.Point pt, GetChildAtPointSkip skipValue)
     {
         foreach (var control in _controls)
         {
@@ -1272,78 +1405,6 @@ public abstract class Control
             }
         }
         return null;
-    }
-
-    /// <summary>
-    /// Converts screen coordinates to client coordinates
-    /// </summary>
-    public Point PointToClient(Point p)
-    {
-        var result = new Point(p.X, p.Y);
-        var control = this;
-        while (control != null)
-        {
-            result.X -= control.Left;
-            result.Y -= control.Top;
-            control = control.Parent;
-        }
-        return result;
-    }
-
-    /// <summary>
-    /// Converts client coordinates to screen coordinates
-    /// </summary>
-    public Point PointToScreen(Point p)
-    {
-        var result = new Point(p.X, p.Y);
-        var control = this;
-        while (control != null)
-        {
-            result.X += control.Left;
-            result.Y += control.Top;
-            control = control.Parent;
-        }
-        return result;
-    }
-
-    /// <summary>
-    /// Converts a rectangle from screen coordinates to client coordinates
-    /// </summary>
-    public Rectangle RectangleToClient(Rectangle r)
-    {
-        var pt = PointToClient(new Point(r.X, r.Y));
-        return new Rectangle(pt.X, pt.Y, r.Width, r.Height);
-    }
-
-    /// <summary>
-    /// Converts a rectangle from client coordinates to screen coordinates
-    /// </summary>
-    public Rectangle RectangleToScreen(Rectangle r)
-    {
-        var pt = PointToScreen(new Point(r.X, r.Y));
-        return new Rectangle(pt.X, pt.Y, r.Width, r.Height);
-    }
-
-    /// <summary>
-    /// Sets the bounds of the control
-    /// </summary>
-    public void SetBounds(int x, int y, int width, int height)
-    {
-        Left = x;
-        Top = y;
-        Width = width;
-        Height = height;
-    }
-
-    /// <summary>
-    /// Sets the bounds of the control with specified parameters
-    /// </summary>
-    public void SetBounds(int x, int y, int width, int height, BoundsSpecified specified)
-    {
-        if ((specified & BoundsSpecified.X) != 0) Left = x;
-        if ((specified & BoundsSpecified.Y) != 0) Top = y;
-        if ((specified & BoundsSpecified.Width) != 0) Width = width;
-        if ((specified & BoundsSpecified.Height) != 0) Height = height;
     }
 
     /// <summary>
@@ -1453,53 +1514,13 @@ public abstract class Control
         PerformLayout();
     }
 
-    /// <summary>
-    /// Executes the specified delegate on the thread that owns the control's handle
-    /// </summary>
-    public object? Invoke(Delegate method)
-    {
-        return method.DynamicInvoke();
-    }
 
-    /// <summary>
-    /// Executes the specified delegate with the specified arguments on the thread that owns the control's handle
-    /// </summary>
-    public object? Invoke(Delegate method, params object?[] args)
-    {
-        return method.DynamicInvoke(args);
-    }
 
-    /// <summary>
-    /// Executes the specified delegate asynchronously on the thread that owns the control's handle
-    /// </summary>
-    public IAsyncResult BeginInvoke(Delegate method)
-    {
-        return Task.Run(() => method.DynamicInvoke());
-    }
 
-    /// <summary>
-    /// Executes the specified delegate asynchronously with the specified arguments on the thread that owns the control's handle
-    /// </summary>
-    public IAsyncResult BeginInvoke(Delegate method, params object?[] args)
-    {
-        return Task.Run(() => method.DynamicInvoke(args));
-    }
 
-    /// <summary>
-    /// Retrieves the return value of the asynchronous operation represented by the IAsyncResult passed
-    /// </summary>
-    public object? EndInvoke(IAsyncResult asyncResult)
-    {
-        if (asyncResult is Task task)
-        {
-            task.Wait();
-            if (task.GetType().IsGenericType)
-            {
-                return task.GetType().GetProperty("Result")?.GetValue(task);
-            }
-        }
-        return null;
-    }
+
+
+
 
     /// <summary>
     /// Initiates a drag-and-drop operation
@@ -2170,54 +2191,66 @@ public abstract class Control
             child.PropagateRequestRender(requestRender);
         }
     }
-}
 
-// Control collection for managing child controls
-public class ControlCollection : IEnumerable<Control>
-{
-    private readonly Control _owner;
-    private readonly List<Control> _list;
-
-    internal ControlCollection(Control owner, List<Control> list)
+    // Matches WinForms: System.Windows.Forms.Control.ControlCollection
+    public class ControlCollection : IEnumerable<Control>
     {
-        _owner = owner;
-        _list = list;
-    }
+        private readonly Control _owner;
+        private readonly List<Control> _list;
 
-    public int Count => _list.Count;
-
-    public Control this[int index] => _list[index];
-
-    public void Add(Control control)
-    {
-        control.Parent = _owner;
-        control.RequestRender = _owner.RequestRender;
-        _list.Add(control);
-        _owner.Invalidate();
-    }
-
-    public void Remove(Control control)
-    {
-        if (_list.Remove(control))
+        internal ControlCollection(Control owner, List<Control> list)
         {
-            control.Parent = null;
+            _owner = owner;
+            _list = list;
+        }
+
+        public virtual int Count => _list.Count;
+
+        public virtual Control this[int index] => _list[index];
+
+        public virtual void Add(Control control)
+        {
+            control.Parent = _owner;
+            control.RequestRender = _owner.RequestRender;
+            _list.Add(control);
             _owner.Invalidate();
         }
-    }
 
-    public void Clear()
-    {
-        foreach (var control in _list)
+        public virtual void AddRange(Control[] controls)
         {
-            control.Parent = null;
+            foreach (var c in controls)
+            {
+                Add(c);
+            }
         }
-        _list.Clear();
-        _owner.Invalidate();
+
+        public virtual void Remove(Control control)
+        {
+            if (_list.Remove(control))
+            {
+                control.Parent = null;
+                _owner.Invalidate();
+            }
+        }
+
+        public virtual void Clear()
+        {
+            foreach (var control in _list)
+            {
+                control.Parent = null;
+            }
+            _list.Clear();
+            _owner.Invalidate();
+        }
+
+        public virtual bool Contains(Control control) => _list.Contains(control);
+
+        public virtual int IndexOf(Control control) => _list.IndexOf(control);
+
+        public virtual IEnumerator<Control> GetEnumerator() => _list.GetEnumerator();
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
     }
-
-    public IEnumerator<Control> GetEnumerator() => _list.GetEnumerator();
-
-    System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
 /// <summary>

@@ -7,7 +7,7 @@
 <div class="desktop-container" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100vw; height: 100vh; background-color: #008080; overflow: hidden;">
 
     <!-- Taskbar at top -->
-    <div class="taskbar" style="position: absolute; top: 0; left: 0; right: 0; height: @(TaskbarHeight)px; background: linear-gradient(180deg, #f0f0f0 0%, #d0d0d0 100%); border-bottom: 1px solid #a0a0a0; z-index: 10000; display: flex; align-items: center; padding: 0 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+    <div class="taskbar" style="position: absolute; top: 0; left: 0; right: 0; height: @(TaskbarHeight)px; background: linear-gradient(180deg, #f0f0f0 0%, #d0d0d0 100%); border-bottom: 1px solid #a0a0a0; z-index: 10000; display: flex; align-items: center; padding: 0 8px; padding-left: @(TaskbarLeftPadding)px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 
         <!-- Window buttons -->
         @foreach (var form in _formManager.OpenForms.OrderBy(f => f.CreatedAt))
@@ -59,6 +59,9 @@
 @code {
     [Parameter]
     public int TaskbarHeight { get; set; } = 32;
+
+    [Parameter]
+    public int TaskbarLeftPadding { get; set; } = 8;
 
     private FormManager _formManager = null!;
     private int _viewportWidth = 1920;

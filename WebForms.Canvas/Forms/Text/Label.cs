@@ -14,7 +14,7 @@ public class Label : Control
     }
 
     public ContentAlignment TextAlign { get; set; } = ContentAlignment.TopLeft;
-    public bool AutoSize { get; set; } = false;
+    public new bool AutoSize { get; set; } = false;
 
     protected internal override void OnPaint(PaintEventArgs e)
     {

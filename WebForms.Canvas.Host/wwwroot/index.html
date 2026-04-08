@@ -27,6 +27,16 @@
         <a class="dismiss">🗙</a>
     </div>
     <script src="_content/Canvas.Windows.Forms/canvas-renderer.js"></script>
+    <script>
+        // Simple wrapper for OS page canvas rendering
+        window.canvasRenderer = {
+            render: function(canvas, commands) {
+                if (!canvas || !commands) return;
+                // Use the existing renderClientAreaCommands with no offset
+                window.renderClientAreaCommands(canvas, 0, 0, commands);
+            }
+        };
+    </script>
     <script src="_framework/blazor.webassembly.js"></script>
 </body>
 

@@ -145,7 +145,7 @@ public class RadioButton : ButtonBase
     /// <summary>
     /// Simulates a click on the radio button
     /// </summary>
-    public void PerformClick()
+    public new void PerformClick()
     {
         OnClick(EventArgs.Empty);
     }

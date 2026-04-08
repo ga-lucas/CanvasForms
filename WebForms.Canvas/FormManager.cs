@@ -13,10 +13,15 @@ public class FormManager
     private Form? _mainForm;
     private Form? _activeForm;
 
+    /// <summary>
+    /// Fired whenever a new form is added to the desktop for the first time.
+    /// </summary>
+    public event EventHandler<Form>? FormAdded;
+
     public FormManager(Action? onFormsChanged = null)
     {
         _onFormsChanged = onFormsChanged;
-        Application.FormManager = this;
+        Canvas.Windows.Forms.CanvasApplication.FormManager = this;
     }
 
     /// <summary>
@@ -62,6 +67,7 @@ public class FormManager
         {
             _forms.Add(form);
             SetupFormEvents(form);
+            FormAdded?.Invoke(this, form);
         }
 
         // Call Show() to ensure PerformLayout is called for docking/anchoring
@@ -103,21 +109,18 @@ public class FormManager
     }
 
     /// <summary>
-    /// Closes a form and removes it from the collection
+    /// Closes a form and removes it from the collection.
+    /// The form's FormClosing event can cancel this operation.
     /// </summary>
     public void CloseForm(Form form)
     {
-        // Don't close the main form - just hide other forms
-        if (form == _mainForm)
-        {
-            // Main form should never be closed this way, only hidden by user action
-            return;
-        }
+        if (!_forms.Contains(form)) return;
 
-        form.Visible = false;
-        _forms.Remove(form);
+        // Call the form's Close method which handles FormClosing/FormClosed events
+        form.Close();
 
-        NotifyChanged();
+        // Note: The actual removal from _forms happens in OnFormClosed handler
+        // if the close wasn't cancelled
     }
 
     /// <summary>
@@ -133,7 +136,7 @@ public class FormManager
         _forms.Clear();
         NotifyChanged();
 
-        Application.OnApplicationExit();
+        Canvas.Windows.Forms.CanvasApplication.OnApplicationExit();
     }
 
     /// <summary>
@@ -220,11 +223,26 @@ public class FormManager
         }
     }
 
-    private void OnFormClosed(object? sender, EventArgs e)
+    private void OnFormClosed(object? sender, FormClosedEventArgs e)
     {
         if (sender is Form form)
         {
-            CloseForm(form);
+            // Remove from our list (form already handled the closing logic)
+            _forms.Remove(form);
+
+            // If closing the main form, clear the reference
+            if (form == _mainForm)
+            {
+                _mainForm = null;
+            }
+
+            // If closing the active form, select another one
+            if (form == _activeForm)
+            {
+                _activeForm = _forms.LastOrDefault();
+            }
+
+            NotifyChanged();
         }
     }
 

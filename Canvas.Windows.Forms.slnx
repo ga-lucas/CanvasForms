@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/WebForms.Canvas.Host/">
+    <Project Path="WebForms.Canvas.Host/Canvas.Windows.Forms.Host.csproj" />
+  </Folder>
+  <Folder Name="/WebForms.Canvas.Tests/">
+    <Project Path="WebForms.Canvas.Tests/Canvas.Windows.Forms.Tests.csproj" />
+  </Folder>
+  <Folder Name="/WebForms.Canvas/">
+    <Project Path="WebForms.Canvas/Canvas.Windows.Forms.csproj" />
+  </Folder>
+  <Project Path="Canvas.Windows.Forms.ILTranslator/Canvas.Windows.Forms.ILTranslator.csproj" />
+  <Project Path="Canvas.Windows.Forms.RemoteProtocol/Canvas.Windows.Forms.RemoteProtocol.csproj" />
+  <Project Path="Canvas.Windows.Forms.Host.Server/Canvas.Windows.Forms.Host.Server.csproj" />
+</Solution>

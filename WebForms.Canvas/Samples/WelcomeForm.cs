@@ -98,7 +98,7 @@ public class WelcomeForm : Form
         };
         _btnDockingDemo.Click += (s, e) =>
         {
-            Application.FormManager?.ShowOrCreateForm<DockingDemoForm>();
+           Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<DockingDemoForm>();
         };
         Controls.Add(_btnDockingDemo);
 
@@ -113,7 +113,7 @@ public class WelcomeForm : Form
         };
         _btnControlsDemo.Click += (s, e) =>
         {
-            Application.FormManager?.ShowOrCreateForm<ControlsDemoForm>();
+          Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<ControlsDemoForm>();
         };
         Controls.Add(_btnControlsDemo);
 
@@ -128,7 +128,7 @@ public class WelcomeForm : Form
         };
         _btnInteractive.Click += (s, e) =>
         {
-            Application.FormManager?.ShowOrCreateForm<InteractiveForm>();
+           Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<InteractiveForm>();
         };
         Controls.Add(_btnInteractive);
 
@@ -143,7 +143,7 @@ public class WelcomeForm : Form
         };
         _btnDrawingSample.Click += (s, e) =>
         {
-            Application.FormManager?.ShowOrCreateForm<SampleDrawingForm>();
+         Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<SampleDrawingForm>();
         };
         Controls.Add(_btnDrawingSample);
 
@@ -159,7 +159,7 @@ public class WelcomeForm : Form
         };
         _btnListControl.Click += (s, e) =>
         {
-            Application.FormManager?.ShowOrCreateForm<ListBoxDemoForm>();
+           Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<ListBoxDemoForm>();
         };
         Controls.Add(_btnListControl);
     }

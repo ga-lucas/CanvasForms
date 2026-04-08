@@ -2,7 +2,7 @@ using Canvas.Windows.Forms.Drawing;
 
 namespace System.Windows.Forms;
 
-public class Form : Control
+public class Form : ContainerControl
 {
     private static int _nextZIndex = 1;
     private const int TitleBarHeight = 32; // Height of the title bar
@@ -46,10 +46,18 @@ public class Form : Control
         WindowStateChanged?.Invoke(this, e);
     }
 
-    // Event fired when form is closed
-    public event EventHandler? FormClosed;
+    // Event fired when form is about to close (can be cancelled)
+    public event FormClosingEventHandler? FormClosing;
 
-    protected virtual void OnFormClosed(EventArgs e)
+    protected virtual void OnFormClosing(FormClosingEventArgs e)
+    {
+        FormClosing?.Invoke(this, e);
+    }
+
+    // Event fired when form is closed
+    public event FormClosedEventHandler? FormClosed;
+
+    protected virtual void OnFormClosed(FormClosedEventArgs e)
     {
         FormClosed?.Invoke(this, e);
     }
@@ -60,6 +68,44 @@ public class Form : Control
     protected virtual void OnActivated(EventArgs e)
     {
         Activated?.Invoke(this, e);
+    }
+
+    // Track the close reason for the current close operation
+    private CloseReason _closeReason = CloseReason.None;
+
+    /// <summary>
+    /// Closes the form. Can be cancelled by handling the FormClosing event.
+    /// </summary>
+    public void Close()
+    {
+        Close(CloseReason.UserClosing);
+    }
+
+    /// <summary>
+    /// Closes the form with a specific reason. Can be cancelled by handling the FormClosing event.
+    /// </summary>
+    internal void Close(CloseReason reason)
+    {
+        _closeReason = reason;
+
+        // Raise FormClosing event - allow cancellation
+        var closingArgs = new FormClosingEventArgs(reason);
+        OnFormClosing(closingArgs);
+
+        if (closingArgs.Cancel)
+        {
+            _closeReason = CloseReason.None;
+            return; // Close was cancelled
+        }
+
+        // Hide the form
+        Visible = false;
+
+        // Raise FormClosed event
+        var closedArgs = new FormClosedEventArgs(reason);
+        OnFormClosed(closedArgs);
+
+        _closeReason = CloseReason.None;
     }
 
     // Callback for notifying parent container of changes (e.g., new forms created)
@@ -86,6 +132,16 @@ public class Form : Control
     // Client area dimensions (excluding title bar)
     public int ClientWidth => Width;
     public int ClientHeight => Math.Max(0, Height - TitleBarHeight);
+
+    public new System.Drawing.Size ClientSize
+    {
+        get => new System.Drawing.Size(ClientWidth, ClientHeight);
+        set
+        {
+            Width = value.Width;
+            Height = value.Height + TitleBarHeight;
+        }
+    }
 
     // Override layout dimensions to use client area (excludes title bar)
     protected override int LayoutWidth => ClientWidth;
@@ -141,15 +197,6 @@ public class Form : Control
         Invalidate();
 
         // Notify container that state changed (for Blazor re-rendering)
-        OnContainerChanged?.Invoke();
-    }
-
-    public void Close()
-    {
-        Visible = false;
-        OnFormClosed(EventArgs.Empty);
-
-        // Notify container that state changed
         OnContainerChanged?.Invoke();
     }
 
