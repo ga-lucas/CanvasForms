@@ -874,12 +874,60 @@ public abstract class Control
 
     protected internal virtual void OnGotFocus(EventArgs e)
     {
+        Invalidate();
         GotFocus?.Invoke(this, e);
     }
 
     protected internal virtual void OnLostFocus(EventArgs e)
     {
+        Invalidate();
         LostFocus?.Invoke(this, e);
+    }
+
+    // ========== SHARED RENDERING HELPERS ==========
+
+    /// <summary>
+    /// Returns the foreground color to use when the control is disabled.
+    /// Derived from ForeColor so custom colors are respected.
+    /// </summary>
+    protected Color DisabledForeColor =>
+        Color.FromArgb((int)(ForeColor.R * 0.43f), (int)(ForeColor.G * 0.43f), (int)(ForeColor.B * 0.43f));
+
+    /// <summary>
+    /// Returns ForeColor when enabled, DisabledForeColor when disabled.
+    /// </summary>
+    protected Color EffectiveForeColor => Enabled ? ForeColor : DisabledForeColor;
+
+    /// <summary>
+    /// Fills the entire control bounds with BackColor (skips fill when Transparent).
+    /// </summary>
+    protected void DrawControlBackground(Graphics g)
+    {
+        if (BackColor == Color.Transparent) return;
+        using var brush = new SolidBrush(BackColor);
+        g.FillRectangle(brush, 0, 0, Width, Height);
+    }
+
+    /// <summary>
+    /// Draws a standard 1-pixel dotted focus rectangle inset by <paramref name="inset"/> pixels.
+    /// Only draws when Focused and Enabled.
+    /// </summary>
+    protected void DrawFocusRect(Graphics g, int inset = 2)
+    {
+        if (!Focused || !Enabled) return;
+        using var pen = new Pen(Color.Black);
+        g.DrawRectangle(pen, inset, inset, Width - inset * 2 - 1, Height - inset * 2 - 1);
+    }
+
+    /// <summary>
+    /// Draws a standard 1-pixel dotted focus rectangle around an explicit bounds.
+    /// Only draws when Focused and Enabled.
+    /// </summary>
+    protected void DrawFocusRect(Graphics g, Rectangle bounds)
+    {
+        if (!Focused || !Enabled) return;
+        using var pen = new Pen(Color.Black);
+        g.DrawRectangle(pen, bounds);
     }
 
     protected internal virtual void OnEnter(EventArgs e)

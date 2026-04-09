@@ -114,26 +114,18 @@ public class PictureBox : Control
     {
         var g = e.Graphics;
 
-        // Draw background
-        g.FillRectangle(new SolidBrush(BackColor), new Rectangle(0, 0, Width, Height));
+        DrawControlBackground(g);
 
         // Draw border
         g.DrawRectangle(new Pen(Color.FromArgb(172, 172, 172)), new Rectangle(0, 0, Width, Height));
 
-        // Draw image if URL is set
         if (!string.IsNullOrEmpty(_imageUrl))
         {
             var imageRect = CalculateImageRectangle();
             g.DrawImage(_imageUrl, imageRect);
         }
 
-        // Draw focus rectangle if focused
-        if (Focused && Enabled)
-        {
-            var focusRect = new Rectangle(2, 2, Width - 4, Height - 4);
-            using var focusPen = new Pen(Color.Black);
-            g.DrawRectangle(focusPen, focusRect);
-        }
+        DrawFocusRect(g);
 
         base.OnPaint(e);
     }
@@ -166,23 +158,12 @@ public class PictureBox : Control
         }
     }
 
-    protected internal override void OnGotFocus(EventArgs e)
-    {
-        Invalidate();
-        base.OnGotFocus(e);
     }
 
-    protected internal override void OnLostFocus(EventArgs e)
-    {
-        Invalidate();
-        base.OnLostFocus(e);
-    }
-}
-
-/// <summary>
-/// Specifies how an image is positioned within a PictureBox
-/// </summary>
-public enum PictureBoxSizeMode
+    /// <summary>
+    /// Specifies how an image is positioned within a PictureBox
+    /// </summary>
+    public enum PictureBoxSizeMode
 {
     /// <summary>
     /// The image is placed in the upper-left corner, and clipped if larger than the control

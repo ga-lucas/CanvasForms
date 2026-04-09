@@ -4,6 +4,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- .NET 10 Preview workaround: disable static asset fingerprinting that causes broken manifests -->
+    <StaticWebAssetsFingerprintContent>false</StaticWebAssetsFingerprintContent>
   </PropertyGroup>
 
   <ItemGroup>

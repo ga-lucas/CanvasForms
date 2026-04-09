@@ -3,13 +3,13 @@ using Canvas.Windows.Forms.Host.Server.Hubs;
 using Canvas.Windows.Forms.RemoteProtocol;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.AspNetCore.StaticFiles;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Configure services
 builder.Services.Configure<FormOptions>(options =>
 {
-    // Allow reasonably large uploads for apps with dependencies
     options.MultipartBodyLengthLimit = 100 * 1024 * 1024; // 100 MB
 });
 
@@ -19,13 +19,30 @@ builder.Services.AddSingleton<AppManager>();
 
 var app = builder.Build();
 
-// Configure middleware - order matters!
 app.UseRouting();
 app.UseWebSockets();
-// MapStaticAssets replaces both UseBlazorFrameworkFiles and UseStaticFiles in .NET 9+
-// UseStaticFiles is kept only for dynamic/runtime assets (e.g. installed app downloads)
-app.UseStaticFiles();
-app.MapStaticAssets();
+
+// UseBlazorFrameworkFiles augments IWebHostEnvironment.WebRootFileProvider so
+// that _framework/* resolves to the WASM project's build output.
+// It must be called before UseStaticFiles.
+app.UseBlazorFrameworkFiles();
+
+// Build a MIME type provider with explicit mappings for all Blazor/WASM types.
+// The default FileExtensionContentTypeProvider already maps .js → text/javascript,
+// but .wasm, .blat, and .dat are missing — we add them here.
+var mimeProvider = new FileExtensionContentTypeProvider();
+mimeProvider.Mappings[".wasm"] = "application/wasm";
+mimeProvider.Mappings[".blat"] = "application/octet-stream";
+mimeProvider.Mappings[".dat"]  = "application/octet-stream";
+mimeProvider.Mappings[".dll"]  = "application/octet-stream";
+
+// Pass the augmented WebRootFileProvider explicitly so UseStaticFiles serves
+// _framework/* from the WASM project output (not just the server's wwwroot).
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = app.Environment.WebRootFileProvider,
+    ContentTypeProvider = mimeProvider
+});
 
 // Wire up desktop change notifications via SignalR
 var runtime = app.Services.GetRequiredService<AppRuntime>();
