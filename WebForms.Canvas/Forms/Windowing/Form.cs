@@ -542,6 +542,42 @@ public class Form : ContainerControl
         _normalBounds = new Rectangle(left, top, width, height);
     }
 
+    // ── Public input-dispatch surface ───────────────────────────────────────
+    // These thin wrappers let external assemblies (e.g. the server host) route
+    // input into the form without needing reflection to reach protected members.
+
+    /// <summary>Dispatches a mouse event into the form's control tree.</summary>
+    public void DispatchMouseEvent(string eventType, int x, int y, MouseButtons button)
+    {
+        var args = new MouseEventArgs(button, 1, x, y);
+        switch (eventType)
+        {
+            case "mousedown":  OnMouseDown(args);       break;
+            case "mouseup":    OnMouseUp(args);         break;
+            case "mousemove":  OnMouseMove(args);       break;
+            case "click":      OnMouseClick(args);      break;
+            case "dblclick":   OnMouseDoubleClick(args);break;
+        }
+    }
+
+    /// <summary>Dispatches a key-down or key-up event into the form.</summary>
+    public void DispatchKeyEvent(string eventType, Keys key, bool alt, bool ctrl, bool shift)
+    {
+        var args = new KeyEventArgs(key, alt, ctrl, shift);
+        switch (eventType)
+        {
+            case "keydown": OnKeyDown(args); break;
+            case "keyup":   OnKeyUp(args);   break;
+        }
+    }
+
+    /// <summary>Dispatches a key-press (character) event into the form.</summary>
+    public void DispatchKeyPress(char keyChar)
+    {
+        OnKeyPress(new KeyPressEventArgs(keyChar));
+    }
+
+
     public void Restore()
     {
         if (_windowState != FormWindowState.Normal)

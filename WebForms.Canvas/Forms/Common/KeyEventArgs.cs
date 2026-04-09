@@ -67,7 +67,33 @@ public enum Keys
     F9 = 120,
     F10 = 121,
     F11 = 122,
-    F12 = 123
+    F12 = 123,
+
+    // Numpad
+    NumPad0 = 96,
+    NumPad1 = 97,
+    NumPad2 = 98,
+    NumPad3 = 99,
+    NumPad4 = 100,
+    NumPad5 = 101,
+    NumPad6 = 102,
+    NumPad7 = 103,
+    NumPad8 = 104,
+    NumPad9 = 105,
+    Multiply = 106,
+    Add = 107,
+    Subtract = 109,
+    Decimal = 110,
+    Divide = 111,
+
+    // Navigation / editing
+    Insert = 45,
+    PrintScreen = 44,
+
+    // Modifier aliases (bitmask-compatible with WinForms)
+    ShiftKey = 16,
+    ControlKey = 17,
+    Menu = 18,
 }
 
 public class KeyEventArgs : EventArgs

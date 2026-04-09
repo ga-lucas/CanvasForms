@@ -80,16 +80,4 @@ public class Button : ButtonBase
 
         base.OnPaint(e);
     }
-
-    protected internal override void OnGotFocus(EventArgs e)
-    {
-        Invalidate();
-        base.OnGotFocus(e);
-    }
-
-    protected internal override void OnLostFocus(EventArgs e)
-    {
-        Invalidate();
-        base.OnLostFocus(e);
-    }
 }

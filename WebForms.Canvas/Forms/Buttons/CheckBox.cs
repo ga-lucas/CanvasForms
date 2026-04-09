@@ -5,10 +5,8 @@ namespace System.Windows.Forms;
 /// <summary>
 /// Represents a Windows Forms checkbox control
 /// </summary>
-public class CheckBox : ButtonBase
+public class CheckBox : ToggleButtonBase
 {
-    private bool _checked = false;
-
     public CheckBox()
     {
         Width = 100;
@@ -18,153 +16,57 @@ public class CheckBox : ButtonBase
         Text = "CheckBox";
     }
 
-    /// <summary>
-    /// Gets or sets a value indicating whether the check box is checked
-    /// </summary>
-    public bool Checked
-    {
-        get => _checked;
-        set
-        {
-            if (_checked != value)
-            {
-                _checked = value;
-                OnCheckedChanged(EventArgs.Empty);
-                Invalidate();
-            }
-        }
-    }
-
-    public event EventHandler? CheckedChanged;
+    public Appearance Appearance { get; set; } = Appearance.Normal;
+    public bool ThreeState { get; set; } = false;
+    public CheckState CheckState { get; set; } = CheckState.Unchecked;
 
     protected internal override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics;
 
-        // Draw background if not transparent
-        if (BackColor != Color.Transparent)
-        {
-            using var bgBrush = new SolidBrush(BackColor);
-            g.FillRectangle(bgBrush, 0, 0, Width, Height);
-        }
+        DrawControlBackground(g);
 
-        // Draw checkbox box (13x13 square)
         const int boxSize = 13;
         var boxBounds = new Rectangle(0, (Height - boxSize) / 2, boxSize, boxSize);
 
-        // Background
-        var bgColor = Enabled ? Color.White : Color.FromArgb(240, 240, 240);
-        g.FillRectangle(new SolidBrush(bgColor), boxBounds);
+        using (var bgBrush = new SolidBrush(GetIndicatorBackColor()))
+            g.FillRectangle(bgBrush, boxBounds);
 
-        // Border - use hover state from ButtonBase
-        var state = GetButtonState();
-        var borderColor = (state == ButtonState.Hot || state == ButtonState.Pushed) && Enabled
-            ? Color.FromArgb(0, 120, 215)
-            : Color.FromArgb(122, 122, 122);
-        g.DrawRectangle(new Pen(borderColor), boxBounds);
+        using (var borderPen = new Pen(GetIndicatorBorderColor()))
+            g.DrawRectangle(borderPen, boxBounds);
 
-        // Draw checkmark if checked
         if (Checked)
         {
-            var checkColor = Enabled ? Color.FromArgb(0, 120, 215) : Color.FromArgb(109, 109, 109);
-            var pen = new Pen(checkColor, 2);
-
-            // Calculate checkmark position relative to box bounds
+            using var pen = new Pen(GetIndicatorMarkColor(), 2);
             var boxY = boxBounds.Y;
-            var x1 = boxBounds.X + 3;
-            var y1 = boxY + boxSize / 2;
-            var x2 = boxBounds.X + boxSize / 2 - 1;
-            var y2 = boxY + boxSize - 3;
-            var x3 = boxBounds.X + boxSize - 3;
-            var y3 = boxY + 3;
-
-            // Draw checkmark (two lines forming a check)
-            g.DrawLine(pen, x1, y1, x2, y2);
-            g.DrawLine(pen, x2, y2, x3, y3);
+            g.DrawLine(pen, boxBounds.X + 3,          boxY + boxSize / 2,
+                            boxBounds.X + boxSize / 2 - 1, boxY + boxSize - 3);
+            g.DrawLine(pen, boxBounds.X + boxSize / 2 - 1, boxY + boxSize - 3,
+                            boxBounds.X + boxSize - 3,      boxY + 3);
         }
 
-        // Draw text
         if (!string.IsNullOrEmpty(Text))
         {
-            var textColor = Enabled ? ForeColor : Color.FromArgb(109, 109, 109);
-            // Align text vertically with the checkbox - account for font baseline being 'top'
-            // Center the text vertically by positioning it at (Height - fontSize) / 2
-            var textY = (Height - 14) / 2 + 2; // +2 to account for typical font baseline offset
-            g.DrawString(Text, boxSize + 4, textY, textColor);
+            var textY = (Height - 14) / 2 + 2;
+            g.DrawString(Text, boxSize + 4, textY, EffectiveForeColor);
         }
 
-        // Draw focus rectangle if focused
-        if (Focused && Enabled)
-        {
-            var textWidth = string.IsNullOrEmpty(Text) ? 0 : Text.Length * 7;
-            var focusRect = new Rectangle(0, 0, boxSize + 4 + textWidth + 2, Height);
-            using var focusPen = new Pen(Color.Black);
-            g.DrawRectangle(focusPen, focusRect);
-        }
+        var textWidth = string.IsNullOrEmpty(Text) ? 0 : Text.Length * 7;
+        DrawFocusRect(g, new Rectangle(0, 0, boxSize + 4 + textWidth + 2, Height - 1));
 
         base.OnPaint(e);
     }
 
     protected override void OnClick(EventArgs e)
     {
-        // Toggle checked state on click
-        Checked = !Checked;
+        if (AutoCheck) Checked = !Checked;
         base.OnClick(e);
     }
-
-    protected virtual void OnCheckedChanged(EventArgs e)
-    {
-        CheckedChanged?.Invoke(this, e);
-    }
-
-    protected internal override void OnGotFocus(EventArgs e)
-    {
-        Invalidate();
-        base.OnGotFocus(e);
-    }
-
-    protected internal override void OnLostFocus(EventArgs e)
-    {
-        Invalidate();
-        base.OnLostFocus(e);
-    }
-
-    /// <summary>
-    /// Gets or sets the appearance of the check box
-    /// </summary>
-    public Appearance Appearance { get; set; } = Appearance.Normal;
-
-    /// <summary>
-    /// Gets or sets a value indicating whether the check box will allow three check states
-    /// </summary>
-    public bool ThreeState { get; set; } = false;
-
-    /// <summary>
-    /// Gets or sets the state of the check box
-    /// </summary>
-    public CheckState CheckState { get; set; } = CheckState.Unchecked;
-
-    /// <summary>
-    /// Gets or sets a value indicating whether the check box is automatically checked on click
-    /// </summary>
-    public bool AutoCheck { get; set; } = true;
 }
 
-/// <summary>
-/// Specifies the appearance of a check box
-/// </summary>
-public enum Appearance
-{
-    Normal,
-    Button
-}
+/// <summary>Specifies the appearance of a check box</summary>
+public enum Appearance { Normal, Button }
 
-/// <summary>
-/// Specifies the state of a check box
-/// </summary>
-public enum CheckState
-{
-    Unchecked,
-    Checked,
-    Indeterminate
-}
+/// <summary>Specifies the state of a check box</summary>
+public enum CheckState { Unchecked, Checked, Indeterminate }
+

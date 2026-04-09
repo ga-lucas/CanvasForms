@@ -354,6 +354,13 @@ public abstract class TextBoxBase : Control
     #region Methods
 
     /// <summary>
+    /// Returns the text to render, accounting for password masking or any other
+    /// display transformation. Override in derived classes (e.g. TextBox applies
+    /// CharacterCasing and PasswordChar; MaskedTextBox applies the mask pattern).
+    /// </summary>
+    protected virtual string GetDisplayText() => Text ?? string.Empty;
+
+    /// <summary>
     /// Appends text to the current text
     /// </summary>
     public void AppendText(string text)

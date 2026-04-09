@@ -21,8 +21,10 @@
             @ontouchend="HandleTouchEnd"
             tabindex="0"
             @onkeydown="HandleKeyDown"
+            @onkeydown:preventDefault="true"
             @onkeyup="HandleKeyUp"
             @onkeypress="HandleKeyPress"
+            @onkeypress:preventDefault="true"
             width="@Form.Width" 
             height="@Form.Height"
             style="position: absolute; 
@@ -1093,7 +1095,6 @@
     {
         if (Form == null) return;
 
-        // Update static modifier keys state
         UpdateModifierKeys(e.CtrlKey, e.ShiftKey, e.AltKey);
 
         var args = new Forms.KeyEventArgs(
@@ -1227,6 +1228,22 @@
             "ArrowRight" => Forms.Keys.Right,
             "ArrowDown" => Forms.Keys.Down,
             "Delete" => Forms.Keys.Delete,
+            "Insert" => Forms.Keys.Insert,
+            "Numpad0" => Forms.Keys.NumPad0,
+            "Numpad1" => Forms.Keys.NumPad1,
+            "Numpad2" => Forms.Keys.NumPad2,
+            "Numpad3" => Forms.Keys.NumPad3,
+            "Numpad4" => Forms.Keys.NumPad4,
+            "Numpad5" => Forms.Keys.NumPad5,
+            "Numpad6" => Forms.Keys.NumPad6,
+            "Numpad7" => Forms.Keys.NumPad7,
+            "Numpad8" => Forms.Keys.NumPad8,
+            "Numpad9" => Forms.Keys.NumPad9,
+            "NumpadAdd" => Forms.Keys.Add,
+            "NumpadSubtract" => Forms.Keys.Subtract,
+            "NumpadMultiply" => Forms.Keys.Multiply,
+            "NumpadDivide" => Forms.Keys.Divide,
+            "NumpadDecimal" => Forms.Keys.Decimal,
             "Digit0" => Forms.Keys.D0,
             "Digit1" => Forms.Keys.D1,
             "Digit2" => Forms.Keys.D2,

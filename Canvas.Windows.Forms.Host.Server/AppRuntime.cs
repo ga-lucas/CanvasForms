@@ -377,7 +377,8 @@ public sealed class AppRuntime : IDisposable
     }
 
     /// <summary>
-    /// Sends a mouse event to the current form.
+    /// Sends a mouse event to the current form, routing through the form's
+    /// normal hit-test and event dispatch so child controls receive events.
     /// </summary>
     public void SendMouseEvent(string eventType, int x, int y, int button)
     {
@@ -393,24 +394,7 @@ public sealed class AppRuntime : IDisposable
                 _ => MouseButtons.None
             };
 
-            var args = new MouseEventArgs(mouseButton, 1, x, y);
-
-            var methodName = eventType switch
-            {
-                "mousedown" => "OnMouseDown",
-                "mouseup" => "OnMouseUp",
-                "mousemove" => "OnMouseMove",
-                "click" => "OnMouseClick",
-                "dblclick" => "OnMouseDoubleClick",
-                _ => null
-            };
-
-            if (methodName != null)
-            {
-                var method = typeof(Control).GetMethod(methodName,
-                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-                method?.Invoke(_mainForm, new object[] { args });
-            }
+            _mainForm.DispatchMouseEvent(eventType, x, y, mouseButton);
         }
     }
 
@@ -425,29 +409,11 @@ public sealed class AppRuntime : IDisposable
 
             if (eventType == "keypress" && keyChar != '\0')
             {
-                var pressArgs = new KeyPressEventArgs(keyChar);
-                var method = typeof(Control).GetMethod("OnKeyPress",
-                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-                method?.Invoke(_mainForm, new object[] { pressArgs });
+                _mainForm.DispatchKeyPress(keyChar);
             }
             else
             {
-                var keys = (Keys)keyCode;
-                var args = new KeyEventArgs(keys, alt, ctrl, shift);
-
-                var methodName = eventType switch
-                {
-                    "keydown" => "OnKeyDown",
-                    "keyup" => "OnKeyUp",
-                    _ => null
-                };
-
-                if (methodName != null)
-                {
-                    var method = typeof(Control).GetMethod(methodName,
-                        BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-                    method?.Invoke(_mainForm, new object[] { args });
-                }
+                _mainForm.DispatchKeyEvent(eventType, (Keys)keyCode, alt, ctrl, shift);
             }
         }
     }

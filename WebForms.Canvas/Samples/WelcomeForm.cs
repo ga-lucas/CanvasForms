@@ -9,10 +9,8 @@ public class WelcomeForm : Form
     private Label? _titleLabel;
     private Label? _infoLabel;
     private Button? _btnDockingDemo;
-    private Button? _btnControlsDemo;
     private Button? _btnInteractive;
     private Button? _btnDrawingSample;
-    private Button? _btnListControl;
 
     public WelcomeForm()
     {
@@ -87,13 +85,56 @@ public class WelcomeForm : Form
         };
         Controls.Add(demosLabel);
 
-        // Docking Demo Button
+        // Row 1
+        var btnInputControls = new Button
+        {
+            Text = "Input Controls",
+            Left = 40,
+            Top = 170,
+            Width = 200,
+            Height = 50
+        };
+        btnInputControls.Click += (s, e) =>
+        {
+           Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<DemoInputControlsForm>();
+        };
+        Controls.Add(btnInputControls);
+
+        var btnSelectionControls = new Button
+        {
+            Text = "Selection Controls",
+            Left = 250,
+            Top = 170,
+            Width = 200,
+            Height = 50
+        };
+        btnSelectionControls.Click += (s, e) =>
+        {
+          Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<DemoSelectionControlsForm>();
+        };
+        Controls.Add(btnSelectionControls);
+
+        var btnCollectionControls = new Button
+        {
+            Text = "TreeView & ListView",
+            Left = 460,
+            Top = 170,
+            Width = 200,
+            Height = 50
+        };
+        btnCollectionControls.Click += (s, e) =>
+        {
+           Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<DemoCollectionControlsForm>();
+        };
+        Controls.Add(btnCollectionControls);
+
+        // Row 2
         _btnDockingDemo = new Button
         {
             Text = "Docking & Anchoring",
             Left = 40,
-            Top = 170,
-            Width = 280,
+            Top = 240,
+            Width = 200,
             Height = 50
         };
         _btnDockingDemo.Click += (s, e) =>
@@ -102,28 +143,12 @@ public class WelcomeForm : Form
         };
         Controls.Add(_btnDockingDemo);
 
-        // Controls Demo Button
-        _btnControlsDemo = new Button
-        {
-            Text = "Controls Demo",
-            Left = 360,
-            Top = 170,
-            Width = 280,
-            Height = 50
-        };
-        _btnControlsDemo.Click += (s, e) =>
-        {
-          Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<ControlsDemoForm>();
-        };
-        Controls.Add(_btnControlsDemo);
-
-        // Interactive Form Button
         _btnInteractive = new Button
         {
             Text = "Interactive Form",
-            Left = 40,
+            Left = 250,
             Top = 240,
-            Width = 280,
+            Width = 200,
             Height = 50
         };
         _btnInteractive.Click += (s, e) =>
@@ -132,13 +157,12 @@ public class WelcomeForm : Form
         };
         Controls.Add(_btnInteractive);
 
-        // Drawing Sample Button
         _btnDrawingSample = new Button
         {
             Text = "Drawing Sample",
-            Left = 360,
+            Left = 460,
             Top = 240,
-            Width = 280,
+            Width = 200,
             Height = 50
         };
         _btnDrawingSample.Click += (s, e) =>
@@ -146,21 +170,5 @@ public class WelcomeForm : Form
          Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<SampleDrawingForm>();
         };
         Controls.Add(_btnDrawingSample);
-
-
-        // ListControl
-        _btnListControl = new Button
-        {
-            Text = "ListBox Demo",
-            Left = 40,
-            Top = 310,
-            Width = 280,
-            Height = 50
-        };
-        _btnListControl.Click += (s, e) =>
-        {
-           Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<ListBoxDemoForm>();
-        };
-        Controls.Add(_btnListControl);
     }
 }

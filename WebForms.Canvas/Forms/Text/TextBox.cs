@@ -395,7 +395,7 @@ public class TextBox : TextBoxBase
         _scrollOffsetX = Math.Max(0, _scrollOffsetX);
     }
 
-    private string GetDisplayText()
+    protected override string GetDisplayText()
     {
         var text = Text ?? string.Empty;
 

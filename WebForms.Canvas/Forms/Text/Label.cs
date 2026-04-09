@@ -38,7 +38,7 @@ public class Label : Control
         base.OnPaint(e);
     }
 
-    private (int x, int y) GetTextPosition()
+    protected (int x, int y) GetTextPosition()
     {
         // Approximate character width and height
         const int charWidth = 7;

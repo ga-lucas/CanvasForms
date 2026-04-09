@@ -70,12 +70,39 @@ public struct Color
         return !left.Equals(right);
     }
 
-    // Common colors
+    // Common colors (standard .NET System.Drawing.Color named colors)
+    public static Color Transparent => FromArgb(0, 0, 0, 0);
     public static Color Black => FromArgb(0, 0, 0);
     public static Color White => FromArgb(255, 255, 255);
+
+    // Primary colors
     public static Color Red => FromArgb(255, 0, 0);
-    public static Color Green => FromArgb(0, 255, 0);
+    public static Color Green => FromArgb(0, 128, 0);  // Web color Green
     public static Color Blue => FromArgb(0, 0, 255);
     public static Color Yellow => FromArgb(255, 255, 0);
-    public static Color Transparent => FromArgb(0, 0, 0, 0);
+    public static Color Cyan => FromArgb(0, 255, 255);
+    public static Color Magenta => FromArgb(255, 0, 255);
+
+    // Grays
+    public static Color Gray => FromArgb(128, 128, 128);
+    public static Color DarkGray => FromArgb(169, 169, 169);
+    public static Color LightGray => FromArgb(211, 211, 211);
+    public static Color DimGray => FromArgb(105, 105, 105);
+    public static Color SlateGray => FromArgb(112, 128, 144);
+    public static Color DarkSlateGray => FromArgb(47, 79, 79);
+    public static Color LightSlateGray => FromArgb(119, 136, 153);
+
+    // Common web/UI colors
+    public static Color Orange => FromArgb(255, 165, 0);
+    public static Color Purple => FromArgb(128, 0, 128);
+    public static Color Brown => FromArgb(165, 42, 42);
+    public static Color Pink => FromArgb(255, 192, 203);
+    public static Color Lime => FromArgb(0, 255, 0);
+    public static Color Navy => FromArgb(0, 0, 128);
+    public static Color Teal => FromArgb(0, 128, 128);
+    public static Color Olive => FromArgb(128, 128, 0);
+    public static Color Maroon => FromArgb(128, 0, 0);
+    public static Color Silver => FromArgb(192, 192, 192);
+    public static Color Aqua => FromArgb(0, 255, 255);
+    public static Color Fuchsia => FromArgb(255, 0, 255);
 }
