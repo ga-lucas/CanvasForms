@@ -170,5 +170,59 @@ public class WelcomeForm : Form
          Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<SampleDrawingForm>();
         };
         Controls.Add(_btnDrawingSample);
+
+        // Links section
+        var linksLabel = new Label
+        {
+            Text = "Links:",
+            Left = 20,
+            Top = 310,
+            Width = 660,
+            Height = 25,
+            ForeColor = Color.FromArgb(60, 60, 60),
+            BackColor = Color.White
+        };
+        Controls.Add(linksLabel);
+
+        // GitHub link
+        var githubLink = new LinkLabel
+        {
+            Text = "View on GitHub",
+            LinkUrl = "https://github.com/ga-lucas/CanvasForms",
+            Left = 40,
+            Top = 340,
+            Width = 150,
+            Height = 20
+        };
+        githubLink.LinkClicked += (s, e) =>
+        {
+            // Optional: show a message when link is clicked
+            // The URL will be opened automatically
+        };
+        Controls.Add(githubLink);
+
+        // Documentation link
+        var docsLink = new LinkLabel
+        {
+            Text = "Documentation",
+            LinkUrl = "https://docs.microsoft.com/en-us/dotnet/desktop/winforms/",
+            Left = 200,
+            Top = 340,
+            Width = 150,
+            Height = 20
+        };
+        Controls.Add(docsLink);
+
+        // Example link
+        var exampleLink = new LinkLabel
+        {
+            Text = "WinForms Examples",
+            LinkUrl = "https://github.com/dotnet/winforms",
+            Left = 360,
+            Top = 340,
+            Width = 150,
+            Height = 20
+        };
+        Controls.Add(exampleLink);
     }
 }

@@ -18,16 +18,23 @@ public abstract class TextBoxBase : Control
     private bool _autoSize = true;
     private Font _font;
 
+    private int _measureRequestId;
+
     // Selection state
     protected int _selectionStart = 0;
     protected int _selectionLength = 0;
     protected int _caretPosition = 0;
+
+    // Selection helpers
+    private bool _isSelecting;
+    private int _selectionAnchor;
 
     // Scrolling
     protected int _scrollOffsetX = 0;
     protected int _scrollOffsetY = 0;
     private bool _acceptsReturn = false;
     private bool _acceptsTab = false;
+    private bool _shortcutsEnabled = true;
 
     // Undo/Redo
     private readonly Stack<string> _undoStack = new();
@@ -41,6 +48,16 @@ public abstract class TextBoxBase : Control
         BackColor = Color.White;
         ForeColor = Color.Black;
         _font = new Font("Arial", 12);
+    }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the standard shortcut commands are enabled.
+    /// (Ctrl+A/C/X/V/Z)
+    /// </summary>
+    public bool ShortcutsEnabled
+    {
+        get => _shortcutsEnabled;
+        set => _shortcutsEnabled = value;
     }
 
     #region Properties
@@ -311,6 +328,7 @@ public abstract class TextBoxBase : Control
         set
         {
             _selectionLength = Math.Max(0, Math.Min(Text.Length - _selectionStart, value));
+            _caretPosition = Math.Max(0, Math.Min(Text.Length, _selectionStart + _selectionLength));
             Invalidate();
         }
     }
@@ -324,7 +342,65 @@ public abstract class TextBoxBase : Control
         set
         {
             _selectionStart = Math.Max(0, Math.Min(Text.Length, value));
+            _caretPosition = Math.Max(0, Math.Min(Text.Length, _selectionStart + _selectionLength));
             Invalidate();
+        }
+    }
+
+    protected override void OnTextChanged(EventArgs e)
+    {
+        // Ensure caret/selection are always within range after programmatic Text changes.
+        var len = Text?.Length ?? 0;
+        _selectionStart = Math.Max(0, Math.Min(len, _selectionStart));
+        _selectionLength = Math.Max(0, Math.Min(len - _selectionStart, _selectionLength));
+        _caretPosition = Math.Max(0, Math.Min(len, _caretPosition));
+
+        // Prime JS text measurement cache so caret placement and scroll calculations
+        // are accurate even when Text is set programmatically (initial values).
+        var requestId = System.Threading.Interlocked.Increment(ref _measureRequestId);
+        _ = MeasureTextForCacheAsync(requestId);
+
+        base.OnTextChanged(e);
+    }
+
+    protected internal override void OnGotFocus(EventArgs e)
+    {
+        var requestId = System.Threading.Interlocked.Increment(ref _measureRequestId);
+        _ = MeasureTextForCacheAsync(requestId);
+        base.OnGotFocus(e);
+    }
+
+    private async Task MeasureTextForCacheAsync(int requestId)
+    {
+        var measureService = (Parent as Form)?.TextMeasurementService;
+        if (measureService == null) return;
+
+        var displayText = GetDisplayText();
+        if (string.IsNullOrEmpty(displayText)) return;
+
+        try
+        {
+            await measureService.MeasureTextAsync(displayText, Font.Family, (int)Font.Size);
+
+            var caret = Math.Max(0, Math.Min(_caretPosition, displayText.Length));
+            if (caret > 0)
+            {
+                await measureService.MeasureTextAsync(displayText.Substring(0, caret), Font.Family, (int)Font.Size);
+            }
+        }
+        catch
+        {
+            // Best-effort cache priming; rendering will fall back to estimation.
+        }
+        finally
+        {
+            // Only refresh if this is the latest measurement request and we're focused.
+            if (requestId == System.Threading.Volatile.Read(ref _measureRequestId)
+                && Parent is Form form
+                && form.FocusedControl == this)
+            {
+                Invalidate();
+            }
         }
     }
 
@@ -850,6 +926,660 @@ public abstract class TextBoxBase : Control
 
     // Simple static clipboard - in a real implementation this would use the system clipboard
     private static string ClipboardText { get; set; } = string.Empty;
+
+    #endregion
+
+    #region Painting
+
+    /// <summary>
+    /// Paints the text box control
+    /// </summary>
+    protected internal override void OnPaint(PaintEventArgs e)
+    {
+        var g = e.Graphics;
+        var bounds = new Rectangle(0, 0, Width, Height);
+        var borderWidth = GetBorderWidth();
+
+        // Check if we have focus
+        var hasFocus = Parent is Form form && form.FocusedControl == this;
+
+        // Draw background
+        DrawBackground(g, bounds);
+
+        // Draw border
+        DrawBorder(g, bounds, hasFocus);
+
+        // Get display text
+        var displayText = GetDisplayText();
+
+        const int textPadding = 3;
+        var textBounds = new Rectangle(
+            borderWidth + textPadding,
+            borderWidth + textPadding,
+            Width - (borderWidth * 2) - (textPadding * 2),
+            Height - (borderWidth * 2) - (textPadding * 2)
+        );
+
+        // Get text measurement service
+        var measureService = (Parent as Form)?.TextMeasurementService;
+
+        // Clip text/caret to the text area so scrolled content doesn't draw outside the control.
+        // Note: Graphics.SetClip must respect the current TranslateTransform applied by Form.
+        g.Save();
+        g.SetClip(textBounds);
+
+        // Draw text
+        if (!string.IsNullOrEmpty(displayText))
+        {
+            DrawTextContent(g, displayText, textBounds, hasFocus, measureService);
+        }
+
+        // Draw caret if focused
+        if (hasFocus && Enabled && _selectionLength == 0)
+        {
+            DrawCaret(g, displayText, textBounds, measureService);
+        }
+
+        g.Restore();
+
+        base.OnPaint(e);
+    }
+
+    #endregion
+
+    #region Mouse Input
+
+    protected internal override void OnMouseDown(MouseEventArgs e)
+    {
+        if (!Enabled)
+        {
+            base.OnMouseDown(e);
+            return;
+        }
+
+        if (e.Button == MouseButtons.Left)
+        {
+            var displayText = GetDisplayText();
+            var borderWidth = GetBorderWidth();
+            const int textPadding = 3;
+            var textBounds = new Rectangle(
+                borderWidth + textPadding,
+                borderWidth + textPadding,
+                Width - (borderWidth * 2) - (textPadding * 2),
+                Height - (borderWidth * 2) - (textPadding * 2)
+            );
+
+            var measureService = (Parent as Form)?.TextMeasurementService;
+
+            if (TryGetCharIndexFromMouse(new Point(e.X, e.Y), textBounds, displayText, measureService, out var index))
+            {
+                _caretPosition = index;
+                _selectionAnchor = index;
+                _selectionStart = index;
+                _selectionLength = 0;
+                _isSelecting = true;
+                Invalidate();
+            }
+        }
+
+        base.OnMouseDown(e);
+    }
+
+    protected internal override void OnMouseMove(MouseEventArgs e)
+    {
+        if (!Enabled)
+        {
+            base.OnMouseMove(e);
+            return;
+        }
+
+        if (_isSelecting)
+        {
+            var displayText = GetDisplayText();
+            var borderWidth = GetBorderWidth();
+            const int textPadding = 3;
+            var textBounds = new Rectangle(
+                borderWidth + textPadding,
+                borderWidth + textPadding,
+                Width - (borderWidth * 2) - (textPadding * 2),
+                Height - (borderWidth * 2) - (textPadding * 2)
+            );
+
+            var measureService = (Parent as Form)?.TextMeasurementService;
+
+            if (TryGetCharIndexFromMouse(new Point(e.X, e.Y), textBounds, displayText, measureService, out var index))
+            {
+                _caretPosition = index;
+
+                var start = Math.Min(_selectionAnchor, index);
+                var end = Math.Max(_selectionAnchor, index);
+                _selectionStart = start;
+                _selectionLength = end - start;
+                Invalidate();
+            }
+        }
+
+        base.OnMouseMove(e);
+    }
+
+    protected internal override void OnMouseUp(MouseEventArgs e)
+    {
+        _isSelecting = false;
+        base.OnMouseUp(e);
+    }
+
+    protected virtual bool TryGetCharIndexFromMouse(Point pt, Rectangle textBounds, string displayText, TextMeasurementService? measureService, out int index)
+    {
+        index = 0;
+
+        if (pt.X < textBounds.X || pt.X >= textBounds.Right || pt.Y < textBounds.Y || pt.Y >= textBounds.Bottom)
+        {
+            return false;
+        }
+
+        // Default implementation maps directly from point to char index.
+        index = GetCharIndexFromPosition(pt);
+        return true;
+    }
+
+    #endregion
+
+    #region Keyboard Input
+
+    protected internal override void OnKeyDown(KeyEventArgs e)
+    {
+        if (!Enabled)
+        {
+            base.OnKeyDown(e);
+            return;
+        }
+
+        // Handle editing/navigation keys here (not KeyPress) because browsers often suppress
+        // keypress for non-printable keys (Backspace, Delete, Enter, Tab).
+        var handled = false;
+
+        // Shortcuts (WinForms-like)
+        if (!_shortcutsEnabled && e.Control &&
+            (e.KeyCode == Keys.A || e.KeyCode == Keys.C || e.KeyCode == Keys.X ||
+             e.KeyCode == Keys.V || e.KeyCode == Keys.Z))
+        {
+            e.Handled = true;
+            base.OnKeyDown(e);
+            return;
+        }
+
+        if (e.Control)
+        {
+            switch (e.KeyCode)
+            {
+                case Keys.A:
+                    SelectAll();
+                    e.Handled = true;
+                    return;
+                case Keys.C:
+                    Copy();
+                    e.Handled = true;
+                    return;
+                case Keys.X:
+                    Cut();
+                    e.Handled = true;
+                    return;
+                case Keys.V:
+                    Paste();
+                    e.Handled = true;
+                    return;
+                case Keys.Z:
+                    Undo();
+                    e.Handled = true;
+                    return;
+            }
+        }
+
+        switch (e.KeyCode)
+        {
+            case Keys.Tab:
+                if (_acceptsTab && !_readOnly)
+                {
+                    InsertText("\t");
+                    handled = true;
+                }
+                break;
+
+            case Keys.Enter:
+                if (_acceptsReturn && _multiline && !_readOnly)
+                {
+                    InsertText(Environment.NewLine);
+                    handled = true;
+                }
+                break;
+
+            case Keys.Left:
+                if (e.Control)
+                {
+                    MoveCaretTo(GetPreviousWordPosition(), e.Shift);
+                }
+                else
+                {
+                    MoveCaretBy(-1, e.Shift);
+                }
+                handled = true;
+                Invalidate();
+                break;
+
+            case Keys.Right:
+                if (e.Control)
+                {
+                    MoveCaretTo(GetNextWordPosition(), e.Shift);
+                }
+                else
+                {
+                    MoveCaretBy(1, e.Shift);
+                }
+                handled = true;
+                Invalidate();
+                break;
+
+            case Keys.Home:
+                MoveCaretTo(0, e.Shift);
+                handled = true;
+                Invalidate();
+                break;
+
+            case Keys.End:
+                MoveCaretTo(Text.Length, e.Shift);
+                handled = true;
+                Invalidate();
+                break;
+
+            case Keys.Back:
+                if (!_readOnly)
+                {
+                    if (_selectionLength > 0)
+                    {
+                        SaveUndoState();
+                        SelectedText = string.Empty;
+                    }
+                    else if (_caretPosition > 0)
+                    {
+                        SaveUndoState();
+                        Text = Text.Remove(_caretPosition - 1, 1);
+                        _caretPosition--;
+                        _modified = true;
+                        OnTextChanged(EventArgs.Empty);
+                    }
+                    handled = true;
+                    Invalidate();
+                }
+                break;
+
+            case Keys.Delete:
+                if (!_readOnly)
+                {
+                    if (_selectionLength > 0)
+                    {
+                        SaveUndoState();
+                        SelectedText = string.Empty;
+                    }
+                    else if (_caretPosition < Text.Length)
+                    {
+                        SaveUndoState();
+                        Text = Text.Remove(_caretPosition, 1);
+                        _modified = true;
+                        OnTextChanged(EventArgs.Empty);
+                    }
+                    handled = true;
+                    Invalidate();
+                }
+                break;
+        }
+
+        if (handled)
+        {
+            e.Handled = true;
+            return;
+        }
+
+        base.OnKeyDown(e);
+    }
+
+    private void MoveCaretBy(int delta, bool extendSelection)
+    {
+        var newCaret = Math.Max(0, Math.Min(Text.Length, _caretPosition + delta));
+        MoveCaretTo(newCaret, extendSelection);
+    }
+
+    private void MoveCaretTo(int newCaret, bool extendSelection)
+    {
+        newCaret = Math.Max(0, Math.Min(Text.Length, newCaret));
+
+        if (extendSelection)
+        {
+            if (_selectionLength == 0)
+            {
+                _selectionAnchor = _caretPosition;
+            }
+
+            _caretPosition = newCaret;
+            var start = Math.Min(_selectionAnchor, _caretPosition);
+            var end = Math.Max(_selectionAnchor, _caretPosition);
+            _selectionStart = start;
+            _selectionLength = end - start;
+        }
+        else
+        {
+            _caretPosition = newCaret;
+            _selectionAnchor = newCaret;
+            _selectionStart = newCaret;
+            _selectionLength = 0;
+        }
+    }
+
+    private int GetPreviousWordPosition()
+    {
+        if (_caretPosition == 0) return 0;
+
+        var pos = _caretPosition - 1;
+
+        // Skip whitespace
+        while (pos > 0 && char.IsWhiteSpace(Text[pos]))
+            pos--;
+
+        // Skip word characters
+        while (pos > 0 && !char.IsWhiteSpace(Text[pos - 1]))
+            pos--;
+
+        return pos;
+    }
+
+    private int GetNextWordPosition()
+    {
+        if (_caretPosition >= Text.Length) return Text.Length;
+
+        var pos = _caretPosition;
+
+        // Skip current word
+        while (pos < Text.Length && !char.IsWhiteSpace(Text[pos]))
+            pos++;
+
+        // Skip whitespace
+        while (pos < Text.Length && char.IsWhiteSpace(Text[pos]))
+            pos++;
+
+        return pos;
+    }
+
+    protected internal override void OnKeyPress(KeyPressEventArgs e)
+    {
+        if (_readOnly || !Enabled)
+        {
+            base.OnKeyPress(e);
+            return;
+        }
+
+        var c = e.KeyChar;
+
+        if (!char.IsControl(c))
+        {
+            InsertText(c.ToString());
+            e.Handled = true;
+            return;
+        }
+
+        base.OnKeyPress(e);
+    }
+
+    private void InsertText(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return;
+
+        if (_maxLength > 0)
+        {
+            var currentLength = Text.Length - _selectionLength;
+            var remaining = _maxLength - currentLength;
+            if (remaining <= 0) return;
+            if (text.Length > remaining)
+            {
+                text = text.Substring(0, remaining);
+            }
+        }
+
+        SaveUndoState();
+
+        if (_selectionLength > 0)
+        {
+            Text = Text.Remove(_selectionStart, _selectionLength);
+            _caretPosition = _selectionStart;
+            _selectionLength = 0;
+        }
+
+        Text = Text.Insert(_caretPosition, text);
+        _caretPosition += text.Length;
+        _selectionStart = _caretPosition;
+        _selectionLength = 0;
+        _modified = true;
+        OnTextChanged(EventArgs.Empty);
+        Invalidate();
+    }
+
+    /// <summary>
+    /// Draws the background of the control
+    /// </summary>
+    protected virtual void DrawBackground(Graphics g, Rectangle bounds)
+    {
+        var bgColor = Enabled ? BackColor : Color.FromArgb(240, 240, 240);
+        using var bgBrush = new SolidBrush(bgColor);
+        g.FillRectangle(bgBrush, bounds);
+    }
+
+    /// <summary>
+    /// Draws the border of the control
+    /// </summary>
+    protected virtual void DrawBorder(Graphics g, Rectangle bounds, bool hasFocus)
+    {
+        switch (_borderStyle)
+        {
+            case BorderStyle.FixedSingle:
+            case BorderStyle.Fixed3D:
+                {
+                    var borderColor = hasFocus ? Color.FromArgb(0, 120, 215) : Color.FromArgb(122, 122, 122);
+                    using var pen = new Pen(borderColor);
+                    g.DrawRectangle(pen, bounds);
+                }
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Draws the text content - override in derived classes for custom rendering
+    /// </summary>
+    protected virtual void DrawTextContent(Graphics g, string displayText, Rectangle textBounds, bool hasFocus, TextMeasurementService? measureService)
+    {
+        var textColor = Enabled ? ForeColor : Color.FromArgb(109, 109, 109);
+
+        if (_multiline)
+        {
+            DrawMultilineText(g, displayText, textBounds, textColor, hasFocus, measureService);
+        }
+        else
+        {
+            DrawSingleLineText(g, displayText, textBounds, textColor, hasFocus, measureService);
+        }
+    }
+
+    /// <summary>
+    /// Draws single-line text with selection
+    /// </summary>
+    protected virtual void DrawSingleLineText(Graphics g, string displayText, Rectangle textBounds, Color textColor, bool hasFocus, TextMeasurementService? measureService)
+    {
+        var textX = textBounds.X - _scrollOffsetX;
+        var textY = textBounds.Y;
+
+        // Draw selection if any
+        if (_selectionLength > 0 && hasFocus && measureService != null)
+        {
+            DrawTextWithSelection(g, displayText, textX, textY, textColor, measureService);
+        }
+        else
+        {
+            g.DrawString(displayText, _font, textColor, textX, textY);
+        }
+    }
+
+    /// <summary>
+    /// Draws multiline text with selection
+    /// </summary>
+    protected virtual void DrawMultilineText(Graphics g, string displayText, Rectangle textBounds, Color textColor, bool hasFocus, TextMeasurementService? measureService)
+    {
+        var lines = displayText.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+        var lineHeight = (int)_font.Size + 4;
+        var y = textBounds.Y - _scrollOffsetY;
+
+        for (int i = 0; i < lines.Length; i++)
+        {
+            if (y + lineHeight < textBounds.Y) // Above visible area
+            {
+                y += lineHeight;
+                continue;
+            }
+
+            if (y > textBounds.Bottom) // Below visible area
+                break;
+
+            var line = lines[i];
+            var x = textBounds.X - _scrollOffsetX;
+
+            // Check if this line contains selection
+            if (hasFocus && _selectionLength > 0 && measureService != null)
+            {
+                var lineStart = GetFirstCharIndexFromLine(i);
+                var lineEnd = lineStart + line.Length;
+                var selStart = _selectionStart;
+                var selEnd = _selectionStart + _selectionLength;
+
+                if (selEnd > lineStart && selStart < lineEnd)
+                {
+                    // This line has selection
+                    var selLineStart = Math.Max(0, selStart - lineStart);
+                    var selLineEnd = Math.Min(line.Length, selEnd - lineStart);
+
+                    var textBefore = selLineStart > 0 ? line.Substring(0, selLineStart) : "";
+                    var textSelected = line.Substring(selLineStart, selLineEnd - selLineStart);
+                    var textAfter = selLineEnd < line.Length ? line.Substring(selLineEnd) : "";
+
+                    var widthBefore = measureService.MeasureTextEstimate(textBefore, _font.Family, (int)_font.Size);
+                    var widthSelected = measureService.MeasureTextEstimate(textSelected, _font.Family, (int)_font.Size);
+
+                    // Draw selection background
+                    using var selBrush = new SolidBrush(Color.FromArgb(0, 120, 215));
+                    g.FillRectangle(selBrush, x + widthBefore, y, widthSelected, lineHeight);
+
+                    // Draw text parts
+                    if (!string.IsNullOrEmpty(textBefore))
+                        g.DrawString(textBefore, _font, textColor, x, y);
+
+                    if (!string.IsNullOrEmpty(textSelected))
+                        g.DrawString(textSelected, _font, Color.White, x + widthBefore, y);
+
+                    if (!string.IsNullOrEmpty(textAfter))
+                        g.DrawString(textAfter, _font, textColor, x + widthBefore + widthSelected, y);
+
+                    y += lineHeight;
+                    continue;
+                }
+            }
+
+            // No selection on this line
+            g.DrawString(line, _font, textColor, x, y);
+            y += lineHeight;
+        }
+    }
+
+    /// <summary>
+    /// Draws text with selection highlighting
+    /// </summary>
+    protected virtual void DrawTextWithSelection(Graphics g, string displayText, int textX, int textY, Color textColor, TextMeasurementService measureService)
+    {
+        if (_selectionStart >= displayText.Length)
+        {
+            g.DrawString(displayText, _font, textColor, textX, textY);
+            return;
+        }
+
+        var selEnd = Math.Min(_selectionStart + _selectionLength, displayText.Length);
+        var textBeforeSelection = _selectionStart > 0 ? displayText.Substring(0, _selectionStart) : "";
+        var selectedText = displayText.Substring(_selectionStart, selEnd - _selectionStart);
+        var textAfterSelection = selEnd < displayText.Length ? displayText.Substring(selEnd) : "";
+
+        var widthBefore = measureService.MeasureTextEstimate(textBeforeSelection, _font.Family, (int)_font.Size);
+        var widthSelected = measureService.MeasureTextEstimate(selectedText, _font.Family, (int)_font.Size);
+
+        // Draw selection background
+        using var selBrush = new SolidBrush(Color.FromArgb(0, 120, 215));
+        g.FillRectangle(selBrush, textX + widthBefore, textY, widthSelected, Height - 6);
+
+        // Draw text parts
+        if (!string.IsNullOrEmpty(textBeforeSelection))
+            g.DrawString(textBeforeSelection, _font, textColor, textX, textY);
+
+        if (!string.IsNullOrEmpty(selectedText))
+            g.DrawString(selectedText, _font, Color.White, textX + widthBefore, textY);
+
+        if (!string.IsNullOrEmpty(textAfterSelection))
+            g.DrawString(textAfterSelection, _font, textColor, textX + widthBefore + widthSelected, textY);
+    }
+
+    /// <summary>
+    /// Draws the caret (cursor) at the current position
+    /// </summary>
+    protected virtual void DrawCaret(Graphics g, string displayText, Rectangle textBounds, TextMeasurementService? measureService)
+    {
+        if (measureService == null) return;
+
+        if (_multiline)
+        {
+            // Multiline caret
+            var lineNumber = GetLineFromCharIndex(_caretPosition);
+            var lineStart = GetFirstCharIndexFromLine(lineNumber);
+            var posInLine = _caretPosition - lineStart;
+            var lines = Lines;
+
+            if (lineNumber < lines.Length)
+            {
+                var line = lines[lineNumber];
+                var textBeforeCaret = posInLine > 0 && posInLine <= line.Length ? line.Substring(0, posInLine) : "";
+                var width = measureService.MeasureTextEstimate(textBeforeCaret, _font.Family, (int)_font.Size);
+                var lineHeight = (int)_font.Size + 4;
+
+                var caretX = textBounds.X + width - _scrollOffsetX;
+                var caretY = textBounds.Y + (lineNumber * lineHeight) - _scrollOffsetY;
+
+                // Only draw if visible
+                if (caretX >= textBounds.X && caretX <= textBounds.Right &&
+                    caretY >= textBounds.Y && caretY + lineHeight <= textBounds.Bottom)
+                {
+                    using var pen = new Pen(Color.Black, 1);
+                    g.DrawLine(pen, caretX, caretY, caretX, caretY + lineHeight);
+                }
+            }
+        }
+        else
+        {
+            // Single line caret
+            var textBeforeCaret = _caretPosition > 0 && _caretPosition <= displayText.Length
+                ? displayText.Substring(0, _caretPosition)
+                : "";
+
+            var width = measureService.MeasureTextEstimate(textBeforeCaret, _font.Family, (int)_font.Size);
+            var caretX = textBounds.X + width - _scrollOffsetX;
+
+            // Only draw if visible
+            if (caretX >= textBounds.X && caretX <= textBounds.Right)
+            {
+                using var pen = new Pen(Color.Black, 1);
+                g.DrawLine(pen, caretX, textBounds.Y, caretX, textBounds.Bottom);
+            }
+        }
+    }
 
     #endregion
 }

@@ -41,7 +41,26 @@ mimeProvider.Mappings[".dll"]  = "application/octet-stream";
 app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = app.Environment.WebRootFileProvider,
-    ContentTypeProvider = mimeProvider
+    ContentTypeProvider = mimeProvider,
+    OnPrepareResponse = ctx =>
+    {
+        // In development, disable caching to ensure fresh files on every request
+        if (app.Environment.IsDevelopment())
+        {
+            ctx.Context.Response.Headers.CacheControl = "no-cache, no-store, must-revalidate";
+            ctx.Context.Response.Headers.Pragma = "no-cache";
+            ctx.Context.Response.Headers.Expires = "0";
+        }
+        else
+        {
+            // In production, use versioned/fingerprinted URLs with long cache
+            var path = ctx.File.PhysicalPath;
+            if (path?.Contains("_framework") == true)
+            {
+                ctx.Context.Response.Headers.CacheControl = "public, max-age=31536000, immutable";
+            }
+        }
+    }
 });
 
 // Wire up desktop change notifications via SignalR

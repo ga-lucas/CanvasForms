@@ -563,47 +563,48 @@ public class DateTimePicker : Control
             g.FillRectangle(bg, bounds);
         }
 
-        using (var borderPen = new Pen(Color.FromArgb(122, 122, 122)))
+        using (var borderPen = new Pen(Color.FromArgb(171, 171, 171)))
         {
             g.DrawRectangle(borderPen, bounds);
         }
 
-        // Header
-        var headerRect = new Rectangle(bounds.X + CalendarPadding, bounds.Y + CalendarPadding, bounds.Width - (CalendarPadding * 2), CalendarHeaderHeight);
-        using (var headerBrush = new SolidBrush(Color.FromArgb(240, 240, 240)))
+        // Header (blue background like MonthCalendar)
+        var headerRect = new Rectangle(bounds.X, bounds.Y, bounds.Width, CalendarHeaderHeight + CalendarPadding);
+        using (var headerBrush = new SolidBrush(Color.FromArgb(0, 120, 215)))
         {
             g.FillRectangle(headerBrush, headerRect);
         }
 
-        // Prev/Next buttons
-        var prevRect = new Rectangle(headerRect.X + 4, headerRect.Y + 2, 24, headerRect.Height - 4);
-        var nextRect = new Rectangle(headerRect.Right - 28, headerRect.Y + 2, 24, headerRect.Height - 4);
-        DrawNavButton(g, prevRect, left: true);
-        DrawNavButton(g, nextRect, left: false);
+        // Month text (centered)
+        var monthText = _displayMonth.ToString("MMMM yyyy");
+        var monthTextWidth = monthText.Length * 7;
+        var monthX = bounds.X + (bounds.Width - monthTextWidth) / 2;
+        using (var headerTextBrush = new SolidBrush(Color.White))
+        {
+            g.DrawString(monthText, "Arial", 12, headerTextBrush, monthX, bounds.Y + 5);
+        }
 
-        // Month text (centered between navigation buttons)
-        var monthText = _displayMonth.ToString("Y", CultureInfo.CurrentCulture);
-        var monthTextWidth = monthText.Length * 7; // Approximate
-        var titleAreaX = prevRect.Right + 4;
-        var titleAreaWidth = nextRect.X - 4 - titleAreaX;
-        var monthX = titleAreaX + Math.Max(0, (titleAreaWidth - monthTextWidth) / 2);
-        g.DrawString(monthText, Font.Family, Math.Max(1, (int)Font.Size), new SolidBrush(Color.Black), monthX, headerRect.Y + 3);
+        // Prev/Next arrows (use symbols like MonthCalendar)
+        using (var arrowBrush = new SolidBrush(Color.FromArgb(200, 230, 255)))
+        {
+            g.DrawString("◄", "Arial", 11, arrowBrush, bounds.X + 6, bounds.Y + 5);
+            g.DrawString("►", "Arial", 11, arrowBrush, bounds.Right - 18, bounds.Y + 5);
+        }
 
         // Day-of-week header
         var dowRect = new Rectangle(gridOriginX, headerRect.Bottom, gridWidth, CalendarDayHeaderHeight);
-        using (var dowBrush = new SolidBrush(Color.FromArgb(250, 250, 250)))
-        {
-            g.FillRectangle(dowBrush, dowRect);
-        }
 
         var dayNames = CultureInfo.CurrentCulture.DateTimeFormat.ShortestDayNames;
         var firstDayOfWeek = (int)CultureInfo.CurrentCulture.DateTimeFormat.FirstDayOfWeek;
-        for (int col = 0; col < 7; col++)
+        using (var dayHeaderBrush = new SolidBrush(Color.FromArgb(0, 90, 158)))
         {
-            var idx = (firstDayOfWeek + col) % 7;
-            var name = dayNames[idx];
-            var x = dowRect.X + (col * CalendarCellSize) + 5;
-            g.DrawString(name, Font.Family, Math.Max(1, (int)(Font.Size - 1)), new SolidBrush(Color.FromArgb(64, 64, 64)), x, dowRect.Y + 1);
+            for (int col = 0; col < 7; col++)
+            {
+                var idx = (firstDayOfWeek + col) % 7;
+                var name = dayNames[idx];
+                var x = dowRect.X + (col * CalendarCellSize) + (CalendarCellSize - name.Length * 7) / 2;
+                g.DrawString(name, "Arial", 10, dayHeaderBrush, x, dowRect.Y + 2);
+            }
         }
 
         // Grid
@@ -658,9 +659,11 @@ public class DateTimePicker : Control
 
             var textColor = isSelected
                 ? Color.White
-                : (isEnabledDay ? Color.Black : Color.FromArgb(160, 160, 160));
+                : (isEnabledDay ? ForeColor : Color.FromArgb(160, 160, 160));
 
-            g.DrawString(day.ToString(CultureInfo.InvariantCulture), Font.Family, Math.Max(1, (int)Font.Size), new SolidBrush(textColor), cellRect.X + 6, cellRect.Y + 4);
+            using var dayBrush = new SolidBrush(textColor);
+            var numX = cellRect.X + (cellRect.Width - day.ToString().Length * 7) / 2;
+            g.DrawString(day.ToString(CultureInfo.InvariantCulture), "Arial", 11, dayBrush, numX, cellRect.Y + 2);
 
             // Keyboard focus rectangle around the selected day when the control has focus.
             if (Focused && DroppedDown && isSelected)
@@ -685,40 +688,30 @@ public class DateTimePicker : Control
 
     private static void DrawNavButton(Graphics g, Rectangle rect, bool left)
     {
-        using var pen = new Pen(Color.FromArgb(64, 64, 64), 2);
-        var midY = rect.Y + rect.Height / 2;
-        if (left)
-        {
-            g.DrawLine(pen, rect.Right - 8, midY - 5, rect.X + 8, midY);
-            g.DrawLine(pen, rect.X + 8, midY, rect.Right - 8, midY + 5);
-        }
-        else
-        {
-            g.DrawLine(pen, rect.X + 8, midY - 5, rect.Right - 8, midY);
-            g.DrawLine(pen, rect.Right - 8, midY, rect.X + 8, midY + 5);
-        }
+        // Not used anymore - arrows are drawn as text symbols in header
     }
 
     private bool HandleCalendarMouseDown(int x, int y)
     {
         // coordinates relative to dropdown bounds (y starts at 0)
         var bounds = GetDropDownBounds();
-        var headerRect = new Rectangle(CalendarPadding, CalendarPadding, bounds.Width - (CalendarPadding * 2), CalendarHeaderHeight);
-        var prevRect = new Rectangle(headerRect.X + 4, headerRect.Y + 2, 24, headerRect.Height - 4);
-        var nextRect = new Rectangle(headerRect.Right - 28, headerRect.Y + 2, 24, headerRect.Height - 4);
+        var headerHeight = CalendarHeaderHeight + CalendarPadding;
 
-        if (x >= prevRect.X && x < prevRect.Right && y >= prevRect.Y && y < prevRect.Bottom)
+        // Check for prev/next month navigation (entire left/right areas of header)
+        if (y < headerHeight)
         {
-            _displayMonth = _displayMonth.AddMonths(-1);
-            Invalidate();
-            return true;
-        }
-
-        if (x >= nextRect.X && x < nextRect.Right && y >= nextRect.Y && y < nextRect.Bottom)
-        {
-            _displayMonth = _displayMonth.AddMonths(1);
-            Invalidate();
-            return true;
+            if (x < 20)
+            {
+                _displayMonth = _displayMonth.AddMonths(-1);
+                Invalidate();
+                return true;
+            }
+            else if (x > bounds.Width - 20)
+            {
+                _displayMonth = _displayMonth.AddMonths(1);
+                Invalidate();
+                return true;
+            }
         }
 
         var day = HitTestDay(x, y);
@@ -740,9 +733,8 @@ public class DateTimePicker : Control
     private int HitTestDay(int x, int y)
     {
         var bounds = GetDropDownBounds();
-        var headerTop = CalendarPadding;
-        var dowTop = headerTop + CalendarHeaderHeight;
-        var gridTop = dowTop + CalendarDayHeaderHeight;
+        var headerHeight = CalendarHeaderHeight + CalendarPadding;
+        var gridTop = headerHeight + CalendarDayHeaderHeight;
 
         if (y < gridTop) return -1;
 

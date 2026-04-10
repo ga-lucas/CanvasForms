@@ -14,6 +14,56 @@ const failedImages = new Set();
 const __measureCanvas = document.createElement('canvas');
 const __measureCtx = __measureCanvas.getContext('2d');
 
+// Track which canvases have been setup to avoid duplicate listeners
+const setupCanvases = new WeakSet();
+
+// Ensure canvas receives focus for keyboard input
+window.ensureCanvasFocus = function(canvas) {
+    if (!canvas) return;
+
+    // Focus the canvas if it's not already focused
+    if (document.activeElement !== canvas) {
+        canvas.focus({ preventScroll: true });
+    }
+};
+
+// Setup keyboard event handling for a canvas element
+window.setupCanvasKeyboardHandling = function(canvas) {
+    if (!canvas) return;
+
+    // Prevent duplicate setup
+    if (setupCanvases.has(canvas)) {
+        return;
+    }
+    setupCanvases.add(canvas);
+
+    // Ensure canvas is focusable
+    if (!canvas.hasAttribute('tabindex')) {
+        canvas.setAttribute('tabindex', '0');
+    }
+
+    // Focus canvas when clicked (use passive listener to not interfere with Blazor)
+    canvas.addEventListener('mousedown', () => {
+        ensureCanvasFocus(canvas);
+    }, { passive: true });
+
+    // Prevent default for navigation keys to keep them in the app
+    canvas.addEventListener('keydown', (e) => {
+        // Prevent browser default for navigation keys
+        const navigationKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter', 'Escape', 'Home', 'End', 'PageUp', 'PageDown', 'Space'];
+
+        if (navigationKeys.includes(e.key)) {
+            e.preventDefault();
+        }
+
+        // Backspace and Delete - prevent ONLY to stop browser back navigation
+        // But DON'T use capture phase, so Blazor gets the event first
+        if (e.key === 'Backspace' || e.key === 'Delete') {
+            e.preventDefault();
+        }
+    }, { capture: false }); // Changed to non-capture so Blazor handles it first
+};
+
 // Preload an image into cache without drawing
 window.preloadImage = async function(imageUrl) {
     if (!imageUrl || imageUrl.trim() === '') {

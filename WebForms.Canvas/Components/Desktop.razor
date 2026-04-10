@@ -72,6 +72,9 @@
     {
         // Initialize FormManager with state update callback
         _formManager = new FormManager(() => InvokeAsync(StateHasChanged));
+
+        // Initialize BrowserNavigationService with JSRuntime
+        Canvas.Windows.Forms.BrowserNavigationService.JSRuntime = JSRuntime;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

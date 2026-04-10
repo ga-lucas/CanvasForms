@@ -4,8 +4,18 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <!-- .NET 10 Preview workaround: disable static asset fingerprinting that causes broken manifests -->
+  </PropertyGroup>
+
+  <!-- Only enable fingerprinting in Release builds -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <StaticWebAssetsFingerprintContent>true</StaticWebAssetsFingerprintContent>
+    <BlazorCacheBootResources>true</BlazorCacheBootResources>
+  </PropertyGroup>
+
+  <!-- Disable fingerprinting in Debug for faster development -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
     <StaticWebAssetsFingerprintContent>false</StaticWebAssetsFingerprintContent>
+    <BlazorCacheBootResources>false</BlazorCacheBootResources>
   </PropertyGroup>
 
   <ItemGroup>

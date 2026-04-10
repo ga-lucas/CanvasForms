@@ -1,4 +1,5 @@
 using Canvas.Windows.Forms.Drawing;
+using Microsoft.JSInterop;
 
 namespace System.Windows.Forms;
 
@@ -9,12 +10,23 @@ public class LinkLabel : Label
 {
     private bool _isHovered = false;
     private bool _isVisited = false;
+    private string _linkUrl = string.Empty;
 
     public LinkLabel()
     {
         ForeColor = Color.FromArgb(0, 0, 255);
         Cursor = Cursor.Hand;
         TabStop = true;
+    }
+
+    /// <summary>
+    /// Gets or sets the URL to navigate to when the link is clicked.
+    /// If set, clicking the link will open this URL in a new browser window.
+    /// </summary>
+    public string LinkUrl
+    {
+        get => _linkUrl;
+        set => _linkUrl = value ?? string.Empty;
     }
 
     public Color LinkColor { get; set; } = Color.FromArgb(0, 0, 255);
@@ -91,10 +103,36 @@ public class LinkLabel : Label
         if (Enabled && e.Button == MouseButtons.Left)
         {
             _isVisited = true;
+
+            // Navigate to URL if LinkUrl is set
+            if (!string.IsNullOrEmpty(_linkUrl))
+            {
+                _ = NavigateToUrlAsync(_linkUrl);
+            }
+
             LinkClicked?.Invoke(this, new LinkLabelLinkClickedEventArgs(e.Button));
             Invalidate();
         }
         base.OnMouseUp(e);
+    }
+
+    /// <summary>
+    /// Opens the specified URL in a new browser window/tab
+    /// </summary>
+    private async Task NavigateToUrlAsync(string url)
+    {
+        try
+        {
+            var jsRuntime = Canvas.Windows.Forms.BrowserNavigationService.JSRuntime;
+            if (jsRuntime != null)
+            {
+                await jsRuntime.InvokeVoidAsync("open", url, "_blank");
+            }
+        }
+        catch
+        {
+            // Silently fail if JavaScript interop is not available
+        }
     }
 
     protected internal override void OnGotFocus(EventArgs e) { base.OnGotFocus(e); }

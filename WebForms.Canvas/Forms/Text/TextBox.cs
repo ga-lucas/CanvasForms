@@ -14,7 +14,6 @@ public class TextBox : TextBoxBase
     private string[] _autoCompleteCustomSource = Array.Empty<string>();
     private AutoCompleteMode _autoCompleteMode = AutoCompleteMode.None;
     private AutoCompleteSource _autoCompleteSource = AutoCompleteSource.None;
-    private bool _shortcutsEnabled = true;
     private AutoCompletePanel? _autoCompletePanel;
 
     public TextBox()
@@ -119,14 +118,7 @@ public class TextBox : TextBoxBase
         set => _autoCompleteSource = value;
     }
 
-    /// <summary>
-    /// Gets or sets whether shortcuts are enabled
-    /// </summary>
-    public bool ShortcutsEnabled
-    {
-        get => _shortcutsEnabled;
-        set => _shortcutsEnabled = value;
-    }
+
 
     /// <summary>
     /// Gets or sets a value indicating whether text in the text box is read-only
@@ -179,68 +171,30 @@ public class TextBox : TextBoxBase
 
     #region Painting
 
-    protected internal override void OnPaint(PaintEventArgs e)
+    /// <summary>
+    /// Draws single-line text with TextBox-specific features (alignment and auto-scroll)
+    /// </summary>
+    protected override void DrawSingleLineText(Graphics g, string displayText, Rectangle textBounds, Color textColor, bool hasFocus, TextMeasurementService? measureService)
     {
-        var g = e.Graphics;
-        var bounds = new Rectangle(0, 0, Width, Height);
-        var borderWidth = GetBorderWidth();
-
-        // Check if we have focus
-        var hasFocus = Parent is Form form && form.FocusedControl == this;
-
-        // Draw background
-        var bgColor = Enabled ? BackColor : Color.FromArgb(240, 240, 240);
-        using var bgBrush = new SolidBrush(bgColor);
-        g.FillRectangle(bgBrush, bounds);
-
-        // Draw border
-        DrawBorder(g, bounds, hasFocus);
-
-        // Get display text (with password masking if applicable)
-        var displayText = GetDisplayText();
-
-        const int textPadding = 3;
-        var textBounds = new Rectangle(
-            borderWidth + textPadding,
-            borderWidth + textPadding,
-            Width - (borderWidth * 2) - (textPadding * 2),
-            Height - (borderWidth * 2) - (textPadding * 2)
-        );
-
-        // Get text measurement service
-        var measureService = (Parent as Form)?.TextMeasurementService;
-
+        // Update scroll to keep caret visible
         if (measureService != null && !string.IsNullOrEmpty(displayText))
         {
-            // Update scroll to keep caret visible
             UpdateScrollPosition(displayText, measureService, textBounds.Width);
         }
 
-        // Draw text
-        if (!string.IsNullOrEmpty(displayText))
+        // Calculate text X position based on alignment
+        var textX = CalculateTextX(textBounds, displayText, measureService);
+        var textY = textBounds.Y;
+
+        // Draw selection if any
+        if (_selectionLength > 0 && hasFocus && measureService != null)
         {
-            var textColor = Enabled ? ForeColor : Color.FromArgb(109, 109, 109);
-            var textX = CalculateTextX(textBounds, displayText, measureService);
-            var textY = textBounds.Y;
-
-            // Draw selection if any
-            if (_selectionLength > 0 && hasFocus && measureService != null)
-            {
-                DrawTextWithSelection(g, displayText, textX, textY, textColor, measureService);
-            }
-            else
-            {
-                g.DrawString(displayText, Font, textColor, textX, textY);
-            }
+            DrawTextWithSelection(g, displayText, textX, textY, textColor, measureService);
         }
-
-        // Draw caret if focused
-        if (hasFocus && Enabled && _selectionLength == 0)
+        else
         {
-            DrawCaret(g, displayText, textBounds, measureService);
+            g.DrawString(displayText, Font, textColor, textX, textY);
         }
-
-        base.OnPaint(e);
     }
 
     /// <summary>
@@ -275,28 +229,6 @@ public class TextBox : TextBoxBase
         return _autoCompletePanel?.GetBounds() ?? Rectangle.Empty;
     }
 
-    private void DrawBorder(Graphics g, Rectangle bounds, bool hasFocus)
-    {
-        switch (BorderStyle)
-        {
-            case BorderStyle.FixedSingle:
-                {
-                    var borderColor = hasFocus ? Color.FromArgb(0, 120, 215) : Color.FromArgb(122, 122, 122);
-                    using var pen = new Pen(borderColor);
-                    g.DrawRectangle(pen, bounds);
-                }
-                break;
-
-            case BorderStyle.Fixed3D:
-                {
-                    var borderColor = hasFocus ? Color.FromArgb(0, 120, 215) : Color.FromArgb(122, 122, 122);
-                    using var pen = new Pen(borderColor);
-                    g.DrawRectangle(pen, bounds);
-                }
-                break;
-        }
-    }
-
     private int CalculateTextX(Rectangle textBounds, string displayText, TextMeasurementService? measureService)
     {
         if (_textAlign == HorizontalAlignment.Left || measureService == null)
@@ -312,56 +244,6 @@ public class TextBox : TextBoxBase
             HorizontalAlignment.Right => textBounds.Right - textWidth,
             _ => textBounds.X - _scrollOffsetX
         };
-    }
-
-    private void DrawTextWithSelection(Graphics g, string displayText, int textX, int textY, Color textColor, TextMeasurementService measureService)
-    {
-        if (_selectionStart >= displayText.Length)
-        {
-            g.DrawString(displayText, Font, textColor, textX, textY);
-            return;
-        }
-
-        var selEnd = Math.Min(_selectionStart + _selectionLength, displayText.Length);
-        var textBeforeSelection = _selectionStart > 0 ? displayText.Substring(0, _selectionStart) : "";
-        var selectedText = displayText.Substring(_selectionStart, selEnd - _selectionStart);
-        var textAfterSelection = selEnd < displayText.Length ? displayText.Substring(selEnd) : "";
-
-        var widthBefore = measureService.MeasureTextEstimate(textBeforeSelection, Font.Family, (int)Font.Size);
-        var widthSelected = measureService.MeasureTextEstimate(selectedText, Font.Family, (int)Font.Size);
-
-        // Draw selection background
-        using var selBrush = new SolidBrush(Color.FromArgb(0, 120, 215));
-        g.FillRectangle(selBrush, textX + widthBefore, textY, widthSelected, Height - 6);
-
-        // Draw text parts
-        if (!string.IsNullOrEmpty(textBeforeSelection))
-            g.DrawString(textBeforeSelection, Font, textColor, textX, textY);
-
-        if (!string.IsNullOrEmpty(selectedText))
-            g.DrawString(selectedText, Font, Color.White, textX + widthBefore, textY);
-
-        if (!string.IsNullOrEmpty(textAfterSelection))
-            g.DrawString(textAfterSelection, Font, textColor, textX + widthBefore + widthSelected, textY);
-    }
-
-    private void DrawCaret(Graphics g, string displayText, Rectangle textBounds, TextMeasurementService? measureService)
-    {
-        if (measureService == null) return;
-
-        var textBeforeCaret = _caretPosition > 0 && _caretPosition <= displayText.Length
-            ? displayText.Substring(0, _caretPosition)
-            : "";
-
-        var width = measureService.MeasureTextEstimate(textBeforeCaret, Font.Family, (int)Font.Size);
-        var caretX = CalculateTextX(textBounds, displayText, measureService) + width;
-
-        // Only draw if visible
-        if (caretX >= textBounds.X && caretX <= textBounds.Right)
-        {
-            using var pen = new Pen(Color.Black, 1);
-            g.DrawLine(pen, caretX, textBounds.Y, caretX, textBounds.Bottom);
-        }
     }
 
     private void UpdateScrollPosition(string displayText, TextMeasurementService measureService, int visibleWidth)
@@ -394,6 +276,8 @@ public class TextBox : TextBoxBase
 
         _scrollOffsetX = Math.Max(0, _scrollOffsetX);
     }
+
+    #endregion
 
     protected override string GetDisplayText()
     {
@@ -467,75 +351,47 @@ public class TextBox : TextBoxBase
         }
     }
 
-    #endregion
+    protected override void OnTextChanged(EventArgs e)
+    {
+        base.OnTextChanged(e);
+        UpdateAutoComplete();
+    }
+
+    /// <summary>
+    /// Measures the current text asynchronously to populate the cache
+    /// This ensures accurate measurements are available for rendering
+    /// </summary>
+    private async Task MeasureTextForCacheAsync()
+    {
+        var measureService = (Parent as Form)?.TextMeasurementService;
+        if (measureService == null) return;
+
+        var displayText = GetDisplayText();
+        if (string.IsNullOrEmpty(displayText)) return;
+
+        try
+        {
+            // Measure full text
+            await measureService.MeasureTextAsync(displayText, Font.Family, (int)Font.Size);
+
+            // Also measure text before caret for accurate caret positioning
+            if (_caretPosition > 0 && _caretPosition <= displayText.Length)
+            {
+                var textBeforeCaret = displayText.Substring(0, _caretPosition);
+                await measureService.MeasureTextAsync(textBeforeCaret, Font.Family, (int)Font.Size);
+            }
+        }
+        catch
+        {
+            // Measurement failed, will use estimation fallback during render
+        }
+    }
 
     #region Keyboard Input
 
     protected internal override void OnKeyPress(KeyPressEventArgs e)
     {
-        if (ReadOnly || !Enabled)
-        {
-            base.OnKeyPress(e);
-            return;
-        }
-
-        var c = e.KeyChar;
-
-        // Handle backspace
-        if (c == '\b')
-        {
-            if (_selectionLength > 0)
-            {
-                SaveUndoState();
-                SelectedText = string.Empty;
-            }
-            else if (_caretPosition > 0)
-            {
-                SaveUndoState();
-                Text = Text.Remove(_caretPosition - 1, 1);
-                _caretPosition--;
-                Modified = true;
-                OnTextChanged(EventArgs.Empty);
-            }
-            e.Handled = true;
-            Invalidate();
-            return;
-        }
-
-        // Handle normal characters
-        if (!char.IsControl(c))
-        {
-            if (MaxLength > 0 && Text.Length >= MaxLength && _selectionLength == 0)
-            {
-                e.Handled = true;
-                return;
-            }
-
-            SaveUndoState();
-
-            if (_selectionLength > 0)
-            {
-                Text = Text.Remove(_selectionStart, _selectionLength);
-                _caretPosition = _selectionStart;
-                _selectionLength = 0;
-            }
-
-            var charToInsert = _characterCasing switch
-            {
-                CharacterCasing.Upper => char.ToUpper(c),
-                CharacterCasing.Lower => char.ToLower(c),
-                _ => c
-            };
-
-            Text = Text.Insert(_caretPosition, charToInsert.ToString());
-            _caretPosition++;
-            Modified = true;
-            OnTextChanged(EventArgs.Empty);
-            UpdateAutoComplete();
-            e.Handled = true;
-            Invalidate();
-        }
-
+        // Let TextBoxBase handle character insertion.
         base.OnKeyPress(e);
     }
 
@@ -557,183 +413,13 @@ public class TextBox : TextBoxBase
             }
         }
 
-        var handled = false;
-
-        // Check if shortcuts are enabled for Ctrl combinations
-        if (!_shortcutsEnabled && e.Control && 
-            (e.KeyCode == Keys.A || e.KeyCode == Keys.C || e.KeyCode == Keys.X || 
-             e.KeyCode == Keys.V || e.KeyCode == Keys.Z))
-        {
-            e.Handled = true;
-            base.OnKeyDown(e);
-            return;
-        }
-
-        switch (e.KeyCode)
-        {
-            case Keys.Left:
-                if (e.Control)
-                {
-                    // Ctrl+Left: Move to previous word
-                    _caretPosition = GetPreviousWordPosition();
-                }
-                else if (_caretPosition > 0)
-                {
-                    _caretPosition--;
-                }
-
-                if (!e.Shift)
-                {
-                    _selectionStart = _caretPosition;
-                    _selectionLength = 0;
-                }
-                handled = true;
-                Invalidate();
-                break;
-
-            case Keys.Right:
-                if (e.Control)
-                {
-                    // Ctrl+Right: Move to next word
-                    _caretPosition = GetNextWordPosition();
-                }
-                else if (_caretPosition < Text.Length)
-                {
-                    _caretPosition++;
-                }
-
-                if (!e.Shift)
-                {
-                    _selectionStart = _caretPosition;
-                    _selectionLength = 0;
-                }
-                handled = true;
-                Invalidate();
-                break;
-
-            case Keys.Home:
-                _caretPosition = 0;
-                if (!e.Shift)
-                {
-                    _selectionStart = 0;
-                    _selectionLength = 0;
-                }
-                handled = true;
-                Invalidate();
-                break;
-
-            case Keys.End:
-                _caretPosition = Text.Length;
-                if (!e.Shift)
-                {
-                    _selectionStart = Text.Length;
-                    _selectionLength = 0;
-                }
-                handled = true;
-                Invalidate();
-                break;
-
-            case Keys.Delete:
-                if (!ReadOnly)
-                {
-                    if (_selectionLength > 0)
-                    {
-                        SaveUndoState();
-                        SelectedText = string.Empty;
-                    }
-                    else if (_caretPosition < Text.Length)
-                    {
-                        SaveUndoState();
-                        Text = Text.Remove(_caretPosition, 1);
-                        Modified = true;
-                        OnTextChanged(EventArgs.Empty);
-                    }
-                    handled = true;
-                    Invalidate();
-                }
-                break;
-
-            case Keys.A:
-                if (e.Control)
-                {
-                    SelectAll();
-                    handled = true;
-                }
-                break;
-
-            case Keys.C:
-                if (e.Control)
-                {
-                    Copy();
-                    handled = true;
-                }
-                break;
-
-            case Keys.X:
-                if (e.Control && !ReadOnly)
-                {
-                    Cut();
-                    handled = true;
-                }
-                break;
-
-            case Keys.V:
-                if (e.Control && !ReadOnly)
-                {
-                    Paste();
-                    handled = true;
-                }
-                break;
-
-            case Keys.Z:
-                if (e.Control && !ReadOnly)
-                {
-                    Undo();
-                    handled = true;
-                }
-                break;
-        }
-
-        if (handled)
-        {
-            e.Handled = true;
-        }
-
+        // Delegate core editing/navigation/shortcuts to TextBoxBase.
         base.OnKeyDown(e);
-    }
 
-    private int GetPreviousWordPosition()
-    {
-        if (_caretPosition == 0) return 0;
-
-        var pos = _caretPosition - 1;
-
-        // Skip whitespace
-        while (pos > 0 && char.IsWhiteSpace(Text[pos]))
-            pos--;
-
-        // Skip word characters
-        while (pos > 0 && !char.IsWhiteSpace(Text[pos - 1]))
-            pos--;
-
-        return pos;
-    }
-
-    private int GetNextWordPosition()
-    {
-        if (_caretPosition >= Text.Length) return Text.Length;
-
-        var pos = _caretPosition;
-
-        // Skip current word
-        while (pos < Text.Length && !char.IsWhiteSpace(Text[pos]))
-            pos++;
-
-        // Skip whitespace
-        while (pos < Text.Length && char.IsWhiteSpace(Text[pos]))
-            pos++;
-
-        return pos;
+        if (e.Handled)
+        {
+            UpdateAutoComplete();
+        }
     }
 
     #endregion
@@ -761,57 +447,6 @@ public class TextBox : TextBoxBase
             if (e.Y < panelBounds.Y || e.Y >= panelBounds.Bottom)
             {
                 _autoCompletePanel.Hide();
-            }
-        }
-
-        var borderWidth = GetBorderWidth();
-        const int textPadding = 3;
-        var textBounds = new Rectangle(
-            borderWidth + textPadding,
-            borderWidth + textPadding,
-            Width - (borderWidth * 2) - (textPadding * 2),
-            Height - (borderWidth * 2) - (textPadding * 2)
-        );
-
-        // Check if click is within text area
-        if (e.X >= textBounds.X && e.X < textBounds.Right &&
-            e.Y >= textBounds.Y && e.Y < textBounds.Bottom)
-        {
-            var displayText = GetDisplayText();
-            var measureService = (Parent as Form)?.TextMeasurementService;
-
-            if (measureService != null && !string.IsNullOrEmpty(displayText))
-            {
-                // Calculate click position relative to text start (accounting for scroll and alignment)
-                var textX = CalculateTextX(textBounds, displayText, measureService);
-                var clickX = e.X - textX;
-
-                // Find the character position closest to the click
-                var closestPosition = 0;
-                var minDistance = int.MaxValue;
-
-                for (int i = 0; i <= displayText.Length; i++)
-                {
-                    var textUpToPosition = i > 0 ? displayText.Substring(0, i) : "";
-                    var width = measureService.MeasureTextEstimate(textUpToPosition, Font.Family, (int)Font.Size);
-
-                    var distance = Math.Abs(width - clickX);
-                    if (distance < minDistance)
-                    {
-                        minDistance = distance;
-                        closestPosition = i;
-                    }
-                    else
-                    {
-                        // Distance is increasing, we've passed the closest point
-                        break;
-                    }
-                }
-
-                _caretPosition = closestPosition;
-                _selectionStart = closestPosition;
-                _selectionLength = 0;
-                Invalidate();
             }
         }
 

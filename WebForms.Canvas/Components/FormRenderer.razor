@@ -21,10 +21,8 @@
             @ontouchend="HandleTouchEnd"
             tabindex="0"
             @onkeydown="HandleKeyDown"
-            @onkeydown:preventDefault="true"
             @onkeyup="HandleKeyUp"
             @onkeypress="HandleKeyPress"
-            @onkeypress:preventDefault="true"
             width="@Form.Width" 
             height="@Form.Height"
             style="position: absolute; 
@@ -156,6 +154,17 @@
 
             // Initialize text measurement service
             Form.TextMeasurementService = new TextMeasurementService(JSRuntime);
+
+            // Setup keyboard handling for the canvas - use try/catch in case JS isn't loaded yet
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("setupCanvasKeyboardHandling", _canvasRef);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to setup keyboard handling: {ex.Message}");
+                // Will retry on next interaction
+            }
 
             // Set RequestRender and propagate to all children
             var renderFunc = () =>
@@ -782,6 +791,17 @@
 
         // Handle mouse down in client area
         BringToFrontSync();
+
+        // Ensure canvas has focus for keyboard input
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("ensureCanvasFocus", _canvasRef);
+        }
+        catch
+        {
+            // Silently fail if JS isn't ready
+        }
+
         var clientX = x - BorderWidth;
         var clientY = y - TitleBarHeight - BorderWidth;
 
