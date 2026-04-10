@@ -1018,6 +1018,12 @@ public abstract class TextBoxBase : Control
                 _selectionStart = index;
                 _selectionLength = 0;
                 _isSelecting = true;
+
+                // Prime measurement cache for the new caret position so the caret lands correctly
+                // even when this click is the first interaction after focus/text changes.
+                var requestId = System.Threading.Interlocked.Increment(ref _measureRequestId);
+                _ = MeasureTextForCacheAsync(requestId);
+
                 Invalidate();
             }
         }
@@ -1072,14 +1078,90 @@ public abstract class TextBoxBase : Control
     {
         index = 0;
 
-        if (pt.X < textBounds.X || pt.X >= textBounds.Right || pt.Y < textBounds.Y || pt.Y >= textBounds.Bottom)
+        // WinForms behavior: clicking within the control (including empty padding areas)
+        // moves the caret to the nearest position. Only reject points completely outside.
+        if (pt.X < 0 || pt.X >= Width || pt.Y < 0 || pt.Y >= Height)
         {
             return false;
         }
 
-        // Default implementation maps directly from point to char index.
-        index = GetCharIndexFromPosition(pt);
+        // Clamp to the text layout bounds so we can still compute a sensible caret position
+        // when clicking in the padding area.
+        var clamped = new Point(
+            Math.Clamp(pt.X, textBounds.X, Math.Max(textBounds.X, textBounds.Right - 1)),
+            Math.Clamp(pt.Y, textBounds.Y, Math.Max(textBounds.Y, textBounds.Bottom - 1))
+        );
+
+        // Prefer the measurement service + displayText, since caret placement needs to match
+        // exactly how we draw text on the canvas.
+        if (measureService != null)
+        {
+            var relativeX = clamped.X - textBounds.X + _scrollOffsetX;
+            var relativeY = clamped.Y - textBounds.Y + _scrollOffsetY;
+
+            if (!_multiline)
+            {
+                index = GetInsertionIndexFromX(displayText, relativeX, measureService);
+                index = Math.Max(0, Math.Min(Text.Length, index));
+                return true;
+            }
+
+            var lines = displayText.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+            if (lines.Length == 0)
+            {
+                index = 0;
+                return true;
+            }
+
+            var lineHeight = (int)_font.Size + 4;
+            var lineNumber = lineHeight > 0 ? Math.Clamp(relativeY / lineHeight, 0, lines.Length - 1) : 0;
+            var lineText = lines[lineNumber];
+
+            var posInLine = GetInsertionIndexFromX(lineText, relativeX, measureService);
+            index = GetFirstCharIndexFromLine(lineNumber) + posInLine;
+            index = Math.Max(0, Math.Min(Text.Length, index));
+            return true;
+        }
+
+        index = GetCharIndexFromPosition(clamped);
+        index = Math.Max(0, Math.Min(Text.Length, index));
         return true;
+    }
+
+    private int GetInsertionIndexFromX(string text, int x, TextMeasurementService measureService)
+    {
+        if (string.IsNullOrEmpty(text)) return 0;
+        if (x <= 0) return 0;
+
+        var fullWidth = measureService.MeasureTextEstimate(text, _font.Family, (int)_font.Size);
+        if (x >= fullWidth) return text.Length;
+
+        // Find the first prefix whose width is >= x.
+        int low = 0;
+        int high = text.Length;
+        while (low < high)
+        {
+            int mid = (low + high) / 2;
+            int w = mid == 0 ? 0 : measureService.MeasureTextEstimate(text.Substring(0, mid), _font.Family, (int)_font.Size);
+            if (w < x) low = mid + 1;
+            else high = mid;
+        }
+
+        var idx = Math.Clamp(low, 0, text.Length);
+
+        // Apply a half-character threshold so clicks to the right half of a glyph place the caret after it.
+        if (idx > 0)
+        {
+            int wPrev = idx - 1 == 0 ? 0 : measureService.MeasureTextEstimate(text.Substring(0, idx - 1), _font.Family, (int)_font.Size);
+            int wIdx = measureService.MeasureTextEstimate(text.Substring(0, idx), _font.Family, (int)_font.Size);
+            double midpoint = (wPrev + wIdx) / 2.0;
+            if (x < midpoint)
+            {
+                idx--;
+            }
+        }
+
+        return idx;
     }
 
     #endregion
@@ -1202,10 +1284,20 @@ public abstract class TextBoxBase : Control
                     else if (_caretPosition > 0)
                     {
                         SaveUndoState();
-                        Text = Text.Remove(_caretPosition - 1, 1);
-                        _caretPosition--;
+
+                        var newCaret = _caretPosition - 1;
+                        var newText = Text.Remove(newCaret, 1);
+
+                        // Keep caret/selection in sync *before* setting Text.
+                        // Setting Text triggers OnTextChanged which clamps indices,
+                        // so updating after can cause a double-step at end-of-text.
+                        _caretPosition = newCaret;
+                        _selectionAnchor = newCaret;
+                        _selectionStart = newCaret;
+                        _selectionLength = 0;
+
+                        Text = newText;
                         _modified = true;
-                        OnTextChanged(EventArgs.Empty);
                     }
                     handled = true;
                     Invalidate();
@@ -1223,9 +1315,14 @@ public abstract class TextBoxBase : Control
                     else if (_caretPosition < Text.Length)
                     {
                         SaveUndoState();
-                        Text = Text.Remove(_caretPosition, 1);
+
+                        var newText = Text.Remove(_caretPosition, 1);
+                        _selectionAnchor = _caretPosition;
+                        _selectionStart = _caretPosition;
+                        _selectionLength = 0;
+
+                        Text = newText;
                         _modified = true;
-                        OnTextChanged(EventArgs.Empty);
                     }
                     handled = true;
                     Invalidate();
@@ -1513,19 +1610,21 @@ public abstract class TextBoxBase : Control
         var widthBefore = measureService.MeasureTextEstimate(textBeforeSelection, _font.Family, (int)_font.Size);
         var widthSelected = measureService.MeasureTextEstimate(selectedText, _font.Family, (int)_font.Size);
 
-        // Draw selection background
-        using var selBrush = new SolidBrush(Color.FromArgb(0, 120, 215));
-        g.FillRectangle(selBrush, textX + widthBefore, textY, widthSelected, Height - 6);
+        var borderWidth = GetBorderWidth();
+        const int textPadding = 3;
+        var selectionHeight = Math.Max(0, Height - (borderWidth * 2) - (textPadding * 2));
 
-        // Draw text parts
-        if (!string.IsNullOrEmpty(textBeforeSelection))
-            g.DrawString(textBeforeSelection, _font, textColor, textX, textY);
+        // Draw background first, then draw the full line once (avoids per-segment rounding drift),
+        // and finally draw the selected substring on top in white.
+        using var selBrush = new SolidBrush(Color.FromArgb(0, 120, 215));
+        g.FillRectangle(selBrush, textX + widthBefore, textY, widthSelected, selectionHeight);
+
+        g.DrawString(displayText, _font, textColor, textX, textY);
 
         if (!string.IsNullOrEmpty(selectedText))
+        {
             g.DrawString(selectedText, _font, Color.White, textX + widthBefore, textY);
-
-        if (!string.IsNullOrEmpty(textAfterSelection))
-            g.DrawString(textAfterSelection, _font, textColor, textX + widthBefore + widthSelected, textY);
+        }
     }
 
     /// <summary>

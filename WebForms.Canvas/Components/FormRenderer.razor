@@ -3,6 +3,7 @@
 @using BlazorMouseEventArgs = Microsoft.AspNetCore.Components.Web.MouseEventArgs
 @using BlazorKeyboardEventArgs = Microsoft.AspNetCore.Components.Web.KeyboardEventArgs
 @using BlazorTouchEventArgs = Microsoft.AspNetCore.Components.Web.TouchEventArgs
+@using BlazorWheelEventArgs = Microsoft.AspNetCore.Components.Web.WheelEventArgs
 @inject IJSRuntime JSRuntime
 @implements IDisposable
 
@@ -12,6 +13,8 @@
             @onmousedown="HandleMouseDown"
             @onmouseup="HandleMouseUp"
             @onmousemove="HandleMouseMove"
+            @onwheel="HandleWheel"
+            @onwheel:preventDefault="true"
             @onmouseleave="HandleMouseLeave"
             @onmouseenter="HandleMouseEnter"
             @onclick="HandleClick"
@@ -1008,6 +1011,37 @@
                 clientY
             );
             Form.OnMouseDoubleClick(args);
+        }
+    }
+
+    private void HandleWheel(BlazorWheelEventArgs e)
+    {
+        if (Form == null) return;
+
+        var x = (int)e.OffsetX;
+        var y = (int)e.OffsetY;
+
+        // Handle wheel in client area
+        var clientX = x - BorderWidth;
+        var clientY = y - TitleBarHeight - BorderWidth;
+
+        if (clientX >= 0 && clientY >= 0 &&
+            clientX < Form.Width - (BorderWidth * 2) &&
+            clientY < Form.Height - TitleBarHeight - (BorderWidth * 2))
+        {
+            // Browser deltaY is positive when scrolling down.
+            // WinForms delta is positive when scrolling up.
+            var delta = (int)-e.DeltaY;
+
+            var args = new Forms.MouseEventArgs(
+                Forms.MouseButtons.None,
+                0,
+                clientX,
+                clientY,
+                delta
+            );
+
+            Form.OnMouseWheel(args);
         }
     }
 

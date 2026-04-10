@@ -469,7 +469,7 @@ public class TextBox : TextBoxBase
         base.OnMouseUp(e);
     }
 
-    protected override void OnMouseWheel(MouseEventArgs e)
+    protected internal override void OnMouseWheel(MouseEventArgs e)
     {
         // Let autocomplete panel handle mouse wheel if visible
         if (_autoCompletePanel?.HandleMouseWheel(e) == true)

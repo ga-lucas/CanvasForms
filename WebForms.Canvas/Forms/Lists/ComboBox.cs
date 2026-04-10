@@ -628,7 +628,7 @@ public class ComboBox : ListControl
         base.OnMouseLeave(e);
     }
 
-    protected override void OnMouseWheel(MouseEventArgs e)
+    protected internal override void OnMouseWheel(MouseEventArgs e)
     {
         if (_isDroppedDown)
         {

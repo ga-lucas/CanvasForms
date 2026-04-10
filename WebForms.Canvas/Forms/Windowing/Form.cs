@@ -421,6 +421,30 @@ public class Form : ContainerControl
         base.OnMouseMove(e);
     }
 
+    protected internal override void OnMouseWheel(MouseEventArgs e)
+    {
+        // Route mouse wheel to the control under the mouse cursor.
+        foreach (var control in Controls)
+        {
+            if (!control.Visible || !control.Enabled) continue;
+
+            if (HitTest(control, e.X, e.Y))
+            {
+                var controlArgs = new MouseEventArgs(
+                    e.Button,
+                    e.Clicks,
+                    e.X - control.Left,
+                    e.Y - control.Top,
+                    e.Delta
+                );
+                control.OnMouseWheel(controlArgs);
+                return;
+            }
+        }
+
+        base.OnMouseWheel(e);
+    }
+
     private bool HitTest(Control control, int x, int y)
     {
         // Normal bounds check

@@ -139,7 +139,7 @@ public abstract class Control
         set { Width = value.Width; Height = value.Height; }
     }
 
-    public Rectangle DisplayRectangle => ClientRectangle;
+    public virtual Rectangle DisplayRectangle => ClientRectangle;
 
     /// <summary>
     /// Gets the width available for laying out child controls.
@@ -957,7 +957,7 @@ public abstract class Control
         MouseHover?.Invoke(this, new MouseEventArgs(MouseButtons.None, 0, 0, 0));
     }
 
-    protected virtual void OnMouseWheel(MouseEventArgs e)
+    protected internal virtual void OnMouseWheel(MouseEventArgs e)
     {
         MouseWheel?.Invoke(this, e);
     }
