@@ -26,6 +26,21 @@ dotnet run --project Canvas.Windows.Forms.Host.Server
 
 Then open https://localhost:7001 in your browser.
 
+## Visual Studio (F5) Notes
+
+This solution hosts a standalone Blazor WebAssembly client. In development, the browser can cache older `/_framework/*` resources while the build produces new (fingerprinted) file names, which can cause F5 runs to fail with missing resource errors.
+
+Mitigations in this repo:
+
+- The WASM host enables .NET 10 HTML asset placeholder replacement (`OverrideHtmlAssetPlaceholders`) and uses the fingerprinted `blazor.webassembly#[.{fingerprint}].js` pattern.
+- The server disables HTTP caching in Development.
+- The server disables Visual Studio's fast up-to-date check in Debug to reduce stale static-web-assets issues.
+
+If you still see `404`/missing requests under `/_framework/`:
+
+1. Hard refresh the page (Ctrl+F5) or clear site data for `localhost`.
+2. Rebuild the WebAssembly + server projects (the root `rebuild-dev.ps1` script is a quick way to do this).
+
 ## Features
 
 ### Native Apps
