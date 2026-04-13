@@ -11,6 +11,8 @@ public class WelcomeForm : Form
     private Button? _btnDockingDemo;
     private Button? _btnInteractive;
     private Button? _btnDrawingSample;
+    private Button? _btnFlowLayoutDemo;
+    private Button? _btnTableLayoutDemo;
 
     public WelcomeForm()
     {
@@ -143,11 +145,40 @@ public class WelcomeForm : Form
         };
         Controls.Add(_btnDockingDemo);
 
+        _btnFlowLayoutDemo = new Button
+        {
+            Text = "FlowLayoutPanel",
+            Left = 250,
+            Top = 240,
+            Width = 200,
+            Height = 50
+        };
+        _btnFlowLayoutDemo.Click += (s, e) =>
+        {
+            Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<FlowLayoutDemoForm>();
+        };
+        Controls.Add(_btnFlowLayoutDemo);
+
+        _btnTableLayoutDemo = new Button
+        {
+            Text = "TableLayoutPanel",
+            Left = 460,
+            Top = 240,
+            Width = 200,
+            Height = 50
+        };
+        _btnTableLayoutDemo.Click += (s, e) =>
+        {
+            Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<TableLayoutDemoForm>();
+        };
+        Controls.Add(_btnTableLayoutDemo);
+
+        // Row 3
         _btnInteractive = new Button
         {
             Text = "Interactive Form",
             Left = 250,
-            Top = 240,
+            Top = 310,
             Width = 200,
             Height = 50
         };
@@ -161,7 +192,7 @@ public class WelcomeForm : Form
         {
             Text = "Drawing Sample",
             Left = 460,
-            Top = 240,
+            Top = 310,
             Width = 200,
             Height = 50
         };
@@ -176,7 +207,7 @@ public class WelcomeForm : Form
         {
             Text = "Links:",
             Left = 20,
-            Top = 310,
+            Top = 380,
             Width = 660,
             Height = 25,
             ForeColor = Color.FromArgb(60, 60, 60),
@@ -190,7 +221,7 @@ public class WelcomeForm : Form
             Text = "View on GitHub",
             LinkUrl = "https://github.com/ga-lucas/CanvasForms",
             Left = 40,
-            Top = 340,
+            Top = 410,
             Width = 150,
             Height = 20
         };
@@ -207,7 +238,7 @@ public class WelcomeForm : Form
             Text = "Documentation",
             LinkUrl = "https://docs.microsoft.com/en-us/dotnet/desktop/winforms/",
             Left = 200,
-            Top = 340,
+            Top = 410,
             Width = 150,
             Height = 20
         };
@@ -219,7 +250,7 @@ public class WelcomeForm : Form
             Text = "WinForms Examples",
             LinkUrl = "https://github.com/dotnet/winforms",
             Left = 360,
-            Top = 340,
+            Top = 410,
             Width = 150,
             Height = 20
         };

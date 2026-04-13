@@ -14,3 +14,6 @@ dotnet build Canvas.Windows.Forms.Host.Server\Canvas.Windows.Forms.Host.Server.c
 
 Write-Host "Build complete! Run the server with:" -ForegroundColor Green
 Write-Host "  dotnet run --project Canvas.Windows.Forms.Host.Server" -ForegroundColor Yellow
+
+
+#dotnet run --project Canvas.Windows.Forms.Host.Server

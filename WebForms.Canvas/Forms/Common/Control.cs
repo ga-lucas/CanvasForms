@@ -1481,6 +1481,8 @@ public abstract class Control
 
     private int _layoutSuspendCount = 0;
 
+    protected bool IsLayoutSuspended => _layoutSuspendCount > 0;
+
     /// <summary>
     /// Temporarily suspends the layout logic for the control
     /// </summary>
@@ -2223,6 +2225,14 @@ public abstract class Control
             control.Top = top;
             control.Width = width;
             control.Height = height;
+        }
+
+        // Recursively apply layout to child containers so nested layout panels
+        // (e.g., FlowLayoutPanel/TableLayoutPanel) lay out their children after being sized/positioned.
+        foreach (var control in _controls)
+        {
+            if (!control.Visible) continue;
+            control.PerformLayout();
         }
 
         Invalidate();

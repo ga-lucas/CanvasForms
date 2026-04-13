@@ -89,33 +89,8 @@ public class Panel : ScrollableControl
             g.TranslateTransform(-(scrollX + child.Left), -(scrollY + child.Top));
         }
 
-        // Paint overlays on top of everything (drop-downs, autocomplete)
-        foreach (var child in Controls)
-        {
-            if (!child.Visible) continue;
-
-            if (child is ComboBox comboBox && comboBox.DroppedDown)
-            {
-                g.TranslateTransform(scrollX + child.Left, scrollY + child.Top);
-                var ddArgs = new PaintEventArgs(g, new Rectangle(0, 0, child.Width, child.Height));
-                comboBox.PaintDropDownOnly(ddArgs);
-                g.TranslateTransform(-(scrollX + child.Left), -(scrollY + child.Top));
-            }
-            else if (child is DateTimePicker dateTimePicker && dateTimePicker.HasVisibleDropDown)
-            {
-                g.TranslateTransform(scrollX + child.Left, scrollY + child.Top);
-                var ddArgs = new PaintEventArgs(g, new Rectangle(0, 0, child.Width, child.Height));
-                dateTimePicker.PaintDropDownOnly(ddArgs);
-                g.TranslateTransform(-(scrollX + child.Left), -(scrollY + child.Top));
-            }
-            else if (child is TextBox textBox && textBox.HasVisibleAutoComplete)
-            {
-                g.TranslateTransform(scrollX + child.Left, scrollY + child.Top);
-                var acArgs = new PaintEventArgs(g, new Rectangle(0, 0, child.Width, child.Height));
-                textBox.PaintAutoCompleteOnly(acArgs);
-                g.TranslateTransform(-(scrollX + child.Left), -(scrollY + child.Top));
-            }
-        }
+        // Overlays (ComboBox drop-down, DateTimePicker popup, TextBox autocomplete) are painted
+        // by the Form in a final pass so they always appear top-most, even for nested controls.
 
         g.Restore();
     }

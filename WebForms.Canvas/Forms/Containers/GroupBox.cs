@@ -73,7 +73,10 @@ public class GroupBox : Control
             g.TranslateTransform(-child.Left, -child.Top);
         }
 
+        g.Restore();
+
         // Paint overlays on top of everything (drop-downs, autocomplete)
+        // These must not be clipped to the GroupBox client area; WinForms drop-downs render outside.
         foreach (var child in Controls)
         {
             if (!child.Visible) continue;
@@ -100,8 +103,6 @@ public class GroupBox : Control
                 g.TranslateTransform(-child.Left, -child.Top);
             }
         }
-
-        g.Restore();
     }
 
     private void DrawGroupBoxBorderAndText(Graphics g)
@@ -253,6 +254,10 @@ public class GroupBox : Control
         {
             form.FocusedControl = control;
         }
+
+        // Match WinForms behavior: clicking a child control focuses it so it can receive keyboard input.
+        // This is required for TextBox editing/caret and consistent ComboBox activation.
+        control.Focus();
     }
 
     private Control? FindChildAt(int x, int y)

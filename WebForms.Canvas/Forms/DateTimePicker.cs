@@ -26,6 +26,8 @@ public class DateTimePicker : Control
     private bool _showCheckBox;
     private bool _checked = true;
 
+    private bool _showUpDown;
+
     public DateTimePicker()
     {
         Width = 140;
@@ -119,6 +121,12 @@ public class DateTimePicker : Control
             if (_showCheckBox != value)
             {
                 _showCheckBox = value;
+
+                if (DroppedDown && !_checked && _showCheckBox)
+                {
+                    DroppedDown = false;
+                }
+
                 OnTextChanged(EventArgs.Empty);
                 Invalidate();
             }
@@ -134,6 +142,12 @@ public class DateTimePicker : Control
             if (_checked != newValue)
             {
                 _checked = newValue;
+
+                if (DroppedDown && !Checked)
+                {
+                    DroppedDown = false;
+                }
+
                 OnCheckedChanged(EventArgs.Empty);
                 OnTextChanged(EventArgs.Empty);
                 Invalidate();
@@ -168,7 +182,24 @@ public class DateTimePicker : Control
 
     public LeftRightAlignment DropDownAlign { get; set; } = LeftRightAlignment.Left;
 
-    public bool ShowUpDown { get; set; } = false;
+    public bool ShowUpDown
+    {
+        get => _showUpDown;
+        set
+        {
+            if (_showUpDown == value)
+                return;
+
+            _showUpDown = value;
+
+            if (_showUpDown && DroppedDown)
+            {
+                DroppedDown = false;
+            }
+
+            Invalidate();
+        }
+    }
 
     public new Font Font { get; set; } = new("Segoe UI", 9);
 
@@ -482,6 +513,32 @@ public class DateTimePicker : Control
         }
 
         base.OnKeyDown(e);
+    }
+
+    protected internal override void OnMouseWheel(MouseEventArgs e)
+    {
+        if (!Enabled)
+        {
+            base.OnMouseWheel(e);
+            return;
+        }
+
+        if (DroppedDown)
+        {
+            var monthDelta = e.Delta > 0 ? -1 : 1;
+            var candidate = new DateTime(_displayMonth.Year, _displayMonth.Month, 1).AddMonths(monthDelta);
+            _displayMonth = ClampMonth(candidate);
+            Invalidate();
+            base.OnMouseWheel(e);
+            return;
+        }
+
+        if (Checked)
+        {
+            ApplySpin(e.Delta > 0 ? 1 : -1);
+        }
+
+        base.OnMouseWheel(e);
     }
 
     protected internal override void OnLostFocus(EventArgs e)
@@ -805,6 +862,18 @@ public class DateTimePicker : Control
     {
         var d = date.Date;
         return d >= MinDate.Date && d <= MaxDate.Date;
+    }
+
+    private DateTime ClampMonth(DateTime month)
+    {
+        var monthFirst = new DateTime(month.Year, month.Month, 1);
+
+        var minMonth = new DateTime(MinDate.Year, MinDate.Month, 1);
+        var maxMonth = new DateTime(MaxDate.Year, MaxDate.Month, 1);
+
+        if (monthFirst < minMonth) return minMonth;
+        if (monthFirst > maxMonth) return maxMonth;
+        return monthFirst;
     }
 }
 

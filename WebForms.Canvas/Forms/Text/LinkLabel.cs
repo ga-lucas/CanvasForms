@@ -60,17 +60,26 @@ public class LinkLabel : Label
             else
                 linkColor = LinkColor;
 
-            var (x, y) = GetTextPosition();
+            var lines = Text.Replace("\r", string.Empty).Split('\n');
+            var (x0, y0, charHeight) = GetTextBlockPosition(lines);
+
             using var brush = new SolidBrush(linkColor);
-            g.DrawString(Text, "Arial", 12, brush, x, y);
+            for (var i = 0; i < lines.Length; i++)
+            {
+                var line = lines[i] ?? string.Empty;
+                var x = x0 + GetLineX(line);
+                var y = y0 + (i * charHeight);
+                g.DrawString(line, "Arial", 12, brush, x, y);
+            }
 
             bool showUnderline = LinkBehavior == LinkBehavior.AlwaysUnderline
                 || (LinkBehavior == LinkBehavior.SystemDefault || LinkBehavior == LinkBehavior.HoverUnderline && _isHovered);
             if (showUnderline)
             {
-                var textWidth = Text.Length * 7;
+                var textWidth = (lines.Length > 0 ? lines[0].Length : 0) * 7;
                 using var underlinePen = new Pen(linkColor, 1);
-                g.DrawLine(underlinePen, x, y + 14, x + textWidth, y + 14);
+                var ux = x0 + GetLineX(lines.Length > 0 ? lines[0] : string.Empty);
+                g.DrawLine(underlinePen, ux, y0 + 14, ux + textWidth, y0 + 14);
             }
         }
 

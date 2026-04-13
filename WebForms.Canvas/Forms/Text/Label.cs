@@ -30,23 +30,38 @@ public class Label : Control
         // Draw text
         if (!string.IsNullOrEmpty(Text))
         {
-            var (x, y) = GetTextPosition();
+            var lines = Text.Replace("\r", string.Empty).Split('\n');
+            var (x0, y0, charHeight) = GetTextBlockPosition(lines);
+
             using var textBrush = new SolidBrush(ForeColor);
-            g.DrawString(Text, "Arial", 12, textBrush, x, y);
+            for (var i = 0; i < lines.Length; i++)
+            {
+                var line = lines[i] ?? string.Empty;
+                var x = GetLineX(line);
+                var y = y0 + (i * charHeight);
+                g.DrawString(line, "Arial", 12, textBrush, x, y);
+            }
         }
 
         base.OnPaint(e);
     }
 
-    protected (int x, int y) GetTextPosition()
+    protected (int x0, int y0, int charHeight) GetTextBlockPosition(string[] lines)
     {
         // Approximate character width and height
         const int charWidth = 7;
         const int charHeight = 14;
         const int baselineOffset = 2; // Offset to account for 'top' baseline in canvas
 
-        var textWidth = Text.Length * charWidth;
-        var textHeight = charHeight;
+        var maxLineLen = 0;
+        foreach (var l in lines)
+        {
+            if (l == null) continue;
+            maxLineLen = Math.Max(maxLineLen, l.Length);
+        }
+
+        var textWidth = maxLineLen * charWidth;
+        var textHeight = lines.Length * charHeight;
 
         var (baseX, baseY) = TextAlign switch
         {
@@ -63,7 +78,20 @@ public class Label : Control
         };
 
         // Add baseline offset to Y coordinate for better vertical alignment
-        return (baseX, baseY + baselineOffset);
+        return (baseX, baseY + baselineOffset, charHeight);
+    }
+
+    protected int GetLineX(string line)
+    {
+        const int charWidth = 7;
+        var lineWidth = (line ?? string.Empty).Length * charWidth;
+
+        return TextAlign switch
+        {
+            ContentAlignment.TopCenter or ContentAlignment.MiddleCenter or ContentAlignment.BottomCenter => Math.Max(0, (Width - lineWidth) / 2),
+            ContentAlignment.TopRight or ContentAlignment.MiddleRight or ContentAlignment.BottomRight => Math.Max(0, Width - lineWidth),
+            _ => 0
+        };
     }
 }
 

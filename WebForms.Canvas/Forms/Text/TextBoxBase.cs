@@ -372,7 +372,7 @@ public abstract class TextBoxBase : Control
 
     private async Task MeasureTextForCacheAsync(int requestId)
     {
-        var measureService = (Parent as Form)?.TextMeasurementService;
+        var measureService = FindForm()?.TextMeasurementService;
         if (measureService == null) return;
 
         var displayText = GetDisplayText();
@@ -396,7 +396,7 @@ public abstract class TextBoxBase : Control
         {
             // Only refresh if this is the latest measurement request and we're focused.
             if (requestId == System.Threading.Volatile.Read(ref _measureRequestId)
-                && Parent is Form form
+                && FindForm() is Form form
                 && form.FocusedControl == this)
             {
                 Invalidate();
@@ -617,7 +617,7 @@ public abstract class TextBoxBase : Control
             return new Point(0, 0);
 
         // Get the form's text measurement service
-        var measureService = (Parent as Form)?.TextMeasurementService;
+        var measureService = FindForm()?.TextMeasurementService;
         if (measureService == null || _font == null)
             return new Point(0, 0);
 
@@ -671,7 +671,7 @@ public abstract class TextBoxBase : Control
     public int GetCharIndexFromPosition(Point pt)
     {
         // Get the form's text measurement service
-        var measureService = (Parent as Form)?.TextMeasurementService;
+        var measureService = FindForm()?.TextMeasurementService;
         if (measureService == null || _font == null)
             return 0;
 
@@ -941,7 +941,7 @@ public abstract class TextBoxBase : Control
         var borderWidth = GetBorderWidth();
 
         // Check if we have focus
-        var hasFocus = Parent is Form form && form.FocusedControl == this;
+        var hasFocus = FindForm() is Form form && form.FocusedControl == this;
 
         // Draw background
         DrawBackground(g, bounds);
@@ -961,7 +961,7 @@ public abstract class TextBoxBase : Control
         );
 
         // Get text measurement service
-        var measureService = (Parent as Form)?.TextMeasurementService;
+        var measureService = FindForm()?.TextMeasurementService;
 
         // Clip text/caret to the text area so scrolled content doesn't draw outside the control.
         // Note: Graphics.SetClip must respect the current TranslateTransform applied by Form.
@@ -1009,7 +1009,7 @@ public abstract class TextBoxBase : Control
                 Height - (borderWidth * 2) - (textPadding * 2)
             );
 
-            var measureService = (Parent as Form)?.TextMeasurementService;
+            var measureService = FindForm()?.TextMeasurementService;
 
             if (TryGetCharIndexFromMouse(new Point(e.X, e.Y), textBounds, displayText, measureService, out var index))
             {
@@ -1051,7 +1051,7 @@ public abstract class TextBoxBase : Control
                 Height - (borderWidth * 2) - (textPadding * 2)
             );
 
-            var measureService = (Parent as Form)?.TextMeasurementService;
+            var measureService = FindForm()?.TextMeasurementService;
 
             if (TryGetCharIndexFromMouse(new Point(e.X, e.Y), textBounds, displayText, measureService, out var index))
             {

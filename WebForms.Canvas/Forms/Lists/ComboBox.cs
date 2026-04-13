@@ -27,6 +27,11 @@ public class ComboBox : ListControl
         ForeColor = Color.Black;
     }
 
+    internal Rectangle GetDropDownBounds()
+    {
+        return new Rectangle(0, Height, DropDownWidth, GetActualDropDownHeight());
+    }
+
     /// <summary>
     /// Gets or sets the style of the combo box
     /// </summary>
@@ -473,7 +478,10 @@ public class ComboBox : ListControl
         // Check if clicking in the text area (for DropDownList, also toggle)
         if (e.Y < Height)
         {
-            if (_dropDownStyle == ComboBoxStyle.DropDownList)
+            // WinForms: DropDownList opens when clicking the non-button area.
+            // In this canvas implementation, the editable DropDown style is not truly editable,
+            // so we also open when clicking the text area to match expected user interaction.
+            if (_dropDownStyle is ComboBoxStyle.DropDownList or ComboBoxStyle.DropDown)
             {
                 DroppedDown = !DroppedDown;
             }

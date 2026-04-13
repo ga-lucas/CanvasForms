@@ -229,6 +229,11 @@ public class TextBox : TextBoxBase
         return _autoCompletePanel?.GetBounds() ?? Rectangle.Empty;
     }
 
+    internal void HideAutoCompletePanel()
+    {
+        _autoCompletePanel?.Hide();
+    }
+
     private int CalculateTextX(Rectangle textBounds, string displayText, TextMeasurementService? measureService)
     {
         if (_textAlign == HorizontalAlignment.Left || measureService == null)
@@ -363,7 +368,7 @@ public class TextBox : TextBoxBase
     /// </summary>
     private async Task MeasureTextForCacheAsync()
     {
-        var measureService = (Parent as Form)?.TextMeasurementService;
+        var measureService = FindForm()?.TextMeasurementService;
         if (measureService == null) return;
 
         var displayText = GetDisplayText();
