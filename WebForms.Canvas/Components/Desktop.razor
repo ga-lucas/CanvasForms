@@ -46,12 +46,15 @@
     <div class="desktop-area" style="position: absolute; top: @(TaskbarHeight)px; left: 0; right: 0; bottom: 0;">
         @foreach (var form in _formManager.OpenForms.Where(f => f.WindowState != FormWindowState.Minimized))
         {
+            var isModalBlock = _formManager.ModalForm != null && !ReferenceEquals(_formManager.ModalForm, form);
+
             <FormRenderer @key="form" 
                           Form="@form" 
                           ViewportWidth="@_viewportWidth"
                           ViewportHeight="@_viewportHeight"
                           TaskbarHeight="@TaskbarHeight"
-                          GetMaxZIndex="@GetCurrentMaxZIndex" />
+                          GetMaxZIndex="@GetCurrentMaxZIndex"
+                          InputBlocked="@isModalBlock" />
         }
     </div>
 </div>

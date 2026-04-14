@@ -79,6 +79,174 @@ runtime.DesktopChanged += async () =>
 
 // ============ API Endpoints ============
 
+// ============ Host File System Endpoints (for browser-hosted dialogs) ============
+
+// List roots (drives on Windows, '/' on Linux/macOS)
+app.MapGet("/api/hostfs/roots", () =>
+{
+    try
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            var roots = DriveInfo.GetDrives()
+                .Where(d => d.IsReady)
+                .Select(d => d.RootDirectory.FullName)
+                .ToArray();
+            return Results.Ok(roots);
+        }
+
+        return Results.Ok(new[] { Path.GetPathRoot(Environment.CurrentDirectory) ?? "/" });
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(ex.Message);
+    }
+});
+
+// Check existence of a directory
+app.MapGet("/api/hostfs/dir-exists", (string path) =>
+{
+    try
+    {
+        return Results.Ok(Directory.Exists(path));
+    }
+    catch
+    {
+        return Results.Ok(false);
+    }
+});
+
+// Check existence of a file
+app.MapGet("/api/hostfs/file-exists", (string path) =>
+{
+    try
+    {
+        return Results.Ok(File.Exists(path));
+    }
+    catch
+    {
+        return Results.Ok(false);
+    }
+});
+
+// List directory entries
+app.MapGet("/api/hostfs/list", (string path) =>
+{
+    try
+    {
+        if (!Directory.Exists(path))
+        {
+            return Results.Ok(Array.Empty<object>());
+        }
+
+        var dirs = Directory.EnumerateDirectories(path)
+            .Select(d => new
+            {
+                name = Path.GetFileName(d),
+                fullPath = d,
+                isDirectory = true,
+                size = (long?)null
+            });
+
+        var files = Directory.EnumerateFiles(path)
+            .Select(f =>
+            {
+                long? size = null;
+                try { size = new FileInfo(f).Length; } catch { }
+                return new
+                {
+                    name = Path.GetFileName(f),
+                    fullPath = f,
+                    isDirectory = false,
+                    size
+                };
+            });
+
+        return Results.Ok(dirs.Concat(files).ToArray());
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(ex.Message);
+    }
+});
+
+// Download file contents (for OpenFileDialog.OpenFile in browser)
+app.MapGet("/api/hostfs/openread", (string path) =>
+{
+    try
+    {
+        if (!File.Exists(path))
+        {
+            return Results.NotFound();
+        }
+
+        var fileName = Path.GetFileName(path);
+        return Results.File(File.OpenRead(path), "application/octet-stream", fileName);
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(ex.Message);
+    }
+});
+
+// Upload one or more files to the host temp folder (browser upload feature)
+app.MapPost("/api/hostfs/upload", async (HttpRequest request, IWebHostEnvironment env) =>
+{
+    try
+    {
+        if (!request.HasFormContentType)
+        {
+            return Results.BadRequest("Expected multipart/form-data");
+        }
+
+        var form = await request.ReadFormAsync();
+        if (form.Files.Count == 0)
+        {
+            return Results.BadRequest("No files uploaded");
+        }
+
+        var baseDir = Path.Combine(env.ContentRootPath, ".apps", "_uploads");
+        Directory.CreateDirectory(baseDir);
+
+        var uploadId = Guid.NewGuid().ToString("N");
+        var uploadDir = Path.Combine(baseDir, uploadId);
+        Directory.CreateDirectory(uploadDir);
+
+        var saved = new List<object>();
+        foreach (var file in form.Files)
+        {
+            if (file.Length == 0) continue;
+
+            // Prevent traversal, keep just the filename.
+            var safeName = Path.GetFileName(file.FileName);
+            if (string.IsNullOrWhiteSpace(safeName)) continue;
+
+            var destPath = Path.Combine(uploadDir, safeName);
+            await using var fs = File.Create(destPath);
+            await using var src = file.OpenReadStream();
+            await src.CopyToAsync(fs, request.HttpContext.RequestAborted);
+
+            saved.Add(new
+            {
+                name = safeName,
+                fullPath = destPath,
+                size = new FileInfo(destPath).Length
+            });
+        }
+
+        return Results.Ok(new
+        {
+            uploadId,
+            directory = uploadDir,
+            files = saved
+        });
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(ex.Message);
+    }
+});
+
 // Status endpoint
 app.MapGet("/api/status", (AppRuntime runtime, AppManager manager) => new
 {

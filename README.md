@@ -169,6 +169,84 @@ FormClosing += (s, e) =>
 
 The goal is maximum API-surface compatibility. Some members are stubs (e.g. `Handle`, `AllowDrop`, IME) — they exist so translated apps compile, but have no browser equivalent.
 
+### Implemented controls (source present)
+
+The following WinForms controls/types currently exist under `WebForms.Canvas/Forms/*` (project: `Canvas.Windows.Forms`). Many are **partial** implementations (see the per-control status table below).
+
+**Windowing**
+- `Form`
+
+**Core / base types**
+- `Control`
+- `ContainerControl`
+- `ScrollableControl`
+
+**Buttons**
+- `Button` (`ButtonBase`)
+- `CheckBox` (`ToggleButtonBase`)
+- `RadioButton`
+
+**Text / input**
+- `Label`
+- `LinkLabel`
+- `TextBox` (`TextBoxBase`)
+- `MaskedTextBox`
+- `RichTextBox`
+
+**Lists / hierarchy**
+- `ListBox`, `CheckedListBox`
+- `ComboBox` (`ListControl`)
+- `ListView`
+- `TreeView`
+
+**Containers / layout**
+- `Panel`
+- `GroupBox`
+- `TabControl`
+- `SplitContainer`
+- `TableLayoutPanel`
+- `FlowLayoutPanel`
+
+**Display / common controls**
+- `PictureBox`
+- `ProgressBar`
+- `DateTimePicker`
+- `MonthCalendar`
+- `NumericUpDown` (`UpDownBase`)
+
+**Non-visual / helper components (currently stubs/compat)**
+- `ToolTip`
+- `NotifyIcon`
+
+### Not implemented yet (common WinForms controls)
+
+This list is not exhaustive; it’s meant to highlight frequently used WinForms controls that are not currently present in this repo.
+
+**Menus / toolbars**
+- `MainMenu`, `ContextMenu`
+- `MenuStrip`, `ContextMenuStrip`, `ToolStrip`, `StatusStrip`
+
+**Data / inspection**
+- `DataGridView`
+- `PropertyGrid`
+
+**Value/input**
+- `TrackBar`
+- `ScrollBar` (`HScrollBar`, `VScrollBar`)
+- `DomainUpDown`
+
+**Rich UI controls**
+- `ListView` / `TreeView` advanced features (icons, in-place label editing, full keyboard/mouse parity, virtualization)
+- `ListView` groups, image lists, and owner-draw modes
+
+**Dialogs**
+- `OpenFileDialog`, `SaveFileDialog`, `FolderBrowserDialog`
+- `ColorDialog`, `FontDialog`, `PrintDialog`
+
+**Other common controls**
+- `WebBrowser`
+- `Chart`
+
 Controls live in `WebForms.Canvas/Forms/...` (project: `Canvas.Windows.Forms`).
 See `COMPATIBILITY_REVIEW.md` for a full per-control breakdown, and the test project for property-level tracking:
 

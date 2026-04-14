@@ -54,6 +54,39 @@ If you still see `404`/missing requests under `/_framework/`:
 - IL is rewritten to target Canvas.Windows.Forms
 - Dependencies uploaded together
 
+## Windows Forms Control Support
+
+This repo is a WinForms compatibility layer. The goal is API/behavior compatibility first; visual fidelity and edge-case behavior may vary.
+
+### Implemented (at least basic rendering + input)
+
+| Area | Controls |
+|------|----------|
+| Windowing | `Form` |
+| Base | `Control`, `ContainerControl`, `ScrollableControl` |
+| Layout / containers | `Panel`, `GroupBox`, `TabControl`, `SplitContainer`, `TableLayoutPanel`, `FlowLayoutPanel` |
+| Buttons | `Button`, `CheckBox`, `RadioButton` |
+| Text | `Label`, `LinkLabel`, `TextBox`, `MaskedTextBox`, `RichTextBox` |
+| Lists / hierarchy | `ListBox`, `CheckedListBox`, `ComboBox`, `ListView`, `TreeView` |
+| Date / value | `DateTimePicker`, `MonthCalendar`, `NumericUpDown` |
+| Display | `PictureBox`, `ProgressBar` |
+| Non-visual / helpers | `ToolTip`, `NotifyIcon` |
+
+### Not implemented yet (common WinForms controls)
+
+This list is not exhaustive, but covers the most commonly requested controls that are not currently present in `WebForms.Canvas/Forms/*`.
+
+| Area | Controls |
+|------|----------|
+| Menus / toolbars | `MenuStrip`, `ContextMenuStrip`, `ToolStrip`, `StatusStrip` |
+| Data | `DataGridView`, `PropertyGrid` |
+| Input | `TrackBar`, `ScrollBar` (`HScrollBar`, `VScrollBar`), `DomainUpDown` |
+| Display | `ImageList` (full integration), `ListView`/`TreeView` icons |
+| Dialogs | `OpenFileDialog`, `SaveFileDialog`, `FolderBrowserDialog`, `ColorDialog`, `FontDialog` |
+
+Notes:
+- `ListView` / `TreeView` exist, but some WinForms features are not yet supported (for example: icons, virtualization, in-place label editing, and full keyboard/mouse parity).
+
 ## API Endpoints
 
 | Method | Path | Description |

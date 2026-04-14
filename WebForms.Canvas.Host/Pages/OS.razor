@@ -151,6 +151,10 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // Host-wide options (per OS instance)
+        // In the future these can be driven by appsettings/config.
+        Canvas.Windows.Forms.CanvasFormsOptions.EnableFileDialogUpload = true;
+
         await RefreshInstalledApps();
     }
 

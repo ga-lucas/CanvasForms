@@ -12,6 +12,7 @@ public class FormManager
     private readonly Action? _onFormsChanged;
     private Form? _mainForm;
     private Form? _activeForm;
+    private Form? _modalForm;
 
     /// <summary>
     /// Fired whenever a new form is added to the desktop for the first time.
@@ -33,6 +34,11 @@ public class FormManager
     /// Gets the currently active form (the one with focus/on top)
     /// </summary>
     public Form? ActiveForm => _activeForm;
+
+    /// <summary>
+    /// Gets the currently modal form (if any). When non-null, only this form should receive input.
+    /// </summary>
+    public Form? ModalForm => _modalForm;
 
     /// <summary>
     /// Gets or sets the main form of the application
@@ -63,6 +69,7 @@ public class FormManager
     /// </summary>
     public void ShowForm(Form form)
     {
+        // If a modal dialog is open, new forms should not steal focus unless they are the modal form.
         if (!_forms.Contains(form))
         {
             _forms.Add(form);
@@ -73,8 +80,11 @@ public class FormManager
         // Call Show() to ensure PerformLayout is called for docking/anchoring
         form.Show();
 
-        // Track the active form
-        _activeForm = form;
+        // Track the active form unless a modal form is currently shown.
+        if (_modalForm == null || ReferenceEquals(_modalForm, form))
+        {
+            _activeForm = form;
+        }
 
         NotifyChanged();
     }
@@ -85,12 +95,27 @@ public class FormManager
     /// </summary>
     public DialogResult ShowDialog(Form form)
     {
+        // In the browser we can't block, but we can enforce modality by capturing input.
+        var previousModal = _modalForm;
+        _modalForm = form;
+
+        void OnDialogClosed(object? sender, FormClosedEventArgs e)
+        {
+            form.FormClosed -= OnDialogClosed;
+            if (ReferenceEquals(_modalForm, form))
+            {
+                _modalForm = previousModal;
+            }
+            NotifyChanged();
+        }
+
+        form.FormClosed += OnDialogClosed;
+
         ShowForm(form);
         form.BringToFront();
 
-        // In a web environment, we can't truly block
-        // Return OK for now - could be enhanced with callbacks
-        return DialogResult.OK;
+        // In a web environment, we can't truly block.
+        return DialogResult.None;
     }
 
     /// <summary>
@@ -193,6 +218,15 @@ public class FormManager
     {
         if (!_forms.Contains(form)) return;
 
+        // Enforce modality.
+        if (_modalForm != null && !ReferenceEquals(_modalForm, form))
+        {
+            _modalForm.BringToFront();
+            _activeForm = _modalForm;
+            NotifyChanged();
+            return;
+        }
+
         if (form.WindowState == FormWindowState.Minimized)
         {
             form.WindowState = FormWindowState.Normal;
@@ -227,6 +261,11 @@ public class FormManager
     {
         if (sender is Form form)
         {
+            if (ReferenceEquals(_modalForm, form))
+            {
+                _modalForm = null;
+            }
+
             // Remove from our list (form already handled the closing logic)
             _forms.Remove(form);
 
@@ -252,17 +291,3 @@ public class FormManager
     }
 }
 
-/// <summary>
-/// Specifies identifiers to indicate the return value of a dialog box
-/// </summary>
-public enum DialogResult
-{
-    None = 0,
-    OK = 1,
-    Cancel = 2,
-    Abort = 3,
-    Retry = 4,
-    Ignore = 5,
-    Yes = 6,
-    No = 7
-}

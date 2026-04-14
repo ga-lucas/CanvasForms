@@ -41,6 +41,20 @@
                    will-change: @(_isResizing || _isDragging ? "transform" : "auto");">
     </canvas>
 
+    @if (InputBlocked)
+    {
+        <div style="position: absolute;
+                    left: @(Form.Left)px;
+                    top: @(Form.Top)px;
+                    width: @(Form.Width)px;
+                    height: @(Form.Height)px;
+                    z-index: @(Form.ZIndex + 1);
+                    background-color: rgba(255,255,255,0.10);
+                    pointer-events: auto;
+                    cursor: not-allowed;">
+        </div>
+    }
+
     @if (_showMaximizePreview)
     {
         <div style="position: fixed;
@@ -60,6 +74,9 @@
 @code {
     [Parameter]
     public Forms.Form? Form { get; set; }
+
+    [Parameter]
+    public bool InputBlocked { get; set; }
 
     private ElementReference _canvasRef;
     private bool _initialized = false;

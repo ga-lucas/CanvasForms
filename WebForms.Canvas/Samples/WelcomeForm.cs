@@ -16,6 +16,8 @@ public class WelcomeForm : Form
     private Button? _btnSplitContainerDemo;
     private Button? _btnTabControlDemo;
 
+    private Button? _btnFileDialogDemo;
+
     public WelcomeForm()
     {
         Text = "Welcome - Windows Forms Canvas Clone";
@@ -231,6 +233,44 @@ public class WelcomeForm : Form
             Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<TabControlDemoForm>();
         };
         Controls.Add(_btnTabControlDemo);
+
+        _btnFileDialogDemo = new Button
+        {
+            Text = "File Dialogs (Host + Upload)",
+            Left = 250,
+            Top = 380,
+            Width = 410,
+            Height = 50
+        };
+        _btnFileDialogDemo.Click += (s, e) =>
+        {
+            var dlg = new OpenFileDialog
+            {
+                Title = "Open (host filesystem). Upload optional.",
+                Filter = "All files (*.*)|*.*|Text files (*.txt)|*.txt|Images (*.png;*.jpg;*.jpeg)|*.png;*.jpg;*.jpeg",
+                FilterIndex = 1,
+                Multiselect = true,
+                EnableUpload = Canvas.Windows.Forms.CanvasFormsOptions.EnableFileDialogUpload
+            };
+
+            dlg.ShowDialogAsync().ContinueWith(t =>
+            {
+                try
+                {
+                    if (t.Status == TaskStatus.RanToCompletion && t.Result == DialogResult.OK)
+                    {
+                        var form = Canvas.Windows.Forms.CanvasApplication.FormManager?.ActiveForm;
+                        if (form != null)
+                        {
+                            form.Text = $"Selected: {dlg.FileNames.Length} file(s)";
+                            form.Invalidate();
+                        }
+                    }
+                }
+                catch { }
+            }, TaskScheduler.Default);
+        };
+        Controls.Add(_btnFileDialogDemo);
 
         // Links section
         var linksLabel = new Label
