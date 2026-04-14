@@ -269,7 +269,7 @@ public class DateTimePicker : Control
         var checkBoxWidth = ShowCheckBox ? 18 : 0;
 
         // Background
-        using (var bg = new SolidBrush(Enabled ? BackColor : Color.FromArgb(240, 240, 240)))
+        using (var bg = new SolidBrush(Enabled ? BackColor : System.Drawing.Color.FromArgb(240, 240, 240)))
         {
             g.FillRectangle(bg, 0, 0, Width, Height);
         }
@@ -309,7 +309,7 @@ public class DateTimePicker : Control
         // Text
         var text = Checked ? GetDisplayText() : string.Empty;
         var textBounds = new Rectangle(PaddingX + checkBoxWidth, PaddingY, Width - DropDownButtonWidth - (PaddingX * 2) - checkBoxWidth, Height - (PaddingY * 2));
-        var textColor = Enabled ? ForeColor : Color.FromArgb(109, 109, 109);
+        var textColor = Enabled ? ForeColor : System.Drawing.Color.FromArgb(109, 109, 109);
         g.DrawString(text, Font.Family, (int)Font.Size, new SolidBrush(textColor), textBounds.X, textBounds.Y + 2);
 
         base.OnPaint(e);

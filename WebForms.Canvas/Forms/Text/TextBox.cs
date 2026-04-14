@@ -174,7 +174,7 @@ public class TextBox : TextBoxBase
     /// <summary>
     /// Draws single-line text with TextBox-specific features (alignment and auto-scroll)
     /// </summary>
-    protected override void DrawSingleLineText(Graphics g, string displayText, Rectangle textBounds, Color textColor, bool hasFocus, TextMeasurementService? measureService)
+    protected override void DrawSingleLineText(Graphics g, string displayText, Rectangle textBounds, System.Drawing.Color textColor, bool hasFocus, TextMeasurementService? measureService)
     {
         // Update scroll to keep caret visible
         if (measureService != null && !string.IsNullOrEmpty(displayText))

@@ -8,8 +8,8 @@ public class Label : Control
     {
         Width = 100;
         Height = 20;
-        BackColor = Color.Transparent;
-        ForeColor = Color.Black;
+        BackColor = System.Drawing.Color.Transparent;
+        ForeColor = System.Drawing.Color.Black;
         Text = "Label";
     }
 
@@ -21,7 +21,7 @@ public class Label : Control
         var g = e.Graphics;
 
         // Draw background if not transparent
-        if (BackColor != Color.Transparent)
+        if (BackColor != System.Drawing.Color.Transparent)
         {
             using var bgBrush = new SolidBrush(BackColor);
             g.FillRectangle(bgBrush, 0, 0, Width, Height);

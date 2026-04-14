@@ -1,4 +1,3 @@
-using Canvas.Windows.Forms.Drawing;
 using System.Windows.Forms;
 
 namespace Canvas.Windows.Forms.Tests;
@@ -13,7 +12,7 @@ public class ColorRenderingBehaviorTests
     {
         var button = new Button
         {
-            BackColor = Color.FromArgb(100, 150, 200),
+            BackColor = System.Drawing.Color.FromArgb(100, 150, 200),
             Text = "Test",
             Width = 100,
             Height = 30,
@@ -21,7 +20,7 @@ public class ColorRenderingBehaviorTests
         };
 
         // Button should have the custom BackColor set and preserved
-        Assert.Equal(Color.FromArgb(100, 150, 200), button.BackColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(100, 150, 200), button.BackColor);
     }
 
     [Fact]
@@ -29,14 +28,14 @@ public class ColorRenderingBehaviorTests
     {
         var checkBox = new CheckBox
         {
-            BackColor = Color.FromArgb(255, 255, 200),
+            BackColor = System.Drawing.Color.FromArgb(255, 255, 200),
             Text = "Test CheckBox",
             Width = 150,
             Height = 20,
             Enabled = true
         };
 
-        Assert.Equal(Color.FromArgb(255, 255, 200), checkBox.BackColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(255, 255, 200), checkBox.BackColor);
     }
 
     [Fact]
@@ -44,14 +43,14 @@ public class ColorRenderingBehaviorTests
     {
         var radioButton = new RadioButton
         {
-            BackColor = Color.FromArgb(200, 220, 255),
+            BackColor = System.Drawing.Color.FromArgb(200, 220, 255),
             Text = "Test Radio",
             Width = 150,
             Height = 20,
             Enabled = true
         };
 
-        Assert.Equal(Color.FromArgb(200, 220, 255), radioButton.BackColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(200, 220, 255), radioButton.BackColor);
     }
 
     [Fact]
@@ -59,7 +58,7 @@ public class ColorRenderingBehaviorTests
     {
         var form = new Form
         {
-            BackColor = Color.FromArgb(240, 248, 255),
+            BackColor = System.Drawing.Color.FromArgb(240, 248, 255),
             Width = 400,
             Height = 300
         };
@@ -72,7 +71,7 @@ public class ColorRenderingBehaviorTests
         };
         form.Controls.Add(childButton);
 
-        Assert.Equal(Color.FromArgb(240, 248, 255), form.BackColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(240, 248, 255), form.BackColor);
         Assert.Equal(1, form.Controls.Count);
     }
 
@@ -81,15 +80,15 @@ public class ColorRenderingBehaviorTests
     {
         var label = new Label
         {
-            BackColor = Color.FromArgb(255, 248, 220),
-            ForeColor = Color.FromArgb(139, 69, 19),
+            BackColor = System.Drawing.Color.FromArgb(255, 248, 220),
+            ForeColor = System.Drawing.Color.FromArgb(139, 69, 19),
             Text = "Custom Label",
             Width = 100,
             Height = 20
         };
 
-        Assert.Equal(Color.FromArgb(255, 248, 220), label.BackColor);
-        Assert.Equal(Color.FromArgb(139, 69, 19), label.ForeColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(255, 248, 220), label.BackColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(139, 69, 19), label.ForeColor);
     }
 
     [Fact]
@@ -97,16 +96,16 @@ public class ColorRenderingBehaviorTests
     {
         var textBox = new TextBox
         {
-            BackColor = Color.FromArgb(255, 255, 224),
-            ForeColor = Color.FromArgb(0, 0, 139),
+            BackColor = System.Drawing.Color.FromArgb(255, 255, 224),
+            ForeColor = System.Drawing.Color.FromArgb(0, 0, 139),
             Text = "Sample text",
             Width = 200,
             Height = 20,
             Enabled = true
         };
 
-        Assert.Equal(Color.FromArgb(255, 255, 224), textBox.BackColor);
-        Assert.Equal(Color.FromArgb(0, 0, 139), textBox.ForeColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(255, 255, 224), textBox.BackColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(0, 0, 139), textBox.ForeColor);
     }
 
     [Fact]
@@ -114,12 +113,12 @@ public class ColorRenderingBehaviorTests
     {
         var pictureBox = new PictureBox
         {
-            BackColor = Color.FromArgb(211, 211, 211),
+            BackColor = System.Drawing.Color.FromArgb(211, 211, 211),
             Width = 100,
             Height = 100
         };
 
-        Assert.Equal(Color.FromArgb(211, 211, 211), pictureBox.BackColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(211, 211, 211), pictureBox.BackColor);
     }
 
     [Fact]
@@ -263,16 +262,16 @@ public class ColorRenderingBehaviorTests
     [Fact]
     public void MultipleControls_WithDifferentColors_ShouldMaintainIndependentColors()
     {
-        var button = new Button { BackColor = Color.FromArgb(255, 0, 0), ForeColor = Color.White };
-        var checkBox = new CheckBox { BackColor = Color.FromArgb(0, 255, 0), ForeColor = Color.Black };
-        var label = new Label { BackColor = Color.FromArgb(0, 0, 255), ForeColor = Color.White };
+        var button = new Button { BackColor = System.Drawing.Color.FromArgb(255, 0, 0), ForeColor = System.Drawing.Color.White };
+        var checkBox = new CheckBox { BackColor = System.Drawing.Color.FromArgb(0, 255, 0), ForeColor = System.Drawing.Color.Black };
+        var label = new Label { BackColor = System.Drawing.Color.FromArgb(0, 0, 255), ForeColor = System.Drawing.Color.White };
 
-        Assert.Equal(Color.FromArgb(255, 0, 0), button.BackColor);
-        Assert.Equal(Color.White, button.ForeColor);
-        Assert.Equal(Color.FromArgb(0, 255, 0), checkBox.BackColor);
-        Assert.Equal(Color.Black, checkBox.ForeColor);
-        Assert.Equal(Color.FromArgb(0, 0, 255), label.BackColor);
-        Assert.Equal(Color.White, label.ForeColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(255, 0, 0), button.BackColor);
+        Assert.Equal(System.Drawing.Color.White, button.ForeColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(0, 255, 0), checkBox.BackColor);
+        Assert.Equal(System.Drawing.Color.Black, checkBox.ForeColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(0, 0, 255), label.BackColor);
+        Assert.Equal(System.Drawing.Color.White, label.ForeColor);
     }
 
     [Fact]

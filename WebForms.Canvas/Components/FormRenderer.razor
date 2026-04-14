@@ -104,6 +104,10 @@
     private DateTime _lastResizeRender = DateTime.MinValue;
     private const int ResizeRenderThrottleMs = 16; // ~60 FPS
 
+    // Throttling for resize layout (docked/anchored child controls)
+    private DateTime _lastResizeLayout = DateTime.MinValue;
+    private const int ResizeLayoutThrottleMs = 140; // lower priority to reduce UI lag
+
     // JS interop throttling for resize bounds updates
     private DateTime _lastResizeBoundsUpdate = DateTime.MinValue;
     private const int ResizeBoundsThrottleMs = 16; // ~60 FPS
@@ -114,6 +118,9 @@
     // Coalescing for control invalidations
     private bool _renderQueued = false;
     private bool _renderRequested = false;
+
+    // Cursor tracking for client-area controls
+    private string _lastClientCursor = "default";
 
     // Touch state
     private double _lastTouchX = 0;
@@ -241,7 +248,7 @@
                 Form.Width,
                 Form.Height,
                 Form.Text,
-                Form.BackColor.ToHexString(),
+                ((Color)Form.BackColor).ToHexString(),
                 BorderWidth,
                 TitleBarHeight + BorderWidth,
                 Form.Width - (BorderWidth * 2),
@@ -400,6 +407,20 @@
                 !IsPointInRect(_lastMouseX, _lastMouseY, minimizeButtonRect))
             {
                 return "move";
+            }
+        }
+
+        // Client-area cursor based on hovered control
+        if (Form != null)
+        {
+            var clientX = _lastMouseX - BorderWidth;
+            var clientY = _lastMouseY - TitleBarHeight - BorderWidth;
+
+            if (clientX >= 0 && clientY >= 0 &&
+                clientX < Form.Width - (BorderWidth * 2) &&
+                clientY < Form.Height - TitleBarHeight - (BorderWidth * 2))
+            {
+                return Form.GetCursorNameAtClientPoint(clientX, clientY);
             }
         }
 
@@ -666,6 +687,14 @@
             var now = DateTime.UtcNow;
             var timeSinceLastRender = (now - _lastResizeRender).TotalMilliseconds;
 
+            // During resize, keep dock/anchor layout reasonably up-to-date, but at a lower frequency
+            // than canvas re-render to reduce UI lag.
+            if ((now - _lastResizeLayout).TotalMilliseconds >= ResizeLayoutThrottleMs)
+            {
+                _lastResizeLayout = now;
+                Form.PerformLayout();
+            }
+
             // Update DOM bounds via JS to avoid frequent Blazor re-renders while resizing.
             // This keeps the canvas element and backing store in sync with Form's dimensions.
             if ((now - _lastResizeBoundsUpdate).TotalMilliseconds >= ResizeBoundsThrottleMs)
@@ -927,6 +956,14 @@
                 clientY
             );
             Form.OnMouseMove(args);
+
+            // Update cursor if the hovered control changed its Cursor (e.g., SplitContainer splitter hover)
+            var currentCursor = GetCanvasCursor();
+            if (!string.Equals(_lastClientCursor, currentCursor, StringComparison.Ordinal))
+            {
+                _lastClientCursor = currentCursor;
+                StateHasChanged();
+            }
         }
     }
 

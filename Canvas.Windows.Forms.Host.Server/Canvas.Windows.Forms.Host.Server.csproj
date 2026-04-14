@@ -12,6 +12,21 @@
     <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
   </PropertyGroup>
 
+  <!-- In Debug/F5, force regeneration of static-web-assets manifests by purging intermediate caches.
+       This avoids stale _framework asset names (dotnet.*.js, blazor.webassembly.*.js) causing 404s. -->
+  <Target Name="PurgeStaticWebAssetsCache" BeforeTargets="Build"
+          Condition="'$(Configuration)' == 'Debug' and '$(BuildingInsideVisualStudio)' == 'true'">
+    <ItemGroup>
+      <_StaticWebAssetsCacheFiles Include="$(BaseIntermediateOutputPath)staticwebassets\**\*" />
+      <_StaticWebAssetsCacheFiles Include="$(IntermediateOutputPath)staticwebassets\**\*" />
+      <_StaticWebAssetsCacheFiles Include="$(BaseIntermediateOutputPath)staticwebassets*.json" />
+      <_StaticWebAssetsCacheFiles Include="$(IntermediateOutputPath)staticwebassets*.json" />
+    </ItemGroup>
+    <Delete Files="@(_StaticWebAssetsCacheFiles)" />
+    <RemoveDir Directories="$(BaseIntermediateOutputPath)staticwebassets" />
+    <RemoveDir Directories="$(IntermediateOutputPath)staticwebassets" />
+  </Target>
+
   <!-- Only enable fingerprinting in Release builds -->
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
     <StaticWebAssetsFingerprintContent>true</StaticWebAssetsFingerprintContent>

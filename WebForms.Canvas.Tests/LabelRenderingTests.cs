@@ -20,7 +20,7 @@ public class LabelRenderingTests
     {
         var label = new TestLabel
         {
-            BackColor = Color.Transparent,
+            BackColor = System.Drawing.Color.Transparent,
             Width = 100,
             Height = 20,
             Text = string.Empty
@@ -36,7 +36,7 @@ public class LabelRenderingTests
     [Fact]
     public void OnPaint_NonTransparentBackColor_EmitsFillRectCoveringControl()
     {
-        var backColor = Color.FromArgb(10, 20, 30);
+        var backColor = System.Drawing.Color.FromArgb(10, 20, 30);
 
         var label = new TestLabel
         {
@@ -57,7 +57,7 @@ public class LabelRenderingTests
         Assert.Equal(label.Height, fillRect.Height);
 
         var brush = Assert.IsType<SolidBrush>(fillRect.Brush);
-        Assert.Equal(backColor, brush.Color);
+        Assert.Equal((Color)backColor, brush.Color);
     }
 
     [Fact]

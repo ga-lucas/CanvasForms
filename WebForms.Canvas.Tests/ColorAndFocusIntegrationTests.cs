@@ -1,4 +1,3 @@
-using Canvas.Windows.Forms.Drawing;
 using System.Windows.Forms;
 
 namespace Canvas.Windows.Forms.Tests;
@@ -14,7 +13,7 @@ public class ColorAndFocusIntegrationTests
         // Create a form with custom background
         var form = new Form
         {
-            BackColor = Color.FromArgb(240, 248, 255), // Alice Blue
+            BackColor = System.Drawing.Color.FromArgb(240, 248, 255), // Alice Blue
             Width = 400,
             Height = 300,
             Text = "Test Form"
@@ -23,8 +22,8 @@ public class ColorAndFocusIntegrationTests
         // Add a button with custom colors
         var button = new Button
         {
-            BackColor = Color.FromArgb(100, 150, 200),
-            ForeColor = Color.White,
+            BackColor = System.Drawing.Color.FromArgb(100, 150, 200),
+            ForeColor = System.Drawing.Color.White,
             Text = "Click Me",
             Left = 10,
             Top = 10,
@@ -36,8 +35,8 @@ public class ColorAndFocusIntegrationTests
         // Add a checkbox with custom colors
         var checkBox = new CheckBox
         {
-            BackColor = Color.FromArgb(255, 255, 200),
-            ForeColor = Color.Black,
+            BackColor = System.Drawing.Color.FromArgb(255, 255, 200),
+            ForeColor = System.Drawing.Color.Black,
             Text = "Check This",
             Left = 10,
             Top = 50,
@@ -49,8 +48,8 @@ public class ColorAndFocusIntegrationTests
         // Add a radio button with custom colors
         var radioButton = new RadioButton
         {
-            BackColor = Color.FromArgb(200, 220, 255),
-            ForeColor = Color.FromArgb(0, 0, 128),
+            BackColor = System.Drawing.Color.FromArgb(200, 220, 255),
+            ForeColor = System.Drawing.Color.FromArgb(0, 0, 128),
             Text = "Select This",
             Left = 10,
             Top = 80,
@@ -62,8 +61,8 @@ public class ColorAndFocusIntegrationTests
         // Add a textbox with custom colors
         var textBox = new TextBox
         {
-            BackColor = Color.FromArgb(255, 255, 224),
-            ForeColor = Color.FromArgb(0, 0, 139),
+            BackColor = System.Drawing.Color.FromArgb(255, 255, 224),
+            ForeColor = System.Drawing.Color.FromArgb(0, 0, 139),
             Text = "Type here",
             Left = 10,
             Top = 110,
@@ -75,8 +74,8 @@ public class ColorAndFocusIntegrationTests
         // Add a label with custom colors
         var label = new Label
         {
-            BackColor = Color.FromArgb(255, 248, 220),
-            ForeColor = Color.FromArgb(139, 69, 19),
+            BackColor = System.Drawing.Color.FromArgb(255, 248, 220),
+            ForeColor = System.Drawing.Color.FromArgb(139, 69, 19),
             Text = "Instructions:",
             Left = 10,
             Top = 140,
@@ -95,19 +94,19 @@ public class ColorAndFocusIntegrationTests
         Assert.Equal(5, form.Controls.Count);
 
         // Verify form background color
-        Assert.Equal(Color.FromArgb(240, 248, 255), form.BackColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(240, 248, 255), form.BackColor);
 
         // Verify all control colors are preserved
-        Assert.Equal(Color.FromArgb(100, 150, 200), button.BackColor);
-        Assert.Equal(Color.White, button.ForeColor);
-        Assert.Equal(Color.FromArgb(255, 255, 200), checkBox.BackColor);
-        Assert.Equal(Color.Black, checkBox.ForeColor);
-        Assert.Equal(Color.FromArgb(200, 220, 255), radioButton.BackColor);
-        Assert.Equal(Color.FromArgb(0, 0, 128), radioButton.ForeColor);
-        Assert.Equal(Color.FromArgb(255, 255, 224), textBox.BackColor);
-        Assert.Equal(Color.FromArgb(0, 0, 139), textBox.ForeColor);
-        Assert.Equal(Color.FromArgb(255, 248, 220), label.BackColor);
-        Assert.Equal(Color.FromArgb(139, 69, 19), label.ForeColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(100, 150, 200), button.BackColor);
+        Assert.Equal(System.Drawing.Color.White, button.ForeColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(255, 255, 200), checkBox.BackColor);
+        Assert.Equal(System.Drawing.Color.Black, checkBox.ForeColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(200, 220, 255), radioButton.BackColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(0, 0, 128), radioButton.ForeColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(255, 255, 224), textBox.BackColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(0, 0, 139), textBox.ForeColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(255, 248, 220), label.BackColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(139, 69, 19), label.ForeColor);
     }
 
     [Fact]
@@ -237,44 +236,44 @@ public class ColorAndFocusIntegrationTests
         // Simulate a "dark theme" set of controls
         var darkButton = new Button
         {
-            BackColor = Color.FromArgb(45, 45, 48),
-            ForeColor = Color.FromArgb(241, 241, 241),
+            BackColor = System.Drawing.Color.FromArgb(45, 45, 48),
+            ForeColor = System.Drawing.Color.FromArgb(241, 241, 241),
             Text = "Dark Button"
         };
 
         var darkCheckBox = new CheckBox
         {
-            BackColor = Color.FromArgb(45, 45, 48),
-            ForeColor = Color.FromArgb(241, 241, 241),
+            BackColor = System.Drawing.Color.FromArgb(45, 45, 48),
+            ForeColor = System.Drawing.Color.FromArgb(241, 241, 241),
             Text = "Dark CheckBox"
         };
 
         // Simulate a "light theme" set of controls
         var lightButton = new Button
         {
-            BackColor = Color.FromArgb(240, 240, 240),
-            ForeColor = Color.FromArgb(30, 30, 30),
+            BackColor = System.Drawing.Color.FromArgb(240, 240, 240),
+            ForeColor = System.Drawing.Color.FromArgb(30, 30, 30),
             Text = "Light Button"
         };
 
         var lightCheckBox = new CheckBox
         {
-            BackColor = Color.FromArgb(255, 255, 255),
-            ForeColor = Color.FromArgb(0, 0, 0),
+            BackColor = System.Drawing.Color.FromArgb(255, 255, 255),
+            ForeColor = System.Drawing.Color.FromArgb(0, 0, 0),
             Text = "Light CheckBox"
         };
 
         // Verify dark theme colors
-        Assert.Equal(Color.FromArgb(45, 45, 48), darkButton.BackColor);
-        Assert.Equal(Color.FromArgb(241, 241, 241), darkButton.ForeColor);
-        Assert.Equal(Color.FromArgb(45, 45, 48), darkCheckBox.BackColor);
-        Assert.Equal(Color.FromArgb(241, 241, 241), darkCheckBox.ForeColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(45, 45, 48), darkButton.BackColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(241, 241, 241), darkButton.ForeColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(45, 45, 48), darkCheckBox.BackColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(241, 241, 241), darkCheckBox.ForeColor);
 
         // Verify light theme colors
-        Assert.Equal(Color.FromArgb(240, 240, 240), lightButton.BackColor);
-        Assert.Equal(Color.FromArgb(30, 30, 30), lightButton.ForeColor);
-        Assert.Equal(Color.FromArgb(255, 255, 255), lightCheckBox.BackColor);
-        Assert.Equal(Color.FromArgb(0, 0, 0), lightCheckBox.ForeColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(240, 240, 240), lightButton.BackColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(30, 30, 30), lightButton.ForeColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(255, 255, 255), lightCheckBox.BackColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(0, 0, 0), lightCheckBox.ForeColor);
     }
 
     [Fact]

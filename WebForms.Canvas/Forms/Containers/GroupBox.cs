@@ -9,7 +9,7 @@ public class GroupBox : Control
     public GroupBox()
     {
         TabStop = false;
-        BackColor = Color.Transparent;
+        BackColor = System.Drawing.Color.Transparent;
     }
 
     protected internal override void OnPaint(PaintEventArgs e)
@@ -18,7 +18,7 @@ public class GroupBox : Control
         var bounds = new Rectangle(0, 0, Width, Height);
 
         // GroupBox is typically transparent; only paint background if explicitly set.
-        if (BackColor != Color.Transparent)
+        if (BackColor != System.Drawing.Color.Transparent)
         {
             using var bgBrush = new SolidBrush(BackColor);
             g.FillRectangle(bgBrush, bounds);
@@ -158,7 +158,7 @@ public class GroupBox : Control
         if (!string.IsNullOrEmpty(text))
         {
             // Clear background behind caption to match WinForms (uses parent back color).
-            var bg = BackColor != Color.Transparent ? BackColor : (Parent?.BackColor ?? Color.White);
+            var bg = BackColor != System.Drawing.Color.Transparent ? BackColor : (Parent?.BackColor ?? System.Drawing.Color.White);
             using var bgBrush = new SolidBrush(bg);
             g.FillRectangle(bgBrush, gapLeft, 0, Math.Max(0, textWidth + (textPad * 2)), textHeight);
 

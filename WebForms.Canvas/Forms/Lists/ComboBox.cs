@@ -289,7 +289,7 @@ public class ComboBox : ListControl
     private void DrawComboBoxArea(Graphics g, Rectangle bounds)
     {
         // Background
-        var bgColor = Enabled ? BackColor : Color.FromArgb(240, 240, 240);
+        var bgColor = Enabled ? BackColor : System.Drawing.Color.FromArgb(240, 240, 240);
         using var bgBrush = new SolidBrush(bgColor);
         g.FillRectangle(bgBrush, bounds);
 
@@ -310,7 +310,7 @@ public class ComboBox : ListControl
             ? (_selectedIndex >= 0 ? GetItemText(Items[_selectedIndex]) : "")
             : _text;
 
-        var textColor = Enabled ? ForeColor : Color.FromArgb(109, 109, 109);
+        var textColor = Enabled ? ForeColor : System.Drawing.Color.FromArgb(109, 109, 109);
         g.DrawString(displayText, textBounds.X, textBounds.Y + 1, textColor);
 
         // Drop-down button
@@ -412,7 +412,7 @@ public class ComboBox : ListControl
 
         // Text
         var text = GetItemText(item);
-        var textColor = (isSelected || isHovered) ? Color.White : ForeColor;
+        var textColor = (isSelected || isHovered) ? System.Drawing.Color.White : ForeColor;
         g.DrawString(text, bounds.X + ItemPadding, bounds.Y + ItemPadding, textColor);
     }
 

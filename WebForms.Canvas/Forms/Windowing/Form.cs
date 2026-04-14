@@ -7,6 +7,7 @@ public class Form : ContainerControl
     private static int _nextZIndex = 1;
     private const int TitleBarHeight = 32; // Height of the title bar
     private Control? _focusedControl;
+    private Control? _capturedControl;
     private FormWindowState _windowState = FormWindowState.Normal;
     private Rectangle _normalBounds; // Store bounds before minimize/maximize
 
@@ -36,6 +37,13 @@ public class Form : ContainerControl
                 Invalidate();
             }
         }
+    }
+
+    internal string GetCursorNameAtClientPoint(int x, int y)
+    {
+        // Use the same hit-testing logic as input dispatch so cursor matches what will receive the event.
+        var hit = FindDeepestHitControl(this, x, y, offsetX: 0, offsetY: 0, includeDisabled: true);
+        return hit.control?.Cursor?.Name ?? "default";
     }
 
     // Event fired when window state changes
@@ -229,12 +237,13 @@ public class Form : ContainerControl
             var childOffsetX = offsetX + sx + control.Left;
             var childOffsetY = offsetY + sy + control.Top;
 
+            // Clip each control to its own bounds so it can't paint outside its rectangle.
+            // This is important for SplitContainer/ListView: columns should not overflow the panel.
+            g.Save();
             g.TranslateTransform(childOffsetX, childOffsetY);
+            g.SetClip(new Rectangle(0, 0, control.Width, control.Height));
 
-            var controlPaintArgs = new PaintEventArgs(
-                g,
-                new Rectangle(0, 0, control.Width, control.Height)
-            );
+            var controlPaintArgs = new PaintEventArgs(g, new Rectangle(0, 0, control.Width, control.Height));
 
             if (control is ComboBox comboBox)
             {
@@ -253,7 +262,7 @@ public class Form : ContainerControl
                 control.OnPaint(controlPaintArgs);
             }
 
-            g.TranslateTransform(-childOffsetX, -childOffsetY);
+            g.Restore();
 
             if (control.HasChildren)
             {
@@ -274,24 +283,27 @@ public class Form : ContainerControl
 
             if (control is ComboBox comboBox && comboBox.DroppedDown)
             {
+                g.Save();
                 g.TranslateTransform(childOffsetX, childOffsetY);
                 var ddArgs = new PaintEventArgs(g, new Rectangle(0, 0, control.Width, control.Height));
                 comboBox.PaintDropDownOnly(ddArgs);
-                g.TranslateTransform(-childOffsetX, -childOffsetY);
+                g.Restore();
             }
             else if (control is DateTimePicker dateTimePicker && dateTimePicker.HasVisibleDropDown)
             {
+                g.Save();
                 g.TranslateTransform(childOffsetX, childOffsetY);
                 var ddArgs = new PaintEventArgs(g, new Rectangle(0, 0, control.Width, control.Height));
                 dateTimePicker.PaintDropDownOnly(ddArgs);
-                g.TranslateTransform(-childOffsetX, -childOffsetY);
+                g.Restore();
             }
             else if (control is TextBox textBox && textBox.HasVisibleAutoComplete)
             {
+                g.Save();
                 g.TranslateTransform(childOffsetX, childOffsetY);
                 var acArgs = new PaintEventArgs(g, new Rectangle(0, 0, control.Width, control.Height));
                 textBox.PaintAutoCompleteOnly(acArgs);
-                g.TranslateTransform(-childOffsetX, -childOffsetY);
+                g.Restore();
             }
 
             if (control.HasChildren)
@@ -315,6 +327,18 @@ public class Form : ContainerControl
 
     protected internal override void OnMouseDown(MouseEventArgs e)
     {
+        UpdateCapturedControl();
+
+        // If a control has mouse capture, it receives all mouse messages.
+        // This is required for drag operations (e.g., SplitContainer splitter).
+        if (_capturedControl is not null)
+        {
+            var (capturedX, capturedY) = TranslateToCapturedControl(_capturedControl, e.X, e.Y);
+            var capturedArgs = new MouseEventArgs(e.Button, e.Clicks, capturedX, capturedY);
+            _capturedControl.OnMouseDown(capturedArgs);
+            return;
+        }
+
         var hit = FindDeepestHitControl(this, e.X, e.Y, offsetX: 0, offsetY: 0);
         if (hit.control is null)
         {
@@ -333,6 +357,20 @@ public class Form : ContainerControl
 
     protected internal override void OnMouseUp(MouseEventArgs e)
     {
+        UpdateCapturedControl();
+
+        // If a control has mouse capture, it receives all mouse messages.
+        if (_capturedControl is not null)
+        {
+            var (capturedX, capturedY) = TranslateToCapturedControl(_capturedControl, e.X, e.Y);
+            var capturedArgs = new MouseEventArgs(e.Button, e.Clicks, capturedX, capturedY);
+            _capturedControl.OnMouseUp(capturedArgs);
+
+            // Capture may have been released during OnMouseUp.
+            UpdateCapturedControl();
+            return;
+        }
+
         var hit = FindDeepestHitControl(this, e.X, e.Y, offsetX: 0, offsetY: 0);
         if (hit.control is not null && hit.control.Enabled)
         {
@@ -346,6 +384,17 @@ public class Form : ContainerControl
 
     protected internal override void OnMouseMove(MouseEventArgs e)
     {
+        UpdateCapturedControl();
+
+        // If a control has mouse capture, it receives all mouse messages.
+        if (_capturedControl is not null)
+        {
+            var (capturedX, capturedY) = TranslateToCapturedControl(_capturedControl, e.X, e.Y);
+            var capturedArgs = new MouseEventArgs(e.Button, e.Clicks, capturedX, capturedY);
+            _capturedControl.OnMouseMove(capturedArgs);
+            return;
+        }
+
         var hit = FindDeepestHitControl(this, e.X, e.Y, offsetX: 0, offsetY: 0, includeDisabled: true);
         if (hit.control is not null)
         {
@@ -641,6 +690,54 @@ public class Form : ContainerControl
     public void DispatchKeyPress(char keyChar)
     {
         OnKeyPress(new KeyPressEventArgs(keyChar));
+    }
+
+    private void UpdateCapturedControl()
+    {
+        var found = FindCapturedControl(this);
+        if (!ReferenceEquals(_capturedControl, found))
+        {
+            _capturedControl = found;
+        }
+    }
+
+    private static Control? FindCapturedControl(Control parent)
+    {
+        if (parent.Capture) return parent;
+
+        foreach (var child in parent.Controls)
+        {
+            if (!child.Visible) continue;
+
+            var deep = FindCapturedControl(child);
+            if (deep is not null) return deep;
+        }
+
+        return null;
+    }
+
+    private static (int x, int y) TranslateToCapturedControl(Control captured, int formX, int formY)
+    {
+        var (left, top) = GetAbsoluteClientPosition(captured);
+        return (formX - left, formY - top);
+    }
+
+    private static (int left, int top) GetAbsoluteClientPosition(Control control)
+    {
+        var x = 0;
+        var y = 0;
+        var current = control;
+
+        while (current.Parent is not null)
+        {
+            var parent = current.Parent;
+            var (sx, sy) = GetChildScrollOffset(parent);
+            x += sx + current.Left;
+            y += sy + current.Top;
+            current = parent;
+        }
+
+        return (x, y);
     }
 
 

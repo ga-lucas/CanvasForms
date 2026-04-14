@@ -13,6 +13,8 @@ public class WelcomeForm : Form
     private Button? _btnDrawingSample;
     private Button? _btnFlowLayoutDemo;
     private Button? _btnTableLayoutDemo;
+    private Button? _btnSplitContainerDemo;
+    private Button? _btnTabControlDemo;
 
     public WelcomeForm()
     {
@@ -202,12 +204,40 @@ public class WelcomeForm : Form
         };
         Controls.Add(_btnDrawingSample);
 
+        _btnSplitContainerDemo = new Button
+        {
+            Text = "SplitContainer",
+            Left = 40,
+            Top = 310,
+            Width = 200,
+            Height = 50
+        };
+        _btnSplitContainerDemo.Click += (s, e) =>
+        {
+            Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<SplitContainerDemoForm>();
+        };
+        Controls.Add(_btnSplitContainerDemo);
+
+        _btnTabControlDemo = new Button
+        {
+            Text = "TabControl",
+            Left = 40,
+            Top = 380,
+            Width = 200,
+            Height = 50
+        };
+        _btnTabControlDemo.Click += (s, e) =>
+        {
+            Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<TabControlDemoForm>();
+        };
+        Controls.Add(_btnTabControlDemo);
+
         // Links section
         var linksLabel = new Label
         {
             Text = "Links:",
             Left = 20,
-            Top = 380,
+            Top = 450,
             Width = 660,
             Height = 25,
             ForeColor = Color.FromArgb(60, 60, 60),
@@ -221,7 +251,7 @@ public class WelcomeForm : Form
             Text = "View on GitHub",
             LinkUrl = "https://github.com/ga-lucas/CanvasForms",
             Left = 40,
-            Top = 410,
+            Top = 480,
             Width = 150,
             Height = 20
         };
@@ -238,7 +268,7 @@ public class WelcomeForm : Form
             Text = "Documentation",
             LinkUrl = "https://docs.microsoft.com/en-us/dotnet/desktop/winforms/",
             Left = 200,
-            Top = 410,
+            Top = 480,
             Width = 150,
             Height = 20
         };
@@ -250,7 +280,7 @@ public class WelcomeForm : Form
             Text = "WinForms Examples",
             LinkUrl = "https://github.com/dotnet/winforms",
             Left = 360,
-            Top = 410,
+            Top = 480,
             Width = 150,
             Height = 20
         };

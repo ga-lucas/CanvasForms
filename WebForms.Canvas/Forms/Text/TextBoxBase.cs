@@ -1463,7 +1463,7 @@ public abstract class TextBoxBase : Control
     /// </summary>
     protected virtual void DrawBackground(Graphics g, Rectangle bounds)
     {
-        var bgColor = Enabled ? BackColor : Color.FromArgb(240, 240, 240);
+        var bgColor = Enabled ? BackColor : System.Drawing.Color.FromArgb(240, 240, 240);
         using var bgBrush = new SolidBrush(bgColor);
         g.FillRectangle(bgBrush, bounds);
     }
@@ -1491,7 +1491,7 @@ public abstract class TextBoxBase : Control
     /// </summary>
     protected virtual void DrawTextContent(Graphics g, string displayText, Rectangle textBounds, bool hasFocus, TextMeasurementService? measureService)
     {
-        var textColor = Enabled ? ForeColor : Color.FromArgb(109, 109, 109);
+        var textColor = Enabled ? ForeColor : System.Drawing.Color.FromArgb(109, 109, 109);
 
         if (_multiline)
         {
@@ -1506,7 +1506,7 @@ public abstract class TextBoxBase : Control
     /// <summary>
     /// Draws single-line text with selection
     /// </summary>
-    protected virtual void DrawSingleLineText(Graphics g, string displayText, Rectangle textBounds, Color textColor, bool hasFocus, TextMeasurementService? measureService)
+    protected virtual void DrawSingleLineText(Graphics g, string displayText, Rectangle textBounds, System.Drawing.Color textColor, bool hasFocus, TextMeasurementService? measureService)
     {
         var textX = textBounds.X - _scrollOffsetX;
         var textY = textBounds.Y;
@@ -1525,7 +1525,7 @@ public abstract class TextBoxBase : Control
     /// <summary>
     /// Draws multiline text with selection
     /// </summary>
-    protected virtual void DrawMultilineText(Graphics g, string displayText, Rectangle textBounds, Color textColor, bool hasFocus, TextMeasurementService? measureService)
+    protected virtual void DrawMultilineText(Graphics g, string displayText, Rectangle textBounds, System.Drawing.Color textColor, bool hasFocus, TextMeasurementService? measureService)
     {
         var lines = displayText.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
         var lineHeight = (int)_font.Size + 4;
@@ -1683,15 +1683,7 @@ public abstract class TextBoxBase : Control
     #endregion
 }
 
-/// <summary>
-/// Specifies the border styles for a text box
-/// </summary>
-public enum BorderStyle
-{
-    None = 0,
-    FixedSingle = 1,
-    Fixed3D = 2
-}
+// BorderStyle moved to Forms/Common to match WinForms (used by many controls).
 
 /// <summary>
 /// Specifies which scroll bars will be visible on a control

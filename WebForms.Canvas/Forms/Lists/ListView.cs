@@ -163,6 +163,12 @@ public class ListView : Control
     {
         var g = e.Graphics;
 
+        var borderWidth = GetBorderWidth();
+        var clientX = borderWidth;
+        var clientY = borderWidth;
+        var clientW = Math.Max(0, Width - (borderWidth * 2));
+        var clientH = Math.Max(0, Height - (borderWidth * 2));
+
         // Background
         using var bgBrush = new SolidBrush(BackColor);
         g.FillRectangle(bgBrush, 0, 0, Width, Height);
@@ -174,41 +180,41 @@ public class ListView : Control
         }
 
         if (_view == View.Details)
-            PaintDetails(g);
+            PaintDetails(g, clientX, clientY, clientW, clientH);
         else if (_view == View.List)
-            PaintList(g);
+            PaintList(g, clientX, clientY, clientW, clientH);
         else
-            PaintLargeIcons(g);
+            PaintLargeIcons(g, clientX, clientY, clientW, clientH);
 
         base.OnPaint(e);
     }
 
-    private void PaintDetails(Graphics g)
+    private void PaintDetails(Graphics g, int clientX, int clientY, int clientW, int clientH)
     {
-        int colX = 0;
+        int colX = clientX;
 
         // Column headers
         using var headerBg = new SolidBrush(Color.FromArgb(240, 240, 240));
-        g.FillRectangle(headerBg, 0, 0, Width, HeaderHeight);
+        g.FillRectangle(headerBg, clientX, clientY, clientW, HeaderHeight);
         using var headerBorderPen = new Pen(Color.FromArgb(200, 200, 200));
-        g.DrawLine(headerBorderPen, 0, HeaderHeight - 1, Width, HeaderHeight - 1);
+        g.DrawLine(headerBorderPen, clientX, clientY + HeaderHeight - 1, clientX + clientW, clientY + HeaderHeight - 1);
 
         foreach (var col in Columns)
         {
             using var colBorderPen = new Pen(Color.FromArgb(210, 210, 210));
-            g.DrawLine(colBorderPen, colX + col.Width - 1, 0, colX + col.Width - 1, HeaderHeight);
+            g.DrawLine(colBorderPen, colX + col.Width - 1, clientY, colX + col.Width - 1, clientY + HeaderHeight);
             using var headerTextBrush = new SolidBrush(Color.Black);
-            g.DrawString(col.Text, "Arial", 12, headerTextBrush, colX + 3, 4);
+            g.DrawString(col.Text, "Arial", 12, headerTextBrush, colX + 3, clientY + 4);
             colX += col.Width;
         }
 
         // Items
         var sorted = GetSortedItems();
-        int y = HeaderHeight - _scrollOffset;
+        int y = clientY + HeaderHeight - _scrollOffset;
         foreach (var item in sorted)
         {
-            if (y + ItemHeight < HeaderHeight) { y += ItemHeight; continue; }
-            if (y > Height) break;
+            if (y + ItemHeight < clientY + HeaderHeight) { y += ItemHeight; continue; }
+            if (y > clientY + clientH) break;
 
             bool isSelected = item.Selected;
             bool isHovered = sorted.IndexOf(item) == _hoveredIndex;
@@ -217,14 +223,14 @@ public class ListView : Control
             {
                 var selBg = Focused ? Color.FromArgb(0, 120, 215) : Color.FromArgb(204, 228, 247);
                 int selX = _fullRowSelect ? 0 : 0;
-                int selW = _fullRowSelect ? Width : (Columns.Count > 0 ? Columns[0].Width : Width);
+                int selW = _fullRowSelect ? clientW : (Columns.Count > 0 ? Columns[0].Width : clientW);
                 using var selBrush = new SolidBrush(selBg);
-                if (_fullRowSelect) g.FillRectangle(selBrush, 0, y, Width, ItemHeight);
+                if (_fullRowSelect) g.FillRectangle(selBrush, clientX, y, clientW, ItemHeight);
             }
             else if (isHovered)
             {
                 using var hoverBrush = new SolidBrush(Color.FromArgb(229, 241, 251));
-                g.FillRectangle(hoverBrush, 0, y, Width, ItemHeight);
+                g.FillRectangle(hoverBrush, clientX, y, clientW, ItemHeight);
             }
 
             int ix = 2;
@@ -244,15 +250,15 @@ public class ListView : Control
             }
 
             // Cells
-            int cx = ix;
+            int cx = clientX + ix;
             var allCols = Columns.ToList();
             for (int ci = 0; ci < allCols.Count || ci == 0; ci++)
             {
-                int colW = ci < allCols.Count ? allCols[ci].Width : (Width - cx);
+                int colW = ci < allCols.Count ? allCols[ci].Width : (clientX + clientW - cx);
                 string cellText = ci == 0 ? item.Text :
                     (ci - 1 < item.SubItems.Count ? item.SubItems[ci - 1].Text : string.Empty);
 
-                var textColor = isSelected && Focused ? Color.White : ForeColor;
+                var textColor = isSelected && Focused ? System.Drawing.Color.White : ForeColor;
                 using var textBrush = new SolidBrush(textColor);
                 g.DrawString(cellText, "Arial", 12, textBrush, cx + 2, y + 3);
 
@@ -268,39 +274,39 @@ public class ListView : Control
             if (_gridLines)
             {
                 using var gridPen = new Pen(Color.FromArgb(220, 220, 220));
-                g.DrawLine(gridPen, 0, y + ItemHeight - 1, Width, y + ItemHeight - 1);
+                g.DrawLine(gridPen, clientX, y + ItemHeight - 1, clientX + clientW, y + ItemHeight - 1);
             }
 
             y += ItemHeight;
         }
     }
 
-    private void PaintList(Graphics g)
+    private void PaintList(Graphics g, int clientX, int clientY, int clientW, int clientH)
     {
         var sorted = GetSortedItems();
-        int y = 0; int col = 0;
+        int y = clientY; int col = 0;
         int colW = 120;
         foreach (var item in sorted)
         {
-            int x = col * colW;
+            int x = clientX + (col * colW);
             bool isSelected = item.Selected;
             if (isSelected)
             {
                 using var selBrush = new SolidBrush(Color.FromArgb(0, 120, 215));
                 g.FillRectangle(selBrush, x, y, colW - 2, ItemHeight);
             }
-            using var textBrush = new SolidBrush(isSelected && Focused ? Color.White : ForeColor);
+            using var textBrush = new SolidBrush(isSelected && Focused ? System.Drawing.Color.White : ForeColor);
             g.DrawString(item.Text, "Arial", 12, textBrush, x + 2, y + 3);
             y += ItemHeight;
-            if (y + ItemHeight > Height) { y = 0; col++; }
+            if (y + ItemHeight > clientY + clientH) { y = clientY; col++; }
         }
     }
 
-    private void PaintLargeIcons(Graphics g)
+    private void PaintLargeIcons(Graphics g, int clientX, int clientY, int clientW, int clientH)
     {
         const int iconSize = 32; const int cellW = 70; const int cellH = 60;
         var sorted = GetSortedItems();
-        int x = 4; int y = 4;
+        int x = clientX + 4; int y = clientY + 4;
         foreach (var item in sorted)
         {
             bool isSelected = item.Selected;
@@ -316,8 +322,18 @@ public class ListView : Control
             var tw = item.Text.Length * 6;
             g.DrawString(item.Text, "Arial", 10, textBrush, x + (cellW - tw) / 2, y + iconSize + 4);
             x += cellW;
-            if (x + cellW > Width) { x = 4; y += cellH; }
+            if (x + cellW > clientX + clientW) { x = clientX + 4; y += cellH; }
         }
+    }
+
+    private int GetBorderWidth()
+    {
+        return BorderStyle switch
+        {
+            BorderStyle.Fixed3D => 2,
+            BorderStyle.FixedSingle => 1,
+            _ => 0
+        };
     }
 
     private List<ListViewItem> GetSortedItems()
@@ -331,9 +347,10 @@ public class ListView : Control
     protected internal override void OnMouseDown(MouseEventArgs e)
     {
         Focus();
-        if (_view == View.Details && e.Y < HeaderHeight)
+        var borderWidth = GetBorderWidth();
+        if (_view == View.Details && e.Y < borderWidth + HeaderHeight)
         {
-            int colIdx = GetColumnAtX(e.X);
+            int colIdx = GetColumnAtX(e.X - borderWidth);
             if (colIdx >= 0) ColumnClick?.Invoke(this, new ColumnClickEventArgs(colIdx));
             return;
         }
@@ -376,6 +393,8 @@ public class ListView : Control
 
     private int GetItemAtY(int y)
     {
+        var borderWidth = GetBorderWidth();
+        y -= borderWidth;
         int startY = _view == View.Details ? HeaderHeight : 0;
         int idx = (y - startY + _scrollOffset) / ItemHeight;
         var sorted = GetSortedItems();

@@ -238,7 +238,31 @@ app.MapGet("/api/apps/{appId}/files/{fileName}", (string appId, string fileName,
 // SignalR hub for canvas rendering
 app.MapHub<CanvasHub>("/hub");
 
-// Fallback to index.html for client-side routing
-app.MapFallbackToFile("index.html");
+// Fallback to index.html for client-side routing.
+// Important: MapFallbackToFile uses default static file options, which can bypass our
+// development no-cache headers and leave stale fingerprinted framework scripts in cache.
+// Serve index.html ourselves in Development with explicit no-cache headers.
+app.MapFallback(async context =>
+{
+    if (app.Environment.IsDevelopment())
+    {
+        context.Response.Headers.CacheControl = "no-cache, no-store, must-revalidate";
+        context.Response.Headers.Pragma = "no-cache";
+        context.Response.Headers.Expires = "0";
+    }
+
+    var fileInfo = app.Environment.WebRootFileProvider.GetFileInfo("index.html");
+    if (!fileInfo.Exists)
+    {
+        context.Response.StatusCode = StatusCodes.Status404NotFound;
+        return;
+    }
+
+    context.Response.ContentType = "text/html; charset=utf-8";
+    context.Response.ContentLength = fileInfo.Length;
+
+    await using var stream = fileInfo.CreateReadStream();
+    await stream.CopyToAsync(context.Response.Body, context.RequestAborted);
+});
 
 app.Run();
