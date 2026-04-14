@@ -3,6 +3,7 @@
 @using BlazorMouseEventArgs = Microsoft.AspNetCore.Components.Web.MouseEventArgs
 @using BlazorKeyboardEventArgs = Microsoft.AspNetCore.Components.Web.KeyboardEventArgs
 @using BlazorTouchEventArgs = Microsoft.AspNetCore.Components.Web.TouchEventArgs
+@using BlazorWheelEventArgs = Microsoft.AspNetCore.Components.Web.WheelEventArgs
 @inject IJSRuntime JSRuntime
 @implements IDisposable
 
@@ -12,6 +13,8 @@
             @onmousedown="HandleMouseDown"
             @onmouseup="HandleMouseUp"
             @onmousemove="HandleMouseMove"
+            @onwheel="HandleWheel"
+            @onwheel:preventDefault="true"
             @onmouseleave="HandleMouseLeave"
             @onmouseenter="HandleMouseEnter"
             @onclick="HandleClick"
@@ -21,10 +24,8 @@
             @ontouchend="HandleTouchEnd"
             tabindex="0"
             @onkeydown="HandleKeyDown"
-            @onkeydown:preventDefault="true"
             @onkeyup="HandleKeyUp"
             @onkeypress="HandleKeyPress"
-            @onkeypress:preventDefault="true"
             width="@Form.Width" 
             height="@Form.Height"
             style="position: absolute; 
@@ -103,6 +104,10 @@
     private DateTime _lastResizeRender = DateTime.MinValue;
     private const int ResizeRenderThrottleMs = 16; // ~60 FPS
 
+    // Throttling for resize layout (docked/anchored child controls)
+    private DateTime _lastResizeLayout = DateTime.MinValue;
+    private const int ResizeLayoutThrottleMs = 140; // lower priority to reduce UI lag
+
     // JS interop throttling for resize bounds updates
     private DateTime _lastResizeBoundsUpdate = DateTime.MinValue;
     private const int ResizeBoundsThrottleMs = 16; // ~60 FPS
@@ -113,6 +118,9 @@
     // Coalescing for control invalidations
     private bool _renderQueued = false;
     private bool _renderRequested = false;
+
+    // Cursor tracking for client-area controls
+    private string _lastClientCursor = "default";
 
     // Touch state
     private double _lastTouchX = 0;
@@ -156,6 +164,17 @@
 
             // Initialize text measurement service
             Form.TextMeasurementService = new TextMeasurementService(JSRuntime);
+
+            // Setup keyboard handling for the canvas - use try/catch in case JS isn't loaded yet
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("setupCanvasKeyboardHandling", _canvasRef);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to setup keyboard handling: {ex.Message}");
+                // Will retry on next interaction
+            }
 
             // Set RequestRender and propagate to all children
             var renderFunc = () =>
@@ -229,7 +248,7 @@
                 Form.Width,
                 Form.Height,
                 Form.Text,
-                Form.BackColor.ToHexString(),
+                ((Color)Form.BackColor).ToHexString(),
                 BorderWidth,
                 TitleBarHeight + BorderWidth,
                 Form.Width - (BorderWidth * 2),
@@ -388,6 +407,20 @@
                 !IsPointInRect(_lastMouseX, _lastMouseY, minimizeButtonRect))
             {
                 return "move";
+            }
+        }
+
+        // Client-area cursor based on hovered control
+        if (Form != null)
+        {
+            var clientX = _lastMouseX - BorderWidth;
+            var clientY = _lastMouseY - TitleBarHeight - BorderWidth;
+
+            if (clientX >= 0 && clientY >= 0 &&
+                clientX < Form.Width - (BorderWidth * 2) &&
+                clientY < Form.Height - TitleBarHeight - (BorderWidth * 2))
+            {
+                return Form.GetCursorNameAtClientPoint(clientX, clientY);
             }
         }
 
@@ -654,6 +687,14 @@
             var now = DateTime.UtcNow;
             var timeSinceLastRender = (now - _lastResizeRender).TotalMilliseconds;
 
+            // During resize, keep dock/anchor layout reasonably up-to-date, but at a lower frequency
+            // than canvas re-render to reduce UI lag.
+            if ((now - _lastResizeLayout).TotalMilliseconds >= ResizeLayoutThrottleMs)
+            {
+                _lastResizeLayout = now;
+                Form.PerformLayout();
+            }
+
             // Update DOM bounds via JS to avoid frequent Blazor re-renders while resizing.
             // This keeps the canvas element and backing store in sync with Form's dimensions.
             if ((now - _lastResizeBoundsUpdate).TotalMilliseconds >= ResizeBoundsThrottleMs)
@@ -782,6 +823,17 @@
 
         // Handle mouse down in client area
         BringToFrontSync();
+
+        // Ensure canvas has focus for keyboard input
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("ensureCanvasFocus", _canvasRef);
+        }
+        catch
+        {
+            // Silently fail if JS isn't ready
+        }
+
         var clientX = x - BorderWidth;
         var clientY = y - TitleBarHeight - BorderWidth;
 
@@ -904,6 +956,14 @@
                 clientY
             );
             Form.OnMouseMove(args);
+
+            // Update cursor if the hovered control changed its Cursor (e.g., SplitContainer splitter hover)
+            var currentCursor = GetCanvasCursor();
+            if (!string.Equals(_lastClientCursor, currentCursor, StringComparison.Ordinal))
+            {
+                _lastClientCursor = currentCursor;
+                StateHasChanged();
+            }
         }
     }
 
@@ -988,6 +1048,37 @@
                 clientY
             );
             Form.OnMouseDoubleClick(args);
+        }
+    }
+
+    private void HandleWheel(BlazorWheelEventArgs e)
+    {
+        if (Form == null) return;
+
+        var x = (int)e.OffsetX;
+        var y = (int)e.OffsetY;
+
+        // Handle wheel in client area
+        var clientX = x - BorderWidth;
+        var clientY = y - TitleBarHeight - BorderWidth;
+
+        if (clientX >= 0 && clientY >= 0 &&
+            clientX < Form.Width - (BorderWidth * 2) &&
+            clientY < Form.Height - TitleBarHeight - (BorderWidth * 2))
+        {
+            // Browser deltaY is positive when scrolling down.
+            // WinForms delta is positive when scrolling up.
+            var delta = (int)-e.DeltaY;
+
+            var args = new Forms.MouseEventArgs(
+                Forms.MouseButtons.None,
+                0,
+                clientX,
+                clientY,
+                delta
+            );
+
+            Form.OnMouseWheel(args);
         }
     }
 

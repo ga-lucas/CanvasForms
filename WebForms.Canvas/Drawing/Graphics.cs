@@ -36,8 +36,16 @@ public class Graphics : IDisposable
 
     public void SetClip(Rectangle rect)
     {
-        _clipRect = rect;
-        _commands.Add(new SetClipCommand(rect));
+        // Clip needs to respect the current translation transform so callers can
+        // specify clip bounds in the same coordinate space as other drawing APIs.
+        var translatedRect = new Rectangle(
+            rect.X + _translateX,
+            rect.Y + _translateY,
+            rect.Width,
+            rect.Height);
+
+        _clipRect = translatedRect;
+        _commands.Add(new SetClipCommand(translatedRect));
     }
 
     public void TranslateTransform(int dx, int dy)

@@ -11,6 +11,10 @@ public class WelcomeForm : Form
     private Button? _btnDockingDemo;
     private Button? _btnInteractive;
     private Button? _btnDrawingSample;
+    private Button? _btnFlowLayoutDemo;
+    private Button? _btnTableLayoutDemo;
+    private Button? _btnSplitContainerDemo;
+    private Button? _btnTabControlDemo;
 
     public WelcomeForm()
     {
@@ -143,11 +147,40 @@ public class WelcomeForm : Form
         };
         Controls.Add(_btnDockingDemo);
 
+        _btnFlowLayoutDemo = new Button
+        {
+            Text = "FlowLayoutPanel",
+            Left = 250,
+            Top = 240,
+            Width = 200,
+            Height = 50
+        };
+        _btnFlowLayoutDemo.Click += (s, e) =>
+        {
+            Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<FlowLayoutDemoForm>();
+        };
+        Controls.Add(_btnFlowLayoutDemo);
+
+        _btnTableLayoutDemo = new Button
+        {
+            Text = "TableLayoutPanel",
+            Left = 460,
+            Top = 240,
+            Width = 200,
+            Height = 50
+        };
+        _btnTableLayoutDemo.Click += (s, e) =>
+        {
+            Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<TableLayoutDemoForm>();
+        };
+        Controls.Add(_btnTableLayoutDemo);
+
+        // Row 3
         _btnInteractive = new Button
         {
             Text = "Interactive Form",
             Left = 250,
-            Top = 240,
+            Top = 310,
             Width = 200,
             Height = 50
         };
@@ -161,7 +194,7 @@ public class WelcomeForm : Form
         {
             Text = "Drawing Sample",
             Left = 460,
-            Top = 240,
+            Top = 310,
             Width = 200,
             Height = 50
         };
@@ -170,5 +203,87 @@ public class WelcomeForm : Form
          Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<SampleDrawingForm>();
         };
         Controls.Add(_btnDrawingSample);
+
+        _btnSplitContainerDemo = new Button
+        {
+            Text = "SplitContainer",
+            Left = 40,
+            Top = 310,
+            Width = 200,
+            Height = 50
+        };
+        _btnSplitContainerDemo.Click += (s, e) =>
+        {
+            Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<SplitContainerDemoForm>();
+        };
+        Controls.Add(_btnSplitContainerDemo);
+
+        _btnTabControlDemo = new Button
+        {
+            Text = "TabControl",
+            Left = 40,
+            Top = 380,
+            Width = 200,
+            Height = 50
+        };
+        _btnTabControlDemo.Click += (s, e) =>
+        {
+            Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<TabControlDemoForm>();
+        };
+        Controls.Add(_btnTabControlDemo);
+
+        // Links section
+        var linksLabel = new Label
+        {
+            Text = "Links:",
+            Left = 20,
+            Top = 450,
+            Width = 660,
+            Height = 25,
+            ForeColor = Color.FromArgb(60, 60, 60),
+            BackColor = Color.White
+        };
+        Controls.Add(linksLabel);
+
+        // GitHub link
+        var githubLink = new LinkLabel
+        {
+            Text = "View on GitHub",
+            LinkUrl = "https://github.com/ga-lucas/CanvasForms",
+            Left = 40,
+            Top = 480,
+            Width = 150,
+            Height = 20
+        };
+        githubLink.LinkClicked += (s, e) =>
+        {
+            // Optional: show a message when link is clicked
+            // The URL will be opened automatically
+        };
+        Controls.Add(githubLink);
+
+        // Documentation link
+        var docsLink = new LinkLabel
+        {
+            Text = "Documentation",
+            LinkUrl = "https://docs.microsoft.com/en-us/dotnet/desktop/winforms/",
+            Left = 200,
+            Top = 480,
+            Width = 150,
+            Height = 20
+        };
+        Controls.Add(docsLink);
+
+        // Example link
+        var exampleLink = new LinkLabel
+        {
+            Text = "WinForms Examples",
+            LinkUrl = "https://github.com/dotnet/winforms",
+            Left = 360,
+            Top = 480,
+            Width = 150,
+            Height = 20
+        };
+        Controls.Add(exampleLink);
     }
 }

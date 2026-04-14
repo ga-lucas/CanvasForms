@@ -169,20 +169,81 @@ FormClosing += (s, e) =>
 
 The goal is maximum API-surface compatibility. Some members are stubs (e.g. `Handle`, `AllowDrop`, IME) — they exist so translated apps compile, but have no browser equivalent.
 
+Controls live in `WebForms.Canvas/Forms/...` (project: `Canvas.Windows.Forms`).
 See `COMPATIBILITY_REVIEW.md` for a full per-control breakdown, and the test project for property-level tracking:
 
+Status legend:
+
+- ✅ **Good**: usable for typical demos/apps.
+- ⚠️ **Partial**: core behavior exists, but missing WinForms features and/or rendering fidelity.
+- 🧩 **Stub/Compatibility**: API exists primarily for porting; limited behavior.
+
+| Area | Control | Status | Notes |
+|------|---------|--------|-------|
+| Windowing | `Form` | ⚠️ Partial | Window chrome, move/resize, min/max/close are implemented. |
+| Core | `Control` | ⚠️ Partial | API surface is prioritized (see tests); many members are compatibility-oriented in a canvas environment. |
+| Text | `Label` | ⚠️ Partial | Basic multi-line + alignment, approximate measurement. |
+| Text | `LinkLabel` | ⚠️ Partial | Click/visited + optional browser navigation via `LinkUrl`. |
+| Text | `TextBox` / `TextBoxBase` | ⚠️ Partial | Basic editing, selection, shortcuts; autocomplete support is evolving. |
+| Text | `MaskedTextBox` | ⚠️ Partial | Masked display + basic validation. |
+| Text | `RichTextBox` | 🧩 Stub/Compatibility | Stores RTF, renders as plain text. |
+| Buttons | `Button` / `ButtonBase` | ✅ Good | Hover/pressed/focus states + click via mouse/keyboard. |
+| Buttons | `CheckBox` | ✅ Good | Toggle behavior + indicator rendering. |
+| Buttons | `RadioButton` | ✅ Good | Mutual exclusivity within parent. |
+| Lists | `ListControl` | ⚠️ Partial | Base type for list-like controls. |
+| Lists | `ListBox` | ⚠️ Partial | Selection + basic navigation; missing advanced modes. |
+| Lists | `CheckedListBox` | ⚠️ Partial | Basic checked item behavior. |
+| Lists | `ComboBox` | ⚠️ Partial | Drop-down + selection; autocomplete support is partial. |
+| Collections | `TreeView` | ⚠️ Partial | Nodes + expand/collapse + selection. |
+| Collections | `ListView` | ⚠️ Partial | Details view + columns/items; feature coverage still growing. |
+| Display | `PictureBox` | ⚠️ Partial | URL-based image loading (see `WebForms.Canvas/Docs/PictureBox.md`). |
+| Display | `ProgressBar` | ⚠️ Partial | Blocks/continuous/marquee-style rendering (simplified). |
+| Display | `MonthCalendar` | ⚠️ Partial | Single-month view + basic keyboard/mouse navigation. |
+| Common | `DateTimePicker` | ⚠️ Partial | Simplified text rendering + drop-down calendar. |
+| Common | `NumericUpDown` / `UpDownBase` | ⚠️ Partial | Spinner UI + value clamping/events; missing WinForms edge cases. |
+| Containers | `Panel` / `ScrollableControl` | ⚠️ Partial | Child painting + input routing; supports scroll offset behavior used by nested controls. |
+| Containers | `GroupBox` | ⚠️ Partial | Border/caption + child routing/clipping. |
+| Layout | `FlowLayoutPanel` | ⚠️ Partial | FlowDirection + wrap/flow-break behavior. |
+| Layout | `TableLayoutPanel` | ⚠️ Partial | Row/column styles + spans; anchors/dock within cells. |
+
+Non-visual WinForms components (API-oriented):
+
+- `ToolTip` (stub)
+- `NotifyIcon` (stub)
+
+### Layout
+
+- Docking and anchoring (`Dock`, `Anchor`)
+
+### Drawing
+
+- Shapes (lines/rectangles/ellipses)
+- Fill operations
+- Text rendering
+- Command-buffered rendering to JS canvas
+
+## WinForms compatibility notes
+
+This project prioritizes matching the **WinForms SDK API surface**. Some APIs exist primarily for compatibility in a browser/canvas environment.
+
+The test project tracks `Control` property parity:
+
+- ✅ **102/102 `Control` properties implemented** (API completeness)
+- ⚠️ Not all properties are fully functional yet (some are stubs by design)
+
+See:
+
+- `Canvas.Windows.Forms.Tests/README.md`
 - `Canvas.Windows.Forms.Tests/PROPERTY_COMPLETENESS.md`
 - `Canvas.Windows.Forms.Tests/PROPERTY_FUNCTIONALITY.md`
 
----
+### Implemented vs partially implemented controls
 
-## Limitations
+The control list above is the authoritative snapshot of which WinForms controls currently exist in the codebase.
 
-- No HWND / native Windows handles
-- No P/Invoke or native Windows APIs
-- No Visual Studio WinForms designer support
-- Single-threaded (WASM) — `InvokeRequired` always returns `false`
-- Local-network scope only (no internet/auth hardening yet)
+For a more detailed narrative review (including gaps and missing members), see `COMPATIBILITY_REVIEW.md` and `CONTROLS_IMPLEMENTATION_STRATEGY.md`.
+
+## Limitations (current)
 
 ---
 

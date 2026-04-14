@@ -4,8 +4,26 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <!-- .NET 10 Preview workaround: disable static asset fingerprinting that causes broken manifests -->
+    <!-- Ensure HTML placeholders (for asset fingerprinting/import maps) are replaced during build -->
+    <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+  </PropertyGroup>
+
+  <!-- VS F5 can incorrectly skip rebuilding referenced static-web-assets, leaving stale/fingerprinted resource names.
+       Disabling the fast up-to-date check in Debug ensures the static assets pipeline runs when you hit F5. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug' and '$(BuildingInsideVisualStudio)' == 'true'">
+    <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
+  </PropertyGroup>
+
+  <!-- Only enable fingerprinting in Release builds -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <StaticWebAssetsFingerprintContent>true</StaticWebAssetsFingerprintContent>
+    <BlazorCacheBootResources>true</BlazorCacheBootResources>
+  </PropertyGroup>
+
+  <!-- Disable fingerprinting in Debug for faster development -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
     <StaticWebAssetsFingerprintContent>false</StaticWebAssetsFingerprintContent>
+    <BlazorCacheBootResources>false</BlazorCacheBootResources>
   </PropertyGroup>
 
   <ItemGroup>

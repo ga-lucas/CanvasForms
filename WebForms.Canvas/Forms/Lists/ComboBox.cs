@@ -27,6 +27,11 @@ public class ComboBox : ListControl
         ForeColor = Color.Black;
     }
 
+    internal Rectangle GetDropDownBounds()
+    {
+        return new Rectangle(0, Height, DropDownWidth, GetActualDropDownHeight());
+    }
+
     /// <summary>
     /// Gets or sets the style of the combo box
     /// </summary>
@@ -284,7 +289,7 @@ public class ComboBox : ListControl
     private void DrawComboBoxArea(Graphics g, Rectangle bounds)
     {
         // Background
-        var bgColor = Enabled ? BackColor : Color.FromArgb(240, 240, 240);
+        var bgColor = Enabled ? BackColor : System.Drawing.Color.FromArgb(240, 240, 240);
         using var bgBrush = new SolidBrush(bgColor);
         g.FillRectangle(bgBrush, bounds);
 
@@ -305,7 +310,7 @@ public class ComboBox : ListControl
             ? (_selectedIndex >= 0 ? GetItemText(Items[_selectedIndex]) : "")
             : _text;
 
-        var textColor = Enabled ? ForeColor : Color.FromArgb(109, 109, 109);
+        var textColor = Enabled ? ForeColor : System.Drawing.Color.FromArgb(109, 109, 109);
         g.DrawString(displayText, textBounds.X, textBounds.Y + 1, textColor);
 
         // Drop-down button
@@ -407,7 +412,7 @@ public class ComboBox : ListControl
 
         // Text
         var text = GetItemText(item);
-        var textColor = (isSelected || isHovered) ? Color.White : ForeColor;
+        var textColor = (isSelected || isHovered) ? System.Drawing.Color.White : ForeColor;
         g.DrawString(text, bounds.X + ItemPadding, bounds.Y + ItemPadding, textColor);
     }
 
@@ -473,7 +478,10 @@ public class ComboBox : ListControl
         // Check if clicking in the text area (for DropDownList, also toggle)
         if (e.Y < Height)
         {
-            if (_dropDownStyle == ComboBoxStyle.DropDownList)
+            // WinForms: DropDownList opens when clicking the non-button area.
+            // In this canvas implementation, the editable DropDown style is not truly editable,
+            // so we also open when clicking the text area to match expected user interaction.
+            if (_dropDownStyle is ComboBoxStyle.DropDownList or ComboBoxStyle.DropDown)
             {
                 DroppedDown = !DroppedDown;
             }
@@ -628,7 +636,7 @@ public class ComboBox : ListControl
         base.OnMouseLeave(e);
     }
 
-    protected override void OnMouseWheel(MouseEventArgs e)
+    protected internal override void OnMouseWheel(MouseEventArgs e)
     {
         if (_isDroppedDown)
         {

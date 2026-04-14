@@ -7,6 +7,7 @@ public class Form : ContainerControl
     private static int _nextZIndex = 1;
     private const int TitleBarHeight = 32; // Height of the title bar
     private Control? _focusedControl;
+    private Control? _capturedControl;
     private FormWindowState _windowState = FormWindowState.Normal;
     private Rectangle _normalBounds; // Store bounds before minimize/maximize
 
@@ -36,6 +37,13 @@ public class Form : ContainerControl
                 Invalidate();
             }
         }
+    }
+
+    internal string GetCursorNameAtClientPoint(int x, int y)
+    {
+        // Use the same hit-testing logic as input dispatch so cursor matches what will receive the event.
+        var hit = FindDeepestHitControl(this, x, y, offsetX: 0, offsetY: 0, includeDisabled: true);
+        return hit.control?.Cursor?.Name ?? "default";
     }
 
     // Event fired when window state changes
@@ -211,21 +219,32 @@ public class Form : ContainerControl
         // Let user code handle Paint event first
         base.OnPaint(e);
 
-        // Then render child controls
-        foreach (var control in Controls)
+        // Then render child controls (full tree), excluding overlays.
+        PaintControlsRecursive(g, this, offsetX: 0, offsetY: 0);
+
+        // Final pass: paint overlays (ComboBox drop-down, DateTimePicker popup, TextBox autocomplete)
+        // on top of everything, including when the owner is nested in containers.
+        PaintOverlaysRecursive(g, this, offsetX: 0, offsetY: 0);
+    }
+
+    private void PaintControlsRecursive(Graphics g, Control parent, int offsetX, int offsetY)
+    {
+        foreach (var control in parent.Controls)
         {
             if (!control.Visible) continue;
 
-            // Translate graphics to control position
-            g.TranslateTransform(control.Left, control.Top);
+            var (sx, sy) = GetChildScrollOffset(parent);
+            var childOffsetX = offsetX + sx + control.Left;
+            var childOffsetY = offsetY + sy + control.Top;
 
-            // Create paint args for the control
-            var controlPaintArgs = new PaintEventArgs(
-                g,
-                new Rectangle(0, 0, control.Width, control.Height)
-            );
+            // Clip each control to its own bounds so it can't paint outside its rectangle.
+            // This is important for SplitContainer/ListView: columns should not overflow the panel.
+            g.Save();
+            g.TranslateTransform(childOffsetX, childOffsetY);
+            g.SetClip(new Rectangle(0, 0, control.Width, control.Height));
 
-            // Let control paint itself (but skip drop-downs for ComboBox/DateTimePicker and autocomplete for TextBox)
+            var controlPaintArgs = new PaintEventArgs(g, new Rectangle(0, 0, control.Width, control.Height));
+
             if (control is ComboBox comboBox)
             {
                 comboBox.PaintWithoutDropDown(controlPaintArgs);
@@ -243,156 +262,121 @@ public class Form : ContainerControl
                 control.OnPaint(controlPaintArgs);
             }
 
-            // Restore graphics state
-            g.TranslateTransform(-control.Left, -control.Top);
-        }
+            g.Restore();
 
-        // Paint all ComboBox drop-downs on top of everything
-        foreach (var control in Controls)
-        {
-            if (control is ComboBox comboBox && comboBox.DroppedDown && control.Visible)
+            if (control.HasChildren)
             {
-                // Translate to control position
-                g.TranslateTransform(control.Left, control.Top);
-
-                // Paint just the drop-down
-                var dropDownPaintArgs = new PaintEventArgs(
-                    g,
-                    new Rectangle(0, 0, control.Width, control.Height)
-                );
-                comboBox.PaintDropDownOnly(dropDownPaintArgs);
-
-                // Restore
-                g.TranslateTransform(-control.Left, -control.Top);
+                PaintControlsRecursive(g, control, childOffsetX, childOffsetY);
             }
         }
+    }
 
-        // Paint all DateTimePicker drop-downs on top of everything
-        foreach (var control in Controls)
+    private void PaintOverlaysRecursive(Graphics g, Control parent, int offsetX, int offsetY)
+    {
+        foreach (var control in parent.Controls)
         {
-            if (control is DateTimePicker dateTimePicker && dateTimePicker.HasVisibleDropDown && control.Visible)
+            if (!control.Visible) continue;
+
+            var (sx, sy) = GetChildScrollOffset(parent);
+            var childOffsetX = offsetX + sx + control.Left;
+            var childOffsetY = offsetY + sy + control.Top;
+
+            if (control is ComboBox comboBox && comboBox.DroppedDown)
             {
-                // Translate to control position
-                g.TranslateTransform(control.Left, control.Top);
+                g.Save();
+                g.TranslateTransform(childOffsetX, childOffsetY);
+                var ddArgs = new PaintEventArgs(g, new Rectangle(0, 0, control.Width, control.Height));
+                comboBox.PaintDropDownOnly(ddArgs);
+                g.Restore();
+            }
+            else if (control is DateTimePicker dateTimePicker && dateTimePicker.HasVisibleDropDown)
+            {
+                g.Save();
+                g.TranslateTransform(childOffsetX, childOffsetY);
+                var ddArgs = new PaintEventArgs(g, new Rectangle(0, 0, control.Width, control.Height));
+                dateTimePicker.PaintDropDownOnly(ddArgs);
+                g.Restore();
+            }
+            else if (control is TextBox textBox && textBox.HasVisibleAutoComplete)
+            {
+                g.Save();
+                g.TranslateTransform(childOffsetX, childOffsetY);
+                var acArgs = new PaintEventArgs(g, new Rectangle(0, 0, control.Width, control.Height));
+                textBox.PaintAutoCompleteOnly(acArgs);
+                g.Restore();
+            }
 
-                // Paint just the drop-down
-                var dropDownPaintArgs = new PaintEventArgs(
-                    g,
-                    new Rectangle(0, 0, control.Width, control.Height)
-                );
-                dateTimePicker.PaintDropDownOnly(dropDownPaintArgs);
-
-                // Restore
-                g.TranslateTransform(-control.Left, -control.Top);
+            if (control.HasChildren)
+            {
+                PaintOverlaysRecursive(g, control, childOffsetX, childOffsetY);
             }
         }
+    }
 
-        // Paint all TextBox autocomplete panels on top of everything
-        foreach (var control in Controls)
+    private static (int x, int y) GetChildScrollOffset(Control parent)
+    {
+        if (parent is ScrollableControl scrollable && scrollable.AutoScroll)
         {
-            if (control is TextBox textBox && textBox.HasVisibleAutoComplete && control.Visible)
-            {
-                // Translate to control position
-                g.TranslateTransform(control.Left, control.Top);
-
-                // Paint just the autocomplete
-                var autoCompletePaintArgs = new PaintEventArgs(
-                    g,
-                    new Rectangle(0, 0, control.Width, control.Height)
-                );
-                textBox.PaintAutoCompleteOnly(autoCompletePaintArgs);
-
-                // Restore
-                g.TranslateTransform(-control.Left, -control.Top);
-            }
+            // DisplayRectangle is offset by AutoScrollPosition (negative when scrolled),
+            // and painting code translates by that value.
+            return (scrollable.DisplayRectangle.X, scrollable.DisplayRectangle.Y);
         }
+
+        return (0, 0);
     }
 
     protected internal override void OnMouseDown(MouseEventArgs e)
     {
-        // Check if any child control was clicked
-        bool hitAnyControl = false;
+        UpdateCapturedControl();
 
-        foreach (var control in Controls)
+        // If a control has mouse capture, it receives all mouse messages.
+        // This is required for drag operations (e.g., SplitContainer splitter).
+        if (_capturedControl is not null)
         {
-            if (!control.Visible || !control.Enabled) continue;
-
-            if (HitTest(control, e.X, e.Y))
-            {
-                hitAnyControl = true;
-
-                // Set focus to this control
-                FocusedControl = control;
-
-                var controlArgs = new MouseEventArgs(
-                    e.Button,
-                    e.Clicks,
-                    e.X - control.Left,
-                    e.Y - control.Top
-                );
-                control.OnMouseDown(controlArgs);
-                break; // Don't check other controls
-            }
+            var (capturedX, capturedY) = TranslateToCapturedControl(_capturedControl, e.X, e.Y);
+            var capturedArgs = new MouseEventArgs(e.Button, e.Clicks, capturedX, capturedY);
+            _capturedControl.OnMouseDown(capturedArgs);
+            return;
         }
 
-        if (!hitAnyControl)
+        var hit = FindDeepestHitControl(this, e.X, e.Y, offsetX: 0, offsetY: 0);
+        if (hit.control is null)
         {
-            // Clicked on form background - clear focus and close any open ComboBox drop-downs
             FocusedControl = null;
-
-            // Close all ComboBox drop-downs
-            foreach (var control in Controls)
-            {
-                if (control is ComboBox comboBox && comboBox.DroppedDown)
-                {
-                    comboBox.DroppedDown = false;
-                }
-                if (control is DateTimePicker dateTimePicker && dateTimePicker.DroppedDown)
-                {
-                    dateTimePicker.DroppedDown = false;
-                }
-            }
-        }
-        else
-        {
-            // Close other ComboBox drop-downs (keep only the clicked one open if it's a ComboBox)
-            foreach (var control in Controls)
-            {
-                if (control is ComboBox comboBox && comboBox != FocusedControl && comboBox.DroppedDown)
-                {
-                    comboBox.DroppedDown = false;
-                }
-                if (control is DateTimePicker dateTimePicker && dateTimePicker != FocusedControl && dateTimePicker.DroppedDown)
-                {
-                    dateTimePicker.DroppedDown = false;
-                }
-            }
-        }
-
-        if (!hitAnyControl)
-        {
+            CloseAllOverlays(except: null);
             base.OnMouseDown(e);
+            return;
         }
+
+        FocusedControl = hit.control;
+        CloseAllOverlays(except: hit.control);
+
+        var controlArgs = new MouseEventArgs(e.Button, e.Clicks, hit.x, hit.y);
+        hit.control.OnMouseDown(controlArgs);
     }
 
     protected internal override void OnMouseUp(MouseEventArgs e)
     {
-        // Check if any child control should receive mouse up
-        foreach (var control in Controls)
-        {
-            if (!control.Visible || !control.Enabled) continue;
+        UpdateCapturedControl();
 
-            if (HitTest(control, e.X, e.Y))
-            {
-                var controlArgs = new MouseEventArgs(
-                    e.Button,
-                    e.Clicks,
-                    e.X - control.Left,
-                    e.Y - control.Top
-                );
-                control.OnMouseUp(controlArgs);
-                return;
-            }
+        // If a control has mouse capture, it receives all mouse messages.
+        if (_capturedControl is not null)
+        {
+            var (capturedX, capturedY) = TranslateToCapturedControl(_capturedControl, e.X, e.Y);
+            var capturedArgs = new MouseEventArgs(e.Button, e.Clicks, capturedX, capturedY);
+            _capturedControl.OnMouseUp(capturedArgs);
+
+            // Capture may have been released during OnMouseUp.
+            UpdateCapturedControl();
+            return;
+        }
+
+        var hit = FindDeepestHitControl(this, e.X, e.Y, offsetX: 0, offsetY: 0);
+        if (hit.control is not null && hit.control.Enabled)
+        {
+            var controlArgs = new MouseEventArgs(e.Button, e.Clicks, hit.x, hit.y);
+            hit.control.OnMouseUp(controlArgs);
+            return;
         }
 
         base.OnMouseUp(e);
@@ -400,67 +384,198 @@ public class Form : ContainerControl
 
     protected internal override void OnMouseMove(MouseEventArgs e)
     {
-        // Check if any child control should receive mouse move
-        foreach (var control in Controls)
-        {
-            if (!control.Visible) continue;
+        UpdateCapturedControl();
 
-            if (HitTest(control, e.X, e.Y))
-            {
-                var controlArgs = new MouseEventArgs(
-                    e.Button,
-                    e.Clicks,
-                    e.X - control.Left,
-                    e.Y - control.Top
-                );
-                control.OnMouseMove(controlArgs);
-                return;
-            }
+        // If a control has mouse capture, it receives all mouse messages.
+        if (_capturedControl is not null)
+        {
+            var (capturedX, capturedY) = TranslateToCapturedControl(_capturedControl, e.X, e.Y);
+            var capturedArgs = new MouseEventArgs(e.Button, e.Clicks, capturedX, capturedY);
+            _capturedControl.OnMouseMove(capturedArgs);
+            return;
+        }
+
+        var hit = FindDeepestHitControl(this, e.X, e.Y, offsetX: 0, offsetY: 0, includeDisabled: true);
+        if (hit.control is not null)
+        {
+            var controlArgs = new MouseEventArgs(e.Button, e.Clicks, hit.x, hit.y);
+            hit.control.OnMouseMove(controlArgs);
+            return;
         }
 
         base.OnMouseMove(e);
     }
 
-    private bool HitTest(Control control, int x, int y)
+    protected internal override void OnMouseWheel(MouseEventArgs e)
     {
-        // Normal bounds check
-        var inNormalBounds = x >= control.Left && x < control.Left + control.Width &&
-                             y >= control.Top && y < control.Top + control.Height;
-
-        if (inNormalBounds)
-            return true;
-
-        // Special case: ComboBox with drop-down open
-        if (control is ComboBox comboBox && comboBox.DroppedDown)
+        var hit = FindDeepestHitControl(this, e.X, e.Y, offsetX: 0, offsetY: 0);
+        if (hit.control is not null && hit.control.Enabled)
         {
-            // Check if clicking in drop-down area (below the control)
-            var dropDownHeight = comboBox.DropDownHeight;
-            var dropDownWidth = comboBox.DropDownWidth;
-
-            return x >= control.Left && x < control.Left + dropDownWidth &&
-                   y >= control.Top + control.Height && y < control.Top + control.Height + dropDownHeight;
+            var controlArgs = new MouseEventArgs(e.Button, e.Clicks, hit.x, hit.y, e.Delta);
+            hit.control.OnMouseWheel(controlArgs);
+            return;
         }
 
-        // Special case: DateTimePicker with drop-down open
+        base.OnMouseWheel(e);
+    }
+
+    private static (Control? control, int x, int y) FindDeepestHitControl(Control parent, int formX, int formY, int offsetX, int offsetY, bool includeDisabled = false)
+    {
+        // Overlays (ComboBox drop-down, DateTimePicker popup, TextBox autocomplete) must be hittable even when
+        // the owner control is nested inside containers and the pointer is outside the container bounds.
+        // So we must search the entire subtree for overlay hits before doing normal bounds-based hit testing.
+        var overlayHit = FindTopMostOverlayHitControl(parent, formX, formY, offsetX, offsetY, includeDisabled);
+        if (overlayHit.control is not null)
+        {
+            return overlayHit;
+        }
+
+        // Traverse from top-most to bottom-most.
+        for (var i = parent.Controls.Count - 1; i >= 0; i--)
+        {
+            var child = parent.Controls[i];
+            if (!child.Visible) continue;
+            if (!includeDisabled && !child.Enabled) continue;
+
+            var (sx, sy) = GetChildScrollOffset(parent);
+            var absLeft = offsetX + sx + child.Left;
+            var absTop = offsetY + sy + child.Top;
+
+            // Check overlays first so they can be hit even outside parent bounds.
+            if (IsPointInOverlay(child, absLeft, absTop, formX, formY, out var localX, out var localY))
+            {
+                return (child, localX, localY);
+            }
+
+            // Normal bounds.
+            if (formX >= absLeft && formX < absLeft + child.Width && formY >= absTop && formY < absTop + child.Height)
+            {
+                // Prefer a deeper child if present.
+                if (child.HasChildren)
+                {
+                    var deep = FindDeepestHitControl(child, formX, formY, absLeft, absTop, includeDisabled);
+                    if (deep.control is not null)
+                    {
+                        return deep;
+                    }
+                }
+
+                return (child, formX - absLeft, formY - absTop);
+            }
+        }
+
+        return (null, 0, 0);
+    }
+
+    private static (Control? control, int x, int y) FindTopMostOverlayHitControl(Control parent, int formX, int formY, int offsetX, int offsetY, bool includeDisabled)
+    {
+        for (var i = parent.Controls.Count - 1; i >= 0; i--)
+        {
+            var child = parent.Controls[i];
+            if (!child.Visible) continue;
+            if (!includeDisabled && !child.Enabled) continue;
+
+            var (sx, sy) = GetChildScrollOffset(parent);
+            var absLeft = offsetX + sx + child.Left;
+            var absTop = offsetY + sy + child.Top;
+
+            if (IsPointInOverlay(child, absLeft, absTop, formX, formY, out var localX, out var localY))
+            {
+                return (child, localX, localY);
+            }
+
+            if (child.HasChildren)
+            {
+                var deep = FindTopMostOverlayHitControl(child, formX, formY, absLeft, absTop, includeDisabled);
+                if (deep.control is not null)
+                {
+                    return deep;
+                }
+            }
+        }
+
+        return (null, 0, 0);
+    }
+
+    private static bool IsPointInOverlay(Control control, int absLeft, int absTop, int x, int y, out int localX, out int localY)
+    {
+        localX = x - absLeft;
+        localY = y - absTop;
+
+        if (control is ComboBox comboBox && comboBox.DroppedDown)
+        {
+            var dd = comboBox.GetDropDownBounds();
+            var ddLeft = absLeft + dd.X;
+            var ddTop = absTop + dd.Y;
+            var ddWidth = dd.Width;
+            var ddHeight = dd.Height;
+
+            if (x >= ddLeft && x < ddLeft + ddWidth && y >= ddTop && y < ddTop + ddHeight)
+            {
+                localX = x - absLeft;
+                localY = y - absTop;
+                return true;
+            }
+        }
+
         if (control is DateTimePicker dateTimePicker && dateTimePicker.DroppedDown)
         {
             var dd = dateTimePicker.GetDropDownBounds();
+            var ddLeft = absLeft + dd.X;
+            var ddTop = absTop + dd.Y;
 
-            return x >= control.Left + dd.X && x < control.Left + dd.Right &&
-                   y >= control.Top + dd.Y && y < control.Top + dd.Bottom;
+            if (x >= ddLeft && x < ddLeft + dd.Width && y >= ddTop && y < ddTop + dd.Height)
+            {
+                localX = x - absLeft;
+                localY = y - absTop;
+                return true;
+            }
         }
 
-        // Special case: TextBox with autocomplete panel open
         if (control is TextBox textBox && textBox.HasVisibleAutoComplete)
         {
-            // Check if clicking in autocomplete panel area (below the control)
-            var panelBounds = textBox.GetAutoCompletePanelBounds();
+            var dd = textBox.GetAutoCompletePanelBounds();
+            var ddLeft = absLeft + dd.X;
+            var ddTop = absTop + dd.Y;
 
-            return x >= control.Left + panelBounds.X && x < control.Left + panelBounds.Right &&
-                   y >= control.Top + panelBounds.Y && y < control.Top + panelBounds.Bottom;
+            if (x >= ddLeft && x < ddLeft + dd.Width && y >= ddTop && y < ddTop + dd.Height)
+            {
+                localX = x - absLeft;
+                localY = y - absTop;
+                return true;
+            }
         }
 
         return false;
+    }
+
+    private void CloseAllOverlays(Control? except)
+    {
+        CloseAllOverlaysRecursive(this, except);
+    }
+
+    private void CloseAllOverlaysRecursive(Control parent, Control? except)
+    {
+        foreach (var control in parent.Controls)
+        {
+            if (control is ComboBox comboBox && comboBox != except && comboBox.DroppedDown)
+            {
+                comboBox.DroppedDown = false;
+            }
+            else if (control is DateTimePicker dateTimePicker && dateTimePicker != except && dateTimePicker.DroppedDown)
+            {
+                dateTimePicker.DroppedDown = false;
+            }
+            else if (control is TextBox textBox && textBox != except)
+            {
+                textBox.HideAutoCompletePanel();
+            }
+
+            if (control.HasChildren)
+            {
+                CloseAllOverlaysRecursive(control, except);
+            }
+        }
     }
 
     protected internal override void OnKeyDown(KeyEventArgs e)
@@ -575,6 +690,54 @@ public class Form : ContainerControl
     public void DispatchKeyPress(char keyChar)
     {
         OnKeyPress(new KeyPressEventArgs(keyChar));
+    }
+
+    private void UpdateCapturedControl()
+    {
+        var found = FindCapturedControl(this);
+        if (!ReferenceEquals(_capturedControl, found))
+        {
+            _capturedControl = found;
+        }
+    }
+
+    private static Control? FindCapturedControl(Control parent)
+    {
+        if (parent.Capture) return parent;
+
+        foreach (var child in parent.Controls)
+        {
+            if (!child.Visible) continue;
+
+            var deep = FindCapturedControl(child);
+            if (deep is not null) return deep;
+        }
+
+        return null;
+    }
+
+    private static (int x, int y) TranslateToCapturedControl(Control captured, int formX, int formY)
+    {
+        var (left, top) = GetAbsoluteClientPosition(captured);
+        return (formX - left, formY - top);
+    }
+
+    private static (int left, int top) GetAbsoluteClientPosition(Control control)
+    {
+        var x = 0;
+        var y = 0;
+        var current = control;
+
+        while (current.Parent is not null)
+        {
+            var parent = current.Parent;
+            var (sx, sy) = GetChildScrollOffset(parent);
+            x += sx + current.Left;
+            y += sy + current.Top;
+            current = parent;
+        }
+
+        return (x, y);
     }
 
 

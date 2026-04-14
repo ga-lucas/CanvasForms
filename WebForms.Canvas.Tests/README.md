@@ -97,6 +97,9 @@ dotnet test --verbosity detailed
 - **PROPERTY_FUNCTIONALITY.md** - Detailed analysis of which properties are functional vs compatibility-only
 - **README.md** - This file
 
+### Rendering Tests
+- **LabelRenderingTests.cs** - Verifies `Label.OnPaint` emits the expected drawing commands (background fill behavior, text alignment positioning, and multi-line text rendering).
+
 ## What's Tested
 
 The tests verify that the Canvas Control class has all the same public properties as System.Windows.Forms.Control, including:

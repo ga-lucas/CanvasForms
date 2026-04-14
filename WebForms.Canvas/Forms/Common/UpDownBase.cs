@@ -20,8 +20,8 @@ public abstract class UpDownBase : ContainerControl
     {
         Width = 100;
         Height = 23;
-        BackColor = Color.White;
-        ForeColor = Color.Black;
+        BackColor = System.Drawing.Color.White;
+        ForeColor = System.Drawing.Color.Black;
         TabStop = true;
         SetStyle(ControlStyles.Selectable | ControlStyles.UserPaint, true);
     }
@@ -35,7 +35,7 @@ public abstract class UpDownBase : ContainerControl
         var g = e.Graphics;
 
         // Background
-        var bgColor = Enabled ? BackColor : Color.FromArgb(240, 240, 240);
+        var bgColor = Enabled ? BackColor : System.Drawing.Color.FromArgb(240, 240, 240);
         using var bgBrush = new SolidBrush(bgColor);
         g.FillRectangle(bgBrush, 0, 0, Width, Height);
 
@@ -45,7 +45,7 @@ public abstract class UpDownBase : ContainerControl
         g.DrawRectangle(borderPen, 0, 0, Width - 1, Height - 1);
 
         // Value text
-        var textColor = Enabled ? ForeColor : Color.FromArgb(109, 109, 109);
+        var textColor = Enabled ? ForeColor : System.Drawing.Color.FromArgb(109, 109, 109);
         using var textBrush = new SolidBrush(textColor);
         var text = GetValueText();
         int textX = UpDownAlign == LeftRightAlignment.Right ? 4 : ButtonWidth + 4;
@@ -61,12 +61,12 @@ public abstract class UpDownBase : ContainerControl
         int halfH = Height / 2;
 
         // Up button
-        var upBg = _isUpHovered && Enabled ? Color.FromArgb(229, 241, 251) : bgColor;
+        var upBg = _isUpHovered && Enabled ? System.Drawing.Color.FromArgb(229, 241, 251) : bgColor;
         using var upBrush = new SolidBrush(upBg);
         g.FillRectangle(upBrush, btnX, 0, ButtonWidth, halfH);
 
         // Down button
-        var downBg = _isDownHovered && Enabled ? Color.FromArgb(229, 241, 251) : bgColor;
+        var downBg = _isDownHovered && Enabled ? System.Drawing.Color.FromArgb(229, 241, 251) : bgColor;
         using var downBrush = new SolidBrush(downBg);
         g.FillRectangle(downBrush, btnX, halfH, ButtonWidth, Height - halfH);
 

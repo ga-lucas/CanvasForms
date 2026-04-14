@@ -1,4 +1,3 @@
-using Canvas.Windows.Forms.Drawing;
 using System.Windows.Forms;
 
 namespace Canvas.Windows.Forms.Tests;
@@ -13,14 +12,14 @@ public class ColorPropertyRenderingTests
     {
         var button = new Button
         {
-            BackColor = Color.FromArgb(100, 150, 200),
+            BackColor = System.Drawing.Color.FromArgb(100, 150, 200),
             Width = 100,
             Height = 30
         };
 
         // Button should use BackColor in normal state
         // This test verifies the property is set correctly
-        Assert.Equal(Color.FromArgb(100, 150, 200), button.BackColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(100, 150, 200), button.BackColor);
     }
 
     [Fact]
@@ -28,11 +27,11 @@ public class ColorPropertyRenderingTests
     {
         var button = new Button
         {
-            ForeColor = Color.FromArgb(255, 0, 0),
+            ForeColor = System.Drawing.Color.FromArgb(255, 0, 0),
             Text = "Test"
         };
 
-        Assert.Equal(Color.FromArgb(255, 0, 0), button.ForeColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(255, 0, 0), button.ForeColor);
     }
 
     [Fact]
@@ -40,12 +39,12 @@ public class ColorPropertyRenderingTests
     {
         var checkBox = new CheckBox
         {
-            BackColor = Color.FromArgb(255, 255, 200),
+            BackColor = System.Drawing.Color.FromArgb(255, 255, 200),
             Width = 100,
             Height = 20
         };
 
-        Assert.Equal(Color.FromArgb(255, 255, 200), checkBox.BackColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(255, 255, 200), checkBox.BackColor);
     }
 
     [Fact]
@@ -53,11 +52,11 @@ public class ColorPropertyRenderingTests
     {
         var checkBox = new CheckBox
         {
-            ForeColor = Color.FromArgb(0, 128, 0),
+            ForeColor = System.Drawing.Color.FromArgb(0, 128, 0),
             Text = "Check me"
         };
 
-        Assert.Equal(Color.FromArgb(0, 128, 0), checkBox.ForeColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(0, 128, 0), checkBox.ForeColor);
     }
 
     [Fact]
@@ -65,12 +64,12 @@ public class ColorPropertyRenderingTests
     {
         var radioButton = new RadioButton
         {
-            BackColor = Color.FromArgb(200, 220, 255),
+            BackColor = System.Drawing.Color.FromArgb(200, 220, 255),
             Width = 100,
             Height = 20
         };
 
-        Assert.Equal(Color.FromArgb(200, 220, 255), radioButton.BackColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(200, 220, 255), radioButton.BackColor);
     }
 
     [Fact]
@@ -78,11 +77,11 @@ public class ColorPropertyRenderingTests
     {
         var radioButton = new RadioButton
         {
-            ForeColor = Color.FromArgb(128, 0, 128),
+            ForeColor = System.Drawing.Color.FromArgb(128, 0, 128),
             Text = "Select me"
         };
 
-        Assert.Equal(Color.FromArgb(128, 0, 128), radioButton.ForeColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(128, 0, 128), radioButton.ForeColor);
     }
 
     [Fact]
@@ -90,12 +89,12 @@ public class ColorPropertyRenderingTests
     {
         var label = new Label
         {
-            BackColor = Color.FromArgb(240, 240, 240),
+            BackColor = System.Drawing.Color.FromArgb(240, 240, 240),
             Width = 100,
             Height = 20
         };
 
-        Assert.Equal(Color.FromArgb(240, 240, 240), label.BackColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(240, 240, 240), label.BackColor);
     }
 
     [Fact]
@@ -103,11 +102,11 @@ public class ColorPropertyRenderingTests
     {
         var label = new Label
         {
-            ForeColor = Color.FromArgb(64, 64, 64),
+            ForeColor = System.Drawing.Color.FromArgb(64, 64, 64),
             Text = "Label text"
         };
 
-        Assert.Equal(Color.FromArgb(64, 64, 64), label.ForeColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(64, 64, 64), label.ForeColor);
     }
 
     [Fact]
@@ -115,12 +114,12 @@ public class ColorPropertyRenderingTests
     {
         var textBox = new TextBox
         {
-            BackColor = Color.FromArgb(255, 255, 230),
+            BackColor = System.Drawing.Color.FromArgb(255, 255, 230),
             Width = 150,
             Height = 20
         };
 
-        Assert.Equal(Color.FromArgb(255, 255, 230), textBox.BackColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(255, 255, 230), textBox.BackColor);
     }
 
     [Fact]
@@ -128,11 +127,11 @@ public class ColorPropertyRenderingTests
     {
         var textBox = new TextBox
         {
-            ForeColor = Color.FromArgb(0, 0, 128),
+            ForeColor = System.Drawing.Color.FromArgb(0, 0, 128),
             Text = "Sample text"
         };
 
-        Assert.Equal(Color.FromArgb(0, 0, 128), textBox.ForeColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(0, 0, 128), textBox.ForeColor);
     }
 
     [Fact]
@@ -140,12 +139,12 @@ public class ColorPropertyRenderingTests
     {
         var pictureBox = new PictureBox
         {
-            BackColor = Color.FromArgb(200, 200, 200),
+            BackColor = System.Drawing.Color.FromArgb(200, 200, 200),
             Width = 100,
             Height = 100
         };
 
-        Assert.Equal(Color.FromArgb(200, 200, 200), pictureBox.BackColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(200, 200, 200), pictureBox.BackColor);
     }
 
     [Fact]
@@ -153,12 +152,12 @@ public class ColorPropertyRenderingTests
     {
         var form = new Form
         {
-            BackColor = Color.FromArgb(220, 230, 240),
+            BackColor = System.Drawing.Color.FromArgb(220, 230, 240),
             Width = 400,
             Height = 300
         };
 
-        Assert.Equal(Color.FromArgb(220, 230, 240), form.BackColor);
+        Assert.Equal(System.Drawing.Color.FromArgb(220, 230, 240), form.BackColor);
     }
 
     [Fact]
@@ -166,13 +165,13 @@ public class ColorPropertyRenderingTests
     {
         var checkBox = new CheckBox
         {
-            BackColor = Color.Transparent,
+            BackColor = System.Drawing.Color.Transparent,
             Width = 100,
             Height = 20
         };
 
         // Transparent BackColor should be preserved
-        Assert.Equal(Color.Transparent, checkBox.BackColor);
+        Assert.Equal(System.Drawing.Color.Transparent, checkBox.BackColor);
     }
 
     [Fact]
@@ -180,13 +179,13 @@ public class ColorPropertyRenderingTests
     {
         var radioButton = new RadioButton
         {
-            BackColor = Color.Transparent,
+            BackColor = System.Drawing.Color.Transparent,
             Width = 100,
             Height = 20
         };
 
         // Transparent BackColor should be preserved
-        Assert.Equal(Color.Transparent, radioButton.BackColor);
+        Assert.Equal(System.Drawing.Color.Transparent, radioButton.BackColor);
     }
 
     [Fact]
@@ -194,12 +193,12 @@ public class ColorPropertyRenderingTests
     {
         var label = new Label
         {
-            BackColor = Color.Transparent,
+            BackColor = System.Drawing.Color.Transparent,
             Width = 100,
             Height = 20
         };
 
         // Transparent BackColor should be preserved
-        Assert.Equal(Color.Transparent, label.BackColor);
+        Assert.Equal(System.Drawing.Color.Transparent, label.BackColor);
     }
 }

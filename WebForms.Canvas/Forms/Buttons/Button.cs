@@ -60,7 +60,7 @@ public class Button : ButtonBase
         // Draw text (centered)
         if (!string.IsNullOrEmpty(Text))
         {
-            var textColor = Enabled ? ForeColor : Color.FromArgb(109, 109, 109);
+            var textColor = Enabled ? ForeColor : System.Drawing.Color.FromArgb(109, 109, 109);
 
             // Simple text centering (approximate)
             var textX = (Width - (Text.Length * 7)) / 2;

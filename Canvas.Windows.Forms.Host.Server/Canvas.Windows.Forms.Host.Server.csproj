@@ -4,7 +4,37 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <!-- .NET 10 Preview workaround: disable static asset fingerprinting that causes broken manifests -->
+  </PropertyGroup>
+
+  <!-- VS F5 can incorrectly skip rebuilding transitive static-web-assets, leaving stale/fingerprinted resource names.
+       Disabling the fast up-to-date check in Debug ensures the WASM static assets pipeline runs when you hit F5. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug' and '$(BuildingInsideVisualStudio)' == 'true'">
+    <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
+  </PropertyGroup>
+
+  <!-- In Debug/F5, force regeneration of static-web-assets manifests by purging intermediate caches.
+       This avoids stale _framework asset names (dotnet.*.js, blazor.webassembly.*.js) causing 404s. -->
+  <Target Name="PurgeStaticWebAssetsCache" BeforeTargets="Build"
+          Condition="'$(Configuration)' == 'Debug' and '$(BuildingInsideVisualStudio)' == 'true'">
+    <ItemGroup>
+      <_StaticWebAssetsCacheFiles Include="$(BaseIntermediateOutputPath)staticwebassets\**\*" />
+      <_StaticWebAssetsCacheFiles Include="$(IntermediateOutputPath)staticwebassets\**\*" />
+      <_StaticWebAssetsCacheFiles Include="$(BaseIntermediateOutputPath)staticwebassets*.json" />
+      <_StaticWebAssetsCacheFiles Include="$(IntermediateOutputPath)staticwebassets*.json" />
+    </ItemGroup>
+    <Delete Files="@(_StaticWebAssetsCacheFiles)" />
+    <RemoveDir Directories="$(BaseIntermediateOutputPath)staticwebassets" />
+    <RemoveDir Directories="$(IntermediateOutputPath)staticwebassets" />
+  </Target>
+
+  <!-- Only enable fingerprinting in Release builds -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <StaticWebAssetsFingerprintContent>true</StaticWebAssetsFingerprintContent>
+    <GenerateStaticWebAssetsManifest>true</GenerateStaticWebAssetsManifest>
+  </PropertyGroup>
+
+  <!-- Disable fingerprinting in Debug for faster development -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
     <StaticWebAssetsFingerprintContent>false</StaticWebAssetsFingerprintContent>
   </PropertyGroup>
 

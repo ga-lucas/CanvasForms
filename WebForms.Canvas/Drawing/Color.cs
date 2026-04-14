@@ -105,4 +105,7 @@ public struct Color
     public static Color Silver => FromArgb(192, 192, 192);
     public static Color Aqua => FromArgb(0, 255, 255);
     public static Color Fuchsia => FromArgb(255, 0, 255);
+
+    public static implicit operator Color(System.Drawing.Color c) => FromArgb(c.A, c.R, c.G, c.B);
+    public static implicit operator System.Drawing.Color(Color c) => System.Drawing.Color.FromArgb(c.A, c.R, c.G, c.B);
 }

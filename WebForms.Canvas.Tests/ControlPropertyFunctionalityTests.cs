@@ -76,11 +76,11 @@ public class ControlPropertyFunctionalityTests
         var control = new TestControl();
 
         // Colors
-        control.BackColor = Color.Red;
-        Assert.Equal(Color.Red, control.BackColor);
+        control.BackColor = System.Drawing.Color.Red;
+        Assert.Equal(System.Drawing.Color.Red, control.BackColor);
 
-        control.ForeColor = Color.Blue;
-        Assert.Equal(Color.Blue, control.ForeColor);
+        control.ForeColor = System.Drawing.Color.Blue;
+        Assert.Equal(System.Drawing.Color.Blue, control.ForeColor);
 
         // Font
         var font = new Font("Arial", 12);

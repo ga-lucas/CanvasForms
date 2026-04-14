@@ -1,4 +1,5 @@
 using Canvas.Windows.Forms.Drawing;
+using Microsoft.JSInterop;
 
 namespace System.Windows.Forms;
 
@@ -9,12 +10,23 @@ public class LinkLabel : Label
 {
     private bool _isHovered = false;
     private bool _isVisited = false;
+    private string _linkUrl = string.Empty;
 
     public LinkLabel()
     {
         ForeColor = Color.FromArgb(0, 0, 255);
         Cursor = Cursor.Hand;
         TabStop = true;
+    }
+
+    /// <summary>
+    /// Gets or sets the URL to navigate to when the link is clicked.
+    /// If set, clicking the link will open this URL in a new browser window.
+    /// </summary>
+    public string LinkUrl
+    {
+        get => _linkUrl;
+        set => _linkUrl = value ?? string.Empty;
     }
 
     public Color LinkColor { get; set; } = Color.FromArgb(0, 0, 255);
@@ -48,17 +60,26 @@ public class LinkLabel : Label
             else
                 linkColor = LinkColor;
 
-            var (x, y) = GetTextPosition();
+            var lines = Text.Replace("\r", string.Empty).Split('\n');
+            var (x0, y0, charHeight) = GetTextBlockPosition(lines);
+
             using var brush = new SolidBrush(linkColor);
-            g.DrawString(Text, "Arial", 12, brush, x, y);
+            for (var i = 0; i < lines.Length; i++)
+            {
+                var line = lines[i] ?? string.Empty;
+                var x = x0 + GetLineX(line);
+                var y = y0 + (i * charHeight);
+                g.DrawString(line, "Arial", 12, brush, x, y);
+            }
 
             bool showUnderline = LinkBehavior == LinkBehavior.AlwaysUnderline
                 || (LinkBehavior == LinkBehavior.SystemDefault || LinkBehavior == LinkBehavior.HoverUnderline && _isHovered);
             if (showUnderline)
             {
-                var textWidth = Text.Length * 7;
+                var textWidth = (lines.Length > 0 ? lines[0].Length : 0) * 7;
                 using var underlinePen = new Pen(linkColor, 1);
-                g.DrawLine(underlinePen, x, y + 14, x + textWidth, y + 14);
+                var ux = x0 + GetLineX(lines.Length > 0 ? lines[0] : string.Empty);
+                g.DrawLine(underlinePen, ux, y0 + 14, ux + textWidth, y0 + 14);
             }
         }
 
@@ -91,10 +112,36 @@ public class LinkLabel : Label
         if (Enabled && e.Button == MouseButtons.Left)
         {
             _isVisited = true;
+
+            // Navigate to URL if LinkUrl is set
+            if (!string.IsNullOrEmpty(_linkUrl))
+            {
+                _ = NavigateToUrlAsync(_linkUrl);
+            }
+
             LinkClicked?.Invoke(this, new LinkLabelLinkClickedEventArgs(e.Button));
             Invalidate();
         }
         base.OnMouseUp(e);
+    }
+
+    /// <summary>
+    /// Opens the specified URL in a new browser window/tab
+    /// </summary>
+    private async Task NavigateToUrlAsync(string url)
+    {
+        try
+        {
+            var jsRuntime = Canvas.Windows.Forms.BrowserNavigationService.JSRuntime;
+            if (jsRuntime != null)
+            {
+                await jsRuntime.InvokeVoidAsync("open", url, "_blank");
+            }
+        }
+        catch
+        {
+            // Silently fail if JavaScript interop is not available
+        }
     }
 
     protected internal override void OnGotFocus(EventArgs e) { base.OnGotFocus(e); }

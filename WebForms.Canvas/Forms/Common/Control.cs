@@ -5,7 +5,7 @@ namespace System.Windows.Forms;
 public abstract class Control
 {
     private Control? _parent;
-    private readonly List<Control> _controls = new();
+    protected internal readonly List<Control> _controls = new();
     private ControlCollection? _controlsCollection;
     private string _text = string.Empty;
 
@@ -121,8 +121,34 @@ public abstract class Control
         }
     }
 
-    public Color BackColor { get; set; } = Color.White;
-    public Color ForeColor { get; set; } = Color.Black;
+    private System.Drawing.Color _backColor = System.Drawing.Color.White;
+    private System.Drawing.Color _foreColor = System.Drawing.Color.Black;
+
+    public System.Drawing.Color BackColor
+    {
+        get => _backColor;
+        set
+        {
+            if (_backColor != value)
+            {
+                _backColor = value;
+                Invalidate();
+            }
+        }
+    }
+
+    public System.Drawing.Color ForeColor
+    {
+        get => _foreColor;
+        set
+        {
+            if (_foreColor != value)
+            {
+                _foreColor = value;
+                Invalidate();
+            }
+        }
+    }
     public bool Visible { get; set; } = true;
     public bool Enabled { get; set; } = true;
     public object? Tag { get; set; }
@@ -139,7 +165,7 @@ public abstract class Control
         set { Width = value.Width; Height = value.Height; }
     }
 
-    public Rectangle DisplayRectangle => ClientRectangle;
+    public virtual Rectangle DisplayRectangle => ClientRectangle;
 
     /// <summary>
     /// Gets the width available for laying out child controls.
@@ -414,7 +440,17 @@ public abstract class Control
     public bool RecreatingHandle { get; private set; } = false;
 
     // Mouse capture
-    public bool Capture { get; set; } = false;
+    private bool _capture;
+    public bool Capture
+    {
+        get => _capture;
+        set
+        {
+            if (_capture == value) return;
+            _capture = value;
+            OnMouseCaptureChanged(EventArgs.Empty);
+        }
+    }
 
     // Painting optimizations
     public bool DoubleBuffered { get; set; } = false;
@@ -563,8 +599,8 @@ public abstract class Control
     public object? WindowTarget { get; set; }
 
     // Default static properties
-    public static Color DefaultBackColor => Color.White;
-    public static Color DefaultForeColor => Color.Black;
+    public static System.Drawing.Color DefaultBackColor => System.Drawing.Color.White;
+    public static System.Drawing.Color DefaultForeColor => System.Drawing.Color.Black;
     public static Font DefaultFont => new Font("Segoe UI", 9);
     public static Cursor DefaultCursor => Cursor.Default;
     public static ImeMode DefaultImeMode => ImeMode.NoControl;
@@ -890,20 +926,20 @@ public abstract class Control
     /// Returns the foreground color to use when the control is disabled.
     /// Derived from ForeColor so custom colors are respected.
     /// </summary>
-    protected Color DisabledForeColor =>
-        Color.FromArgb((int)(ForeColor.R * 0.43f), (int)(ForeColor.G * 0.43f), (int)(ForeColor.B * 0.43f));
+    protected System.Drawing.Color DisabledForeColor =>
+        System.Drawing.Color.FromArgb((int)(ForeColor.R * 0.43f), (int)(ForeColor.G * 0.43f), (int)(ForeColor.B * 0.43f));
 
     /// <summary>
     /// Returns ForeColor when enabled, DisabledForeColor when disabled.
     /// </summary>
-    protected Color EffectiveForeColor => Enabled ? ForeColor : DisabledForeColor;
+    protected System.Drawing.Color EffectiveForeColor => Enabled ? ForeColor : DisabledForeColor;
 
     /// <summary>
     /// Fills the entire control bounds with BackColor (skips fill when Transparent).
     /// </summary>
     protected void DrawControlBackground(Graphics g)
     {
-        if (BackColor == Color.Transparent) return;
+        if (BackColor == System.Drawing.Color.Transparent) return;
         using var brush = new SolidBrush(BackColor);
         g.FillRectangle(brush, 0, 0, Width, Height);
     }
@@ -957,7 +993,7 @@ public abstract class Control
         MouseHover?.Invoke(this, new MouseEventArgs(MouseButtons.None, 0, 0, 0));
     }
 
-    protected virtual void OnMouseWheel(MouseEventArgs e)
+    protected internal virtual void OnMouseWheel(MouseEventArgs e)
     {
         MouseWheel?.Invoke(this, e);
     }
@@ -1480,6 +1516,8 @@ public abstract class Control
     }
 
     private int _layoutSuspendCount = 0;
+
+    protected bool IsLayoutSuspended => _layoutSuspendCount > 0;
 
     /// <summary>
     /// Temporarily suspends the layout logic for the control
@@ -2223,6 +2261,14 @@ public abstract class Control
             control.Top = top;
             control.Width = width;
             control.Height = height;
+        }
+
+        // Recursively apply layout to child containers so nested layout panels
+        // (e.g., FlowLayoutPanel/TableLayoutPanel) lay out their children after being sized/positioned.
+        foreach (var control in _controls)
+        {
+            if (!control.Visible) continue;
+            control.PerformLayout();
         }
 
         Invalidate();

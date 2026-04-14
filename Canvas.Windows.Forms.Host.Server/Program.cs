@@ -41,7 +41,26 @@ mimeProvider.Mappings[".dll"]  = "application/octet-stream";
 app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = app.Environment.WebRootFileProvider,
-    ContentTypeProvider = mimeProvider
+    ContentTypeProvider = mimeProvider,
+    OnPrepareResponse = ctx =>
+    {
+        // In development, disable caching to ensure fresh files on every request
+        if (app.Environment.IsDevelopment())
+        {
+            ctx.Context.Response.Headers.CacheControl = "no-cache, no-store, must-revalidate";
+            ctx.Context.Response.Headers.Pragma = "no-cache";
+            ctx.Context.Response.Headers.Expires = "0";
+        }
+        else
+        {
+            // In production, use versioned/fingerprinted URLs with long cache
+            var path = ctx.File.PhysicalPath;
+            if (path?.Contains("_framework") == true)
+            {
+                ctx.Context.Response.Headers.CacheControl = "public, max-age=31536000, immutable";
+            }
+        }
+    }
 });
 
 // Wire up desktop change notifications via SignalR
@@ -219,7 +238,31 @@ app.MapGet("/api/apps/{appId}/files/{fileName}", (string appId, string fileName,
 // SignalR hub for canvas rendering
 app.MapHub<CanvasHub>("/hub");
 
-// Fallback to index.html for client-side routing
-app.MapFallbackToFile("index.html");
+// Fallback to index.html for client-side routing.
+// Important: MapFallbackToFile uses default static file options, which can bypass our
+// development no-cache headers and leave stale fingerprinted framework scripts in cache.
+// Serve index.html ourselves in Development with explicit no-cache headers.
+app.MapFallback(async context =>
+{
+    if (app.Environment.IsDevelopment())
+    {
+        context.Response.Headers.CacheControl = "no-cache, no-store, must-revalidate";
+        context.Response.Headers.Pragma = "no-cache";
+        context.Response.Headers.Expires = "0";
+    }
+
+    var fileInfo = app.Environment.WebRootFileProvider.GetFileInfo("index.html");
+    if (!fileInfo.Exists)
+    {
+        context.Response.StatusCode = StatusCodes.Status404NotFound;
+        return;
+    }
+
+    context.Response.ContentType = "text/html; charset=utf-8";
+    context.Response.ContentLength = fileInfo.Length;
+
+    await using var stream = fileInfo.CreateReadStream();
+    await stream.CopyToAsync(context.Response.Body, context.RequestAborted);
+});
 
 app.Run();
