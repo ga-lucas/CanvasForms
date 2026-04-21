@@ -246,8 +246,8 @@ public class WelcomeForm : Form
         {
             var dlg = new OpenFileDialog
             {
-                Title = "Open (host filesystem). Upload optional.",
-                Filter = "All files (*.*)|*.*|Text files (*.txt)|*.txt|Images (*.png;*.jpg;*.jpeg)|*.png;*.jpg;*.jpeg",
+                Title = "Open text file or image",
+                Filter = "All supported|*.txt;*.cs;*.json;*.xml;*.md;*.log;*.png;*.jpg;*.jpeg;*.gif;*.bmp|Text files|*.txt;*.cs;*.json;*.xml;*.md;*.log|Images|*.png;*.jpg;*.jpeg;*.gif;*.bmp|All files (*.*)|*.*",
                 FilterIndex = 1,
                 Multiselect = true,
                 EnableUpload = Canvas.Windows.Forms.CanvasFormsOptions.EnableFileDialogUpload
@@ -259,11 +259,11 @@ public class WelcomeForm : Form
                 {
                     if (t.Status == TaskStatus.RanToCompletion && t.Result == DialogResult.OK)
                     {
-                        var form = Canvas.Windows.Forms.CanvasApplication.FormManager?.ActiveForm;
-                        if (form != null)
+                        // Open a FileViewerForm for each selected file
+                        foreach (var fileName in dlg.FileNames)
                         {
-                            form.Text = $"Selected: {dlg.FileNames.Length} file(s)";
-                            form.Invalidate();
+                            var viewerForm = new FileViewerForm(fileName);
+                            Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowForm(viewerForm);
                         }
                     }
                 }

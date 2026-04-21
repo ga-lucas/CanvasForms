@@ -7,6 +7,7 @@ public class PictureBox : Control
 {
     private string _imageUrl = string.Empty;
     private PictureBoxSizeMode _sizeMode = PictureBoxSizeMode.Normal;
+    private BorderStyle _borderStyle = BorderStyle.None;
     private bool _imageLoaded = false;
 
     public PictureBox()
@@ -97,6 +98,22 @@ public class PictureBox : Control
     }
 
     /// <summary>
+    /// Gets or sets the border style of the PictureBox
+    /// </summary>
+    public BorderStyle BorderStyle
+    {
+        get => _borderStyle;
+        set
+        {
+            if (_borderStyle != value)
+            {
+                _borderStyle = value;
+                Invalidate();
+            }
+        }
+    }
+
+    /// <summary>
     /// Called when the control is added to a parent
     /// </summary>
     protected override void OnParentChanged(EventArgs e)
@@ -116,8 +133,25 @@ public class PictureBox : Control
 
         DrawControlBackground(g);
 
-        // Draw border
-        g.DrawRectangle(new Pen(Color.FromArgb(172, 172, 172)), new Rectangle(0, 0, Width, Height));
+        // Draw border based on BorderStyle
+        if (_borderStyle == BorderStyle.FixedSingle)
+        {
+            g.DrawRectangle(new Pen(Color.FromArgb(172, 172, 172)), new Rectangle(0, 0, Width, Height));
+        }
+        else if (_borderStyle == BorderStyle.Fixed3D)
+        {
+            // Draw a simple 3D-style border (inset effect)
+            var darkGray = new Pen(Color.FromArgb(128, 128, 128));
+            var lightGray = new Pen(Color.FromArgb(223, 223, 223));
+
+            // Top and left - dark
+            g.DrawLine(darkGray, 0, 0, Width - 1, 0);
+            g.DrawLine(darkGray, 0, 0, 0, Height - 1);
+
+            // Bottom and right - light
+            g.DrawLine(lightGray, Width - 1, 0, Width - 1, Height - 1);
+            g.DrawLine(lightGray, 0, Height - 1, Width - 1, Height - 1);
+        }
 
         if (!string.IsNullOrEmpty(_imageUrl))
         {
@@ -132,29 +166,34 @@ public class PictureBox : Control
 
     private Rectangle CalculateImageRectangle()
     {
+        // Account for border insets
+        var inset = _borderStyle == BorderStyle.None ? 0 : (_borderStyle == BorderStyle.Fixed3D ? 2 : 1);
+        var contentWidth = Math.Max(0, Width - (inset * 2));
+        var contentHeight = Math.Max(0, Height - (inset * 2));
+
         // For now, we'll use simple size modes
         // In a full implementation, we'd need to know the actual image dimensions
         switch (_sizeMode)
         {
             case PictureBoxSizeMode.Normal:
                 // Draw at original size from top-left
-                return new Rectangle(1, 1, Width - 2, Height - 2);
+                return new Rectangle(inset, inset, contentWidth, contentHeight);
 
             case PictureBoxSizeMode.StretchImage:
                 // Stretch to fill entire control
-                return new Rectangle(1, 1, Width - 2, Height - 2);
+                return new Rectangle(inset, inset, contentWidth, contentHeight);
 
             case PictureBoxSizeMode.CenterImage:
                 // Center the image (for now, just center within bounds)
-                return new Rectangle(1, 1, Width - 2, Height - 2);
+                return new Rectangle(inset, inset, contentWidth, contentHeight);
 
             case PictureBoxSizeMode.Zoom:
                 // Maintain aspect ratio and fit within bounds
                 // For now, same as stretch (would need actual image dimensions)
-                return new Rectangle(1, 1, Width - 2, Height - 2);
+                return new Rectangle(inset, inset, contentWidth, contentHeight);
 
             default:
-                return new Rectangle(1, 1, Width - 2, Height - 2);
+                return new Rectangle(inset, inset, contentWidth, contentHeight);
         }
     }
 
