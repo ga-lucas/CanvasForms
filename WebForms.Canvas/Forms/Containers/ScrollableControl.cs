@@ -1,4 +1,3 @@
-using Canvas.Windows.Forms.Drawing;
 
 namespace System.Windows.Forms;
 
@@ -15,6 +14,16 @@ public class ScrollableControl : Control
     // Backing store is the WinForms-style negative scroll offset.
     private System.Drawing.Point _autoScrollPosition = System.Drawing.Point.Empty;
 
+    /// <summary>
+    /// Overrides the base to subtract AutoScroll offset so FindChildAt hit-testing
+    /// works in content coordinates rather than viewport coordinates.
+    /// </summary>
+    protected override (int contentX, int contentY) ToContentCoordinates(int x, int y)
+    {
+        if (!AutoScroll) return (x, y);
+        return (x - AutoScrollPosition.X, y - AutoScrollPosition.Y);
+    }
+
     public bool AutoScroll
     {
         get => _autoScroll;
@@ -30,6 +39,34 @@ public class ScrollableControl : Control
                 }
                 Invalidate();
             }
+        }
+    }
+
+    /// <summary>
+    /// Gets a value indicating whether the horizontal scroll bar is visible.
+    /// In canvas mode this reflects whether content is wider than the viewport with AutoScroll enabled.
+    /// </summary>
+    public bool HScroll
+    {
+        get
+        {
+            if (!AutoScroll) return false;
+            var (contentWidth, _) = GetContentSize();
+            return contentWidth > ClientSize.Width;
+        }
+    }
+
+    /// <summary>
+    /// Gets a value indicating whether the vertical scroll bar is visible.
+    /// In canvas mode this reflects whether content is taller than the viewport with AutoScroll enabled.
+    /// </summary>
+    public bool VScroll
+    {
+        get
+        {
+            if (!AutoScroll) return false;
+            var (_, contentHeight) = GetContentSize();
+            return contentHeight > ClientSize.Height;
         }
     }
 

@@ -1,15 +1,33 @@
-using Canvas.Windows.Forms.Drawing;
 
 namespace System.Windows.Forms;
 
 public class GroupBox : Control
 {
-    private Control? _mouseCaptureChild;
+    private FlatStyle _flatStyle = FlatStyle.Standard;
 
     public GroupBox()
     {
         TabStop = false;
         BackColor = System.Drawing.Color.Transparent;
+        IsMouseRoutingContainer = true;
+    }
+
+    /// <summary>
+    /// Gets or sets the flat style of the GroupBox border.
+    /// Matches WinForms: Standard draws the etched recessed border; Flat draws a single flat line;
+    /// System defers to the OS theme (rendered the same as Standard here).
+    /// </summary>
+    public FlatStyle FlatStyle
+    {
+        get => _flatStyle;
+        set
+        {
+            if (_flatStyle != value)
+            {
+                _flatStyle = value;
+                Invalidate();
+            }
+        }
     }
 
     protected internal override void OnPaint(PaintEventArgs e)
@@ -111,10 +129,10 @@ public class GroupBox : Control
         var textHeight = Font.Height;
         var borderTop = Math.Max(0, textHeight / 2);
 
-        var borderColor = Color.FromArgb(122, 122, 122);
-        using var pen = new Pen(borderColor);
+        CanvasColor borderColor = FlatStyle == FlatStyle.Flat
+            ? (CanvasColor)ForeColor
+            : CanvasColor.FromArgb(122, 122, 122);
 
-        // Outer rectangle (top starts below text baseline area)
         var rect = new Rectangle(0, borderTop, Width - 1, Height - borderTop - 1);
 
         // Text measurements
@@ -137,178 +155,67 @@ public class GroupBox : Control
         var gapLeft = leftPadding;
         var gapRight = leftPadding + (textWidth > 0 ? textWidth + (textPad * 2) : 0);
 
-        // Left, right, bottom
-        g.DrawLine(pen, rect.X, rect.Y, rect.X, rect.Bottom);
-        g.DrawLine(pen, rect.Right, rect.Y, rect.Right, rect.Bottom);
-        g.DrawLine(pen, rect.X, rect.Bottom, rect.Right, rect.Bottom);
-
-        // Top line with a gap for the caption
-        if (gapRight <= gapLeft)
+        if (FlatStyle == FlatStyle.Flat)
         {
-            g.DrawLine(pen, rect.X, rect.Y, rect.Right, rect.Y);
+            // Flat: single-line border, no etching
+            using var pen = new Pen(borderColor);
+
+            g.DrawLine(pen, rect.X, rect.Y, rect.X, rect.Bottom);
+            g.DrawLine(pen, rect.Right, rect.Y, rect.Right, rect.Bottom);
+            g.DrawLine(pen, rect.X, rect.Bottom, rect.Right, rect.Bottom);
+
+            if (gapRight <= gapLeft)
+            {
+                g.DrawLine(pen, rect.X, rect.Y, rect.Right, rect.Y);
+            }
+            else
+            {
+                g.DrawLine(pen, rect.X, rect.Y, rect.X + gapLeft - 1, rect.Y);
+                g.DrawLine(pen, rect.X + gapRight + 1, rect.Y, rect.Right, rect.Y);
+            }
         }
         else
         {
-            // Left segment
-            g.DrawLine(pen, rect.X, rect.Y, rect.X + gapLeft - 1, rect.Y);
-            // Right segment
-            g.DrawLine(pen, rect.X + gapRight + 1, rect.Y, rect.Right, rect.Y);
+            // Standard / System: etched (two-line) border
+            using var darkPen = new Pen(CanvasColor.FromArgb(122, 122, 122));
+            using var lightPen = new Pen(CanvasColor.FromArgb(255, 255, 255));
+
+            // Draw sides and bottom twice (dark offset + light offset) for etched look
+            // Left
+            g.DrawLine(darkPen, rect.X, rect.Y, rect.X, rect.Bottom);
+            g.DrawLine(lightPen, rect.X + 1, rect.Y + 1, rect.X + 1, rect.Bottom - 1);
+            // Right
+            g.DrawLine(darkPen, rect.Right, rect.Y, rect.Right, rect.Bottom);
+            g.DrawLine(lightPen, rect.Right + 1, rect.Y + 1, rect.Right + 1, rect.Bottom - 1);
+            // Bottom
+            g.DrawLine(darkPen, rect.X, rect.Bottom, rect.Right, rect.Bottom);
+            g.DrawLine(lightPen, rect.X + 1, rect.Bottom + 1, rect.Right + 1, rect.Bottom + 1);
+
+            // Top with caption gap
+            if (gapRight <= gapLeft)
+            {
+                g.DrawLine(darkPen, rect.X, rect.Y, rect.Right, rect.Y);
+                g.DrawLine(lightPen, rect.X + 1, rect.Y + 1, rect.Right + 1, rect.Y + 1);
+            }
+            else
+            {
+                g.DrawLine(darkPen, rect.X, rect.Y, rect.X + gapLeft - 1, rect.Y);
+                g.DrawLine(lightPen, rect.X + 1, rect.Y + 1, rect.X + gapLeft, rect.Y + 1);
+                g.DrawLine(darkPen, rect.X + gapRight + 1, rect.Y, rect.Right, rect.Y);
+                g.DrawLine(lightPen, rect.X + gapRight + 2, rect.Y + 1, rect.Right + 1, rect.Y + 1);
+            }
         }
 
         if (!string.IsNullOrEmpty(text))
         {
-            // Clear background behind caption to match WinForms (uses parent back color).
+            // Clear background behind caption
             var bg = BackColor != System.Drawing.Color.Transparent ? BackColor : (Parent?.BackColor ?? System.Drawing.Color.White);
             using var bgBrush = new SolidBrush(bg);
             g.FillRectangle(bgBrush, gapLeft, 0, Math.Max(0, textWidth + (textPad * 2)), textHeight);
 
-            g.DrawString(text, Font, ForeColor, gapLeft + textPad, 0);
+            CanvasColor textColor = Enabled ? (CanvasColor)ForeColor : CanvasColor.FromArgb(122, 122, 122);
+            g.DrawString(text, Font, textColor, gapLeft + textPad, 0);
         }
-    }
-
-    protected internal override void OnMouseDown(MouseEventArgs e)
-    {
-        if (!Enabled)
-        {
-            base.OnMouseDown(e);
-            return;
-        }
-
-        var child = FindChildAt(e.X, e.Y);
-        if (child != null)
-        {
-            _mouseCaptureChild = child;
-            SetFormFocusedControl(child);
-
-            var args = new MouseEventArgs(e.Button, e.Clicks, e.X - child.Left, e.Y - child.Top);
-            child.OnMouseDown(args);
-            return;
-        }
-
-        base.OnMouseDown(e);
-    }
-
-    protected internal override void OnMouseMove(MouseEventArgs e)
-    {
-        if (!Enabled)
-        {
-            base.OnMouseMove(e);
-            return;
-        }
-
-        var child = _mouseCaptureChild ?? FindChildAt(e.X, e.Y);
-        if (child != null)
-        {
-            var args = new MouseEventArgs(e.Button, e.Clicks, e.X - child.Left, e.Y - child.Top);
-            child.OnMouseMove(args);
-            return;
-        }
-
-        base.OnMouseMove(e);
-    }
-
-    protected internal override void OnMouseUp(MouseEventArgs e)
-    {
-        if (!Enabled)
-        {
-            base.OnMouseUp(e);
-            return;
-        }
-
-        var child = _mouseCaptureChild ?? FindChildAt(e.X, e.Y);
-        if (child != null)
-        {
-            var args = new MouseEventArgs(e.Button, e.Clicks, e.X - child.Left, e.Y - child.Top);
-            child.OnMouseUp(args);
-        }
-        else
-        {
-            base.OnMouseUp(e);
-        }
-
-        _mouseCaptureChild = null;
-    }
-
-    protected internal override void OnMouseWheel(MouseEventArgs e)
-    {
-        if (!Enabled)
-        {
-            base.OnMouseWheel(e);
-            return;
-        }
-
-        var child = FindChildAt(e.X, e.Y);
-        if (child != null)
-        {
-            var args = new MouseEventArgs(e.Button, e.Clicks, e.X - child.Left, e.Y - child.Top, e.Delta);
-            child.OnMouseWheel(args);
-            return;
-        }
-
-        base.OnMouseWheel(e);
-    }
-
-    private void SetFormFocusedControl(Control control)
-    {
-        if (FindForm() is Form form)
-        {
-            form.FocusedControl = control;
-        }
-
-        // Match WinForms behavior: clicking a child control focuses it so it can receive keyboard input.
-        // This is required for TextBox editing/caret and consistent ComboBox activation.
-        control.Focus();
-    }
-
-    private Control? FindChildAt(int x, int y)
-    {
-        for (var i = Controls.Count - 1; i >= 0; i--)
-        {
-            var child = Controls[i];
-            if (!child.Visible || !child.Enabled) continue;
-
-            if (HitTest(child, x, y))
-            {
-                return child;
-            }
-        }
-
-        return null;
-    }
-
-    private bool HitTest(Control child, int x, int y)
-    {
-        var inNormalBounds = x >= child.Left && x < child.Left + child.Width &&
-                         y >= child.Top && y < child.Top + child.Height;
-
-        if (inNormalBounds)
-            return true;
-
-        if (child is ComboBox comboBox && comboBox.DroppedDown)
-        {
-            var dropDownHeight = comboBox.DropDownHeight;
-            var dropDownWidth = comboBox.DropDownWidth;
-
-            return x >= child.Left && x < child.Left + dropDownWidth &&
-                   y >= child.Top + child.Height && y < child.Top + child.Height + dropDownHeight;
-        }
-
-        if (child is DateTimePicker dateTimePicker && dateTimePicker.DroppedDown)
-        {
-            var dd = dateTimePicker.GetDropDownBounds();
-
-            return x >= child.Left + dd.X && x < child.Left + dd.Right &&
-                   y >= child.Top + dd.Y && y < child.Top + dd.Bottom;
-        }
-
-        if (child is TextBox textBox && textBox.HasVisibleAutoComplete)
-        {
-            var panelBounds = textBox.GetAutoCompletePanelBounds();
-
-            return x >= child.Left + panelBounds.X && x < child.Left + panelBounds.Right &&
-                   y >= child.Top + panelBounds.Y && y < child.Top + panelBounds.Bottom;
-        }
-
-        return false;
     }
 }
+

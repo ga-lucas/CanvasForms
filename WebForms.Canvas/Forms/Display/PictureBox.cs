@@ -1,4 +1,3 @@
-using Canvas.Windows.Forms.Drawing;
 using Microsoft.JSInterop;
 
 namespace System.Windows.Forms;

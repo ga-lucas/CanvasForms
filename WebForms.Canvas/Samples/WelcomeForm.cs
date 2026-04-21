@@ -1,4 +1,3 @@
-using Canvas.Windows.Forms.Drawing;
 using System.Windows.Forms;
 
 namespace Canvas.Windows.Forms.Samples;

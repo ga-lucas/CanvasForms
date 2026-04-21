@@ -1,4 +1,3 @@
-using Canvas.Windows.Forms.Drawing;
 
 namespace System.Windows.Forms;
 
@@ -22,8 +21,8 @@ public class TabControl : Control
     {
         Width = 200;
         Height = 150;
-        BackColor = Color.White;
-        ForeColor = Color.Black;
+        BackColor = CanvasColor.White;
+        ForeColor = CanvasColor.Black;
         TabStop = true;
 
         SetStyle(ControlStyles.Selectable | ControlStyles.UserPaint, true);
@@ -132,7 +131,7 @@ public class TabControl : Control
         DrawControlBackground(g);
 
         // Border
-        using (var pen = new Pen(Color.FromArgb(200, 200, 200)))
+        using (var pen = new Pen(CanvasColor.FromArgb(200, 200, 200)))
         {
             g.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
         }
@@ -147,13 +146,13 @@ public class TabControl : Control
         var headerBounds = GetHeaderBounds();
 
         // Header strip background
-        using (var headerBrush = new SolidBrush(Color.FromArgb(240, 240, 240)))
+        using (var headerBrush = new SolidBrush(CanvasColor.FromArgb(240, 240, 240)))
         {
             g.FillRectangle(headerBrush, headerBounds);
         }
 
         // Divider line between headers and page area
-        using (var dividerPen = new Pen(Color.FromArgb(200, 200, 200)))
+        using (var dividerPen = new Pen(CanvasColor.FromArgb(200, 200, 200)))
         {
             if (Alignment == TabAlignment.Top)
             {
@@ -224,14 +223,14 @@ public class TabControl : Control
             var selected = i == _selectedIndex;
             var hovered = i == _hoveredIndex;
 
-            var bg = selected ? Color.White : (hovered && HotTrack ? Color.FromArgb(229, 241, 251) : Color.FromArgb(240, 240, 240));
+            var bg = selected ? CanvasColor.White : (hovered && HotTrack ? CanvasColor.FromArgb(229, 241, 251) : CanvasColor.FromArgb(240, 240, 240));
 
             using (var b = new SolidBrush(bg))
             {
                 g.FillRectangle(b, rect);
             }
 
-            using (var border = new Pen(Color.FromArgb(200, 200, 200)))
+            using (var border = new Pen(CanvasColor.FromArgb(200, 200, 200)))
             {
                 g.DrawRectangle(border, rect);
             }
@@ -258,7 +257,7 @@ public class TabControl : Control
         if (_selectedIndex >= 0 && _selectedIndex < _tabHeaderRects.Count)
         {
             var rect = _tabHeaderRects[_selectedIndex];
-            using var erase = new Pen(Color.White);
+            using var erase = new Pen(CanvasColor.White);
 
             var selectedHeaderBounds = GetHeaderBounds();
 
@@ -874,16 +873,16 @@ public class TabControl : Control
         var left = GetScrollLeftRect();
         var right = GetScrollRightRect();
 
-        using var bg = new SolidBrush(Color.FromArgb(240, 240, 240));
+        using var bg = new SolidBrush(CanvasColor.FromArgb(240, 240, 240));
         g.FillRectangle(bg, left);
         g.FillRectangle(bg, right);
 
-        using var pen = new Pen(Color.FromArgb(200, 200, 200));
+        using var pen = new Pen(CanvasColor.FromArgb(200, 200, 200));
         g.DrawRectangle(pen, left);
         g.DrawRectangle(pen, right);
 
         // simple chevrons
-        using var arrow = new Pen(Color.FromArgb(80, 80, 80));
+        using var arrow = new Pen(CanvasColor.FromArgb(80, 80, 80));
         g.DrawLine(arrow, left.X + 10, left.Y + 6, left.X + 6, left.Y + left.Height / 2);
         g.DrawLine(arrow, left.X + 6, left.Y + left.Height / 2, left.X + 10, left.Y + left.Height - 6);
 
@@ -1049,7 +1048,7 @@ public class TabPage : Panel
     public TabPage()
     {
         TabStop = false;
-        BackColor = Color.White;
+        BackColor = CanvasColor.White;
     }
 
     public TabPage(string text) : this()

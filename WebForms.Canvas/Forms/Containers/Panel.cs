@@ -1,4 +1,3 @@
-using Canvas.Windows.Forms.Drawing;
 
 namespace System.Windows.Forms;
 
@@ -6,11 +5,10 @@ public class Panel : ScrollableControl
 {
     private BorderStyle _borderStyle = BorderStyle.None;
 
-    private Control? _mouseCaptureChild;
-
     public Panel()
     {
         TabStop = false;
+        IsMouseRoutingContainer = true;
     }
 
     public BorderStyle BorderStyle
@@ -95,156 +93,6 @@ public class Panel : ScrollableControl
         g.Restore();
     }
 
-    protected internal override void OnMouseDown(MouseEventArgs e)
-    {
-        if (!Enabled)
-        {
-            base.OnMouseDown(e);
-            return;
-        }
-
-        var child = FindChildAt(e.X, e.Y);
-        if (child != null)
-        {
-            _mouseCaptureChild = child;
-            SetFormFocusedControl(child);
-
-            var (cx, cy) = ToChildCoordinates(child, e.X, e.Y);
-            var args = new MouseEventArgs(e.Button, e.Clicks, cx, cy);
-            child.OnMouseDown(args);
-            return;
-        }
-
-        base.OnMouseDown(e);
-    }
-
-    protected internal override void OnMouseMove(MouseEventArgs e)
-    {
-        if (!Enabled)
-        {
-            base.OnMouseMove(e);
-            return;
-        }
-
-        var child = _mouseCaptureChild ?? FindChildAt(e.X, e.Y);
-        if (child != null)
-        {
-            var (cx, cy) = ToChildCoordinates(child, e.X, e.Y);
-            var args = new MouseEventArgs(e.Button, e.Clicks, cx, cy);
-            child.OnMouseMove(args);
-            return;
-        }
-
-        base.OnMouseMove(e);
-    }
-
-    protected internal override void OnMouseUp(MouseEventArgs e)
-    {
-        if (!Enabled)
-        {
-            base.OnMouseUp(e);
-            return;
-        }
-
-        var child = _mouseCaptureChild ?? FindChildAt(e.X, e.Y);
-        if (child != null)
-        {
-            var (cx, cy) = ToChildCoordinates(child, e.X, e.Y);
-            var args = new MouseEventArgs(e.Button, e.Clicks, cx, cy);
-            child.OnMouseUp(args);
-        }
-        else
-        {
-            base.OnMouseUp(e);
-        }
-
-        _mouseCaptureChild = null;
-    }
-
-    private void SetFormFocusedControl(Control control)
-    {
-        // Keep behavior consistent with Form (it uses FocusedControl for routing keyboard and caret painting)
-        if (GetContainerControl() is Form form)
-        {
-            form.FocusedControl = control;
-        }
-    }
-
-    private Control? FindChildAt(int x, int y)
-    {
-        // Convert point from viewport coords to content coords.
-        var scrollX = AutoScroll ? DisplayRectangle.X : 0;
-        var scrollY = AutoScroll ? DisplayRectangle.Y : 0;
-
-        var contentX = x - scrollX;
-        var contentY = y - scrollY;
-
-        // Check children from top-most to bottom-most.
-        for (var i = Controls.Count - 1; i >= 0; i--)
-        {
-            var child = Controls[i];
-            if (!child.Visible || !child.Enabled) continue;
-
-            if (HitTest(child, contentX, contentY))
-            {
-                return child;
-            }
-        }
-
-        return null;
-    }
-
-    private (int x, int y) ToChildCoordinates(Control child, int x, int y)
-    {
-        var scrollX = AutoScroll ? DisplayRectangle.X : 0;
-        var scrollY = AutoScroll ? DisplayRectangle.Y : 0;
-
-        var contentX = x - scrollX;
-        var contentY = y - scrollY;
-
-        return (contentX - child.Left, contentY - child.Top);
-    }
-
-    private bool HitTest(Control child, int x, int y)
-    {
-        // Normal bounds check
-        var inNormalBounds = x >= child.Left && x < child.Left + child.Width &&
-                             y >= child.Top && y < child.Top + child.Height;
-
-        if (inNormalBounds)
-            return true;
-
-        // Special case: ComboBox with drop-down open
-        if (child is ComboBox comboBox && comboBox.DroppedDown)
-        {
-            var dropDownHeight = comboBox.DropDownHeight;
-            var dropDownWidth = comboBox.DropDownWidth;
-
-            return x >= child.Left && x < child.Left + dropDownWidth &&
-                   y >= child.Top + child.Height && y < child.Top + child.Height + dropDownHeight;
-        }
-
-        // Special case: DateTimePicker with drop-down open
-        if (child is DateTimePicker dateTimePicker && dateTimePicker.DroppedDown)
-        {
-            var dd = dateTimePicker.GetDropDownBounds();
-
-            return x >= child.Left + dd.X && x < child.Left + dd.Right &&
-                   y >= child.Top + dd.Y && y < child.Top + dd.Bottom;
-        }
-
-        // Special case: TextBox with autocomplete panel open
-        if (child is TextBox textBox && textBox.HasVisibleAutoComplete)
-        {
-            var panelBounds = textBox.GetAutoCompletePanelBounds();
-
-            return x >= child.Left + panelBounds.X && x < child.Left + panelBounds.Right &&
-                   y >= child.Top + panelBounds.Y && y < child.Top + panelBounds.Bottom;
-        }
-
-        return false;
-    }
-
     private int GetBorderWidth()
     {
         return _borderStyle switch
@@ -260,10 +108,32 @@ public class Panel : ScrollableControl
         switch (_borderStyle)
         {
             case BorderStyle.FixedSingle:
-            case BorderStyle.Fixed3D:
-                using (var pen = new Pen(Color.FromArgb(122, 122, 122)))
+                using (var pen = new Pen(CanvasColor.FromArgb(122, 122, 122)))
                 {
                     g.DrawRectangle(pen, bounds);
+                }
+                break;
+
+            case BorderStyle.Fixed3D:
+                // Inset 3D: dark outer top/left, light outer bottom/right;
+                // then lighter inner top/left, white inner bottom/right.
+                using (var darkOuter = new Pen(CanvasColor.FromArgb(100, 100, 100)))
+                using (var lightOuter = new Pen(CanvasColor.FromArgb(255, 255, 255)))
+                using (var darkInner = new Pen(CanvasColor.FromArgb(160, 160, 160)))
+                using (var lightInner = new Pen(CanvasColor.FromArgb(227, 227, 227)))
+                {
+                    // Outer top + left
+                    g.DrawLine(darkOuter, bounds.X, bounds.Y, bounds.Right - 1, bounds.Y);
+                    g.DrawLine(darkOuter, bounds.X, bounds.Y, bounds.X, bounds.Bottom - 1);
+                    // Outer bottom + right
+                    g.DrawLine(lightOuter, bounds.X, bounds.Bottom - 1, bounds.Right - 1, bounds.Bottom - 1);
+                    g.DrawLine(lightOuter, bounds.Right - 1, bounds.Y, bounds.Right - 1, bounds.Bottom - 1);
+                    // Inner top + left
+                    g.DrawLine(darkInner, bounds.X + 1, bounds.Y + 1, bounds.Right - 2, bounds.Y + 1);
+                    g.DrawLine(darkInner, bounds.X + 1, bounds.Y + 1, bounds.X + 1, bounds.Bottom - 2);
+                    // Inner bottom + right
+                    g.DrawLine(lightInner, bounds.X + 1, bounds.Bottom - 2, bounds.Right - 2, bounds.Bottom - 2);
+                    g.DrawLine(lightInner, bounds.Right - 2, bounds.Y + 1, bounds.Right - 2, bounds.Bottom - 2);
                 }
                 break;
         }

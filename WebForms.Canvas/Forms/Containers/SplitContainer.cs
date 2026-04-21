@@ -1,4 +1,3 @@
-using Canvas.Windows.Forms.Drawing;
 
 namespace System.Windows.Forms;
 
@@ -25,23 +24,24 @@ public class SplitContainer : ContainerControl
     public SplitContainer()
     {
         TabStop = false;
+        IsMouseRoutingContainer = true;
 
         _panel1 = new SplitterPanel(this, panelIndex: 1)
         {
-            BackColor = Color.Transparent,
+            BackColor = CanvasColor.Transparent,
             Dock = DockStyle.None,
         };
 
         _panel2 = new SplitterPanel(this, panelIndex: 2)
         {
-            BackColor = Color.Transparent,
+            BackColor = CanvasColor.Transparent,
             Dock = DockStyle.None,
         };
 
         base.Controls.Add(_panel1);
         base.Controls.Add(_panel2);
 
-        BackColor = Color.Transparent;
+        BackColor = CanvasColor.Transparent;
         BorderStyle = BorderStyle.None;
 
         UpdateSplitterBounds();
@@ -136,6 +136,44 @@ public class SplitContainer : ContainerControl
                 {
                     _dragging = false;
                 }
+                Invalidate();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets whether Panel1 is collapsed (hidden), giving all space to Panel2.
+    /// Matches WinForms SplitContainer.Panel1Collapsed.
+    /// </summary>
+    public bool Panel1Collapsed
+    {
+        get => !_panel1.Visible;
+        set
+        {
+            if (_panel1.Visible == value)   // value=true means we want to collapse → hide
+            {
+                _panel1.Visible = !value;
+                if (value) _panel2.Visible = true;   // ensure Panel2 is visible
+                PerformLayout();
+                Invalidate();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets whether Panel2 is collapsed (hidden), giving all space to Panel1.
+    /// Matches WinForms SplitContainer.Panel2Collapsed.
+    /// </summary>
+    public bool Panel2Collapsed
+    {
+        get => !_panel2.Visible;
+        set
+        {
+            if (_panel2.Visible == value)
+            {
+                _panel2.Visible = !value;
+                if (value) _panel1.Visible = true;
+                PerformLayout();
                 Invalidate();
             }
         }
@@ -258,42 +296,18 @@ public class SplitContainer : ContainerControl
             return;
         }
 
-        if (!_isSplitterFixed && e.Button == MouseButtons.Left && IsInSplitter(e.X, e.Y))
+        if (!_isSplitterFixed && e.Button == MouseButtons.Left
+            && _panel1.Visible && _panel2.Visible
+            && IsInSplitter(e.X, e.Y))
         {
             _dragging = true;
             _dragOffset = _orientation == Orientation.Vertical ? e.X - _splitterDistance : e.Y - _splitterDistance;
             Capture = true;
-
-            // Focus behavior: SplitContainer itself is not selectable.
             Invalidate();
-            base.OnMouseDown(e);
             return;
         }
 
-        // Route to appropriate panel
-        var hitPanel = GetPanelAt(e.X, e.Y);
-        if (hitPanel != null)
-        {
-            // Focus routed like Panel.
-            if (FindForm() is Form form)
-            {
-                var deepest = FindDeepestEnabledChild(hitPanel, e.X - hitPanel.Left, e.Y - hitPanel.Top);
-                if (deepest != null)
-                {
-                    form.FocusedControl = deepest;
-                    deepest.Focus();
-                }
-                else
-                {
-                    form.FocusedControl = hitPanel;
-                }
-            }
-
-            var args = new MouseEventArgs(e.Button, e.Clicks, e.X - hitPanel.Left, e.Y - hitPanel.Top);
-            hitPanel.OnMouseDown(args);
-            return;
-        }
-
+        // Delegate panel routing to shared base (IsMouseRoutingContainer = true).
         base.OnMouseDown(e);
     }
 
@@ -305,11 +319,10 @@ public class SplitContainer : ContainerControl
             return;
         }
 
-        // Cursor support (FormRenderer queries the hovered control's Cursor)
+        // Update split cursor when hovering the splitter bar.
         if (!_dragging && !_isSplitterFixed)
         {
-            var wantsSplit = IsInSplitter(e.X, e.Y);
-            var desired = wantsSplit
+            var desired = IsInSplitter(e.X, e.Y)
                 ? (_orientation == Orientation.Vertical ? Cursor.VSplit : Cursor.HSplit)
                 : DefaultCursor;
 
@@ -325,9 +338,7 @@ public class SplitContainer : ContainerControl
             var raw = _orientation == Orientation.Vertical ? e.X - _dragOffset : e.Y - _dragOffset;
 
             if (_splitterIncrement > 1)
-            {
                 raw = (int)Math.Round(raw / (double)_splitterIncrement) * _splitterIncrement;
-            }
 
             var coerced = CoerceSplitterDistance(raw);
             if (coerced != _splitterDistance)
@@ -337,14 +348,6 @@ public class SplitContainer : ContainerControl
                 OnSplitterMoving(CreateSplitterEventArgs(e));
                 Invalidate();
             }
-            return;
-        }
-
-        var hitPanel = GetPanelAt(e.X, e.Y);
-        if (hitPanel != null)
-        {
-            var args = new MouseEventArgs(e.Button, e.Clicks, e.X - hitPanel.Left, e.Y - hitPanel.Top);
-            hitPanel.OnMouseMove(args);
             return;
         }
 
@@ -365,20 +368,62 @@ public class SplitContainer : ContainerControl
             Capture = false;
             OnSplitterMoved(CreateSplitterEventArgs(e));
             Invalidate();
-            base.OnMouseUp(e);
-            return;
-        }
-
-        var hitPanel = GetPanelAt(e.X, e.Y);
-        if (hitPanel != null)
-        {
-            var args = new MouseEventArgs(e.Button, e.Clicks, e.X - hitPanel.Left, e.Y - hitPanel.Top);
-            hitPanel.OnMouseUp(args);
             return;
         }
 
         base.OnMouseUp(e);
     }
+
+    protected internal override void OnKeyDown(KeyEventArgs e)
+    {
+        if (!Enabled || _isSplitterFixed || !_panel1.Visible || !_panel2.Visible)
+        {
+            base.OnKeyDown(e);
+            return;
+        }
+
+        // WinForms: when the SplitContainer itself has focus, Arrow keys move the splitter.
+        var step = _splitterIncrement > 1 ? _splitterIncrement : KeyboardSplitterStep;
+
+        var moved = false;
+        var newDistance = _splitterDistance;
+
+        if (_orientation == Orientation.Vertical)
+        {
+            if (e.KeyCode == Keys.Left)  { newDistance -= step; moved = true; }
+            else if (e.KeyCode == Keys.Right) { newDistance += step; moved = true; }
+        }
+        else
+        {
+            if (e.KeyCode == Keys.Up)    { newDistance -= step; moved = true; }
+            else if (e.KeyCode == Keys.Down)  { newDistance += step; moved = true; }
+        }
+
+        if (moved)
+        {
+            var coerced = CoerceSplitterDistance(newDistance);
+            if (coerced != _splitterDistance)
+            {
+                _splitterDistance = coerced;
+                UpdateSplitterBounds();
+
+                var fakeArgs = new SplitterEventArgs(0, 0,
+                    _orientation == Orientation.Vertical ? _splitterDistance : 0,
+                    _orientation == Orientation.Horizontal ? _splitterDistance : 0);
+
+                OnSplitterMoving(fakeArgs);
+                OnSplitterMoved(fakeArgs);
+                Invalidate();
+            }
+
+            e.Handled = true;
+            return;
+        }
+
+        base.OnKeyDown(e);
+    }
+
+    private const int KeyboardSplitterStep = 5;
 
     private SplitterEventArgs CreateSplitterEventArgs(MouseEventArgs e)
     {
@@ -387,19 +432,6 @@ public class SplitContainer : ContainerControl
         var splitX = _orientation == Orientation.Vertical ? _splitterDistance : 0;
         var splitY = _orientation == Orientation.Horizontal ? _splitterDistance : 0;
         return new SplitterEventArgs(e.X, e.Y, splitX, splitY);
-    }
-
-    private SplitterPanel? GetPanelAt(int x, int y)
-    {
-        if (x < 0 || y < 0 || x >= Width || y >= Height) return null;
-
-        if (_panel1.Visible && x >= _panel1.Left && x < _panel1.Left + _panel1.Width && y >= _panel1.Top && y < _panel1.Top + _panel1.Height)
-            return _panel1;
-
-        if (_panel2.Visible && x >= _panel2.Left && x < _panel2.Left + _panel2.Width && y >= _panel2.Top && y < _panel2.Top + _panel2.Height)
-            return _panel2;
-
-        return null;
     }
 
     private bool IsInSplitter(int x, int y)
@@ -420,14 +452,17 @@ public class SplitContainer : ContainerControl
 
     private void DrawSplitter(Graphics g)
     {
+        // Don't draw the splitter if either panel is collapsed.
+        if (!_panel1.Visible || !_panel2.Visible) return;
+
         var rect = GetSplitterRect();
 
         // WinForms default: subtle 3D splitter.
-        using var bgBrush = new SolidBrush(Color.FromArgb(240, 240, 240));
+        using var bgBrush = new SolidBrush(CanvasColor.FromArgb(240, 240, 240));
         g.FillRectangle(bgBrush, rect);
 
-        using var dark = new Pen(Color.FromArgb(160, 160, 160));
-        using var light = new Pen(Color.FromArgb(255, 255, 255));
+        using var dark = new Pen(CanvasColor.FromArgb(160, 160, 160));
+        using var light = new Pen(CanvasColor.FromArgb(255, 255, 255));
 
         if (_orientation == Orientation.Vertical)
         {
@@ -448,18 +483,18 @@ public class SplitContainer : ContainerControl
         switch (BorderStyle)
         {
             case BorderStyle.FixedSingle:
-                using (var pen = new Pen(Color.FromArgb(122, 122, 122)))
+                using (var pen = new Pen(CanvasColor.FromArgb(122, 122, 122)))
                 {
                     g.DrawRectangle(pen, bounds);
                 }
                 break;
 
             case BorderStyle.Fixed3D:
-                using (var darkPen = new Pen(Color.FromArgb(122, 122, 122)))
+                using (var darkPen = new Pen(CanvasColor.FromArgb(122, 122, 122)))
                 {
                     g.DrawRectangle(darkPen, bounds);
                 }
-                using (var lightPen = new Pen(Color.FromArgb(240, 240, 240)))
+                using (var lightPen = new Pen(CanvasColor.FromArgb(240, 240, 240)))
                 {
                     g.DrawRectangle(lightPen, new Rectangle(1, 1, Width - 3, Height - 3));
                 }
@@ -470,6 +505,33 @@ public class SplitContainer : ContainerControl
     private void UpdateSplitterBounds()
     {
         CoerceSplitterDistance();
+
+        // When a panel is collapsed the other panel fills the full area and the splitter is hidden.
+        if (!_panel1.Visible)
+        {
+            _panel2.Left = 0;
+            _panel2.Top = 0;
+            _panel2.Width = Width;
+            _panel2.Height = Height;
+            _panel1.Width = 0;
+            _panel1.Height = 0;
+            _panel1.PerformLayout();
+            _panel2.PerformLayout();
+            return;
+        }
+
+        if (!_panel2.Visible)
+        {
+            _panel1.Left = 0;
+            _panel1.Top = 0;
+            _panel1.Width = Width;
+            _panel1.Height = Height;
+            _panel2.Width = 0;
+            _panel2.Height = 0;
+            _panel1.PerformLayout();
+            _panel2.PerformLayout();
+            return;
+        }
 
         if (_orientation == Orientation.Vertical)
         {
@@ -524,29 +586,6 @@ public class SplitContainer : ContainerControl
 
         return Math.Max(_panel1MinSize, Height - _splitterWidth - _panel2MinSize);
     }
-
-    private Control? FindDeepestEnabledChild(Control root, int x, int y)
-    {
-        // Match Form.FindDeepestHitControl behavior in the simplest form for focus selection.
-        for (var i = root.Controls.Count - 1; i >= 0; i--)
-        {
-            var child = root.Controls[i];
-            if (!child.Visible || !child.Enabled) continue;
-
-            if (x >= child.Left && x < child.Left + child.Width && y >= child.Top && y < child.Top + child.Height)
-            {
-                if (child.HasChildren)
-                {
-                    var deep = FindDeepestEnabledChild(child, x - child.Left, y - child.Top);
-                    if (deep != null) return deep;
-                }
-
-                return child;
-            }
-        }
-
-        return null;
-    }
 }
 
 public class SplitterPanel : Panel
@@ -559,7 +598,7 @@ public class SplitterPanel : Panel
         // WinForms: panels are not selectable.
         TabStop = false;
         BorderStyle = BorderStyle.None;
-        BackColor = Color.Transparent;
+        BackColor = CanvasColor.Transparent;
     }
 
     public SplitContainer Owner { get; }

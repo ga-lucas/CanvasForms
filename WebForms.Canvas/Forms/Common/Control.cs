@@ -1,4 +1,3 @@
-using Canvas.Windows.Forms.Drawing;
 
 namespace System.Windows.Forms;
 
@@ -850,16 +849,52 @@ public abstract class Control
 
     protected internal virtual void OnMouseDown(MouseEventArgs e)
     {
+        if (IsMouseRoutingContainer && Enabled)
+        {
+            var child = FindChildAt(e.X, e.Y);
+            if (child != null)
+            {
+                _mouseCaptureChild = child;
+                SetFormFocusedControl(child);
+                var (cx, cy) = ToChildCoordinates(child, e.X, e.Y);
+                child.OnMouseDown(new MouseEventArgs(e.Button, e.Clicks, cx, cy));
+                MouseDown?.Invoke(this, e);
+                return;
+            }
+        }
         MouseDown?.Invoke(this, e);
     }
 
     protected internal virtual void OnMouseUp(MouseEventArgs e)
     {
+        if (IsMouseRoutingContainer && Enabled)
+        {
+            var child = _mouseCaptureChild ?? FindChildAt(e.X, e.Y);
+            _mouseCaptureChild = null;
+            if (child != null)
+            {
+                var (cx, cy) = ToChildCoordinates(child, e.X, e.Y);
+                child.OnMouseUp(new MouseEventArgs(e.Button, e.Clicks, cx, cy));
+                MouseUp?.Invoke(this, e);
+                return;
+            }
+        }
         MouseUp?.Invoke(this, e);
     }
 
     protected internal virtual void OnMouseMove(MouseEventArgs e)
     {
+        if (IsMouseRoutingContainer && Enabled)
+        {
+            var child = _mouseCaptureChild ?? FindChildAt(e.X, e.Y);
+            if (child != null)
+            {
+                var (cx, cy) = ToChildCoordinates(child, e.X, e.Y);
+                child.OnMouseMove(new MouseEventArgs(e.Button, e.Clicks, cx, cy));
+                MouseMove?.Invoke(this, e);
+                return;
+            }
+        }
         MouseMove?.Invoke(this, e);
     }
 
@@ -976,6 +1011,96 @@ public abstract class Control
         Leave?.Invoke(this, e);
     }
 
+    // ========== SHARED CONTAINER MOUSE-ROUTING ==========
+    // Centralised here so Panel, GroupBox, SplitContainer etc. don't each
+    // duplicate the same capture/find/route logic.
+
+    private Control? _mouseCaptureChild;
+
+    /// <summary>
+    /// Returns the content-space coordinates for a raw event point.
+    /// Base implementation is identity (no scroll). ScrollableControl overrides
+    /// to subtract the AutoScroll offset.
+    /// </summary>
+    protected virtual (int contentX, int contentY) ToContentCoordinates(int x, int y) => (x, y);
+
+    /// <summary>
+    /// Returns the child-local coordinates for a raw event point.
+    /// </summary>
+    protected (int x, int y) ToChildCoordinates(Control child, int x, int y)
+    {
+        var (cx, cy) = ToContentCoordinates(x, y);
+        return (cx - child.Left, cy - child.Top);
+    }
+
+    /// <summary>
+    /// Returns true when (x,y) — in content coordinates — hits the child,
+    /// including any popup/overlay regions the child may extend into.
+    /// </summary>
+    protected virtual bool ChildHitTest(Control child, int x, int y)
+    {
+        // Normal bounds
+        if (x >= child.Left && x < child.Left + child.Width &&
+            y >= child.Top  && y < child.Top  + child.Height)
+            return true;
+
+        // ComboBox drop-down
+        if (child is ComboBox cb && cb.DroppedDown)
+            return x >= child.Left && x < child.Left + cb.DropDownWidth &&
+                   y >= child.Top + child.Height && y < child.Top + child.Height + cb.DropDownHeight;
+
+        // DateTimePicker calendar
+        if (child is DateTimePicker dtp && dtp.DroppedDown)
+        {
+            var dd = dtp.GetDropDownBounds();
+            return x >= child.Left + dd.X && x < child.Left + dd.Right &&
+                   y >= child.Top  + dd.Y && y < child.Top  + dd.Bottom;
+        }
+
+        // TextBox autocomplete panel
+        if (child is TextBox tb && tb.HasVisibleAutoComplete)
+        {
+            var ac = tb.GetAutoCompletePanelBounds();
+            return x >= child.Left + ac.X && x < child.Left + ac.Right &&
+                   y >= child.Top  + ac.Y && y < child.Top  + ac.Bottom;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Returns the top-most enabled+visible child hit at (x,y) in this control's
+    /// coordinate space. Scroll offset is handled by ToContentCoordinates.
+    /// </summary>
+    protected Control? FindChildAt(int x, int y)
+    {
+        var (cx, cy) = ToContentCoordinates(x, y);
+        for (var i = Controls.Count - 1; i >= 0; i--)
+        {
+            var child = Controls[i];
+            if (!child.Visible || !child.Enabled) continue;
+            if (ChildHitTest(child, cx, cy)) return child;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Focuses a child and updates Form.FocusedControl.
+    /// </summary>
+    protected void SetFormFocusedControl(Control control)
+    {
+        if (FindForm() is Form form)
+            form.FocusedControl = control;
+        control.Focus();
+    }
+
+    /// <summary>
+    /// Whether this control acts as a routing container for its children's mouse events.
+    /// True for Panel, GroupBox and similar containers; false for leaf controls.
+    /// Derived classes set this in their constructor.
+    /// </summary>
+    protected bool IsMouseRoutingContainer { get; set; } = false;
+
     // ========== ADDITIONAL EVENT HANDLERS ==========
 
     protected virtual void OnClick(EventArgs e)
@@ -995,6 +1120,17 @@ public abstract class Control
 
     protected internal virtual void OnMouseWheel(MouseEventArgs e)
     {
+        if (IsMouseRoutingContainer && Enabled)
+        {
+            var child = FindChildAt(e.X, e.Y);
+            if (child != null)
+            {
+                var (cx, cy) = ToChildCoordinates(child, e.X, e.Y);
+                child.OnMouseWheel(new MouseEventArgs(e.Button, e.Clicks, cx, cy, e.Delta));
+                MouseWheel?.Invoke(this, e);
+                return;
+            }
+        }
         MouseWheel?.Invoke(this, e);
     }
 

@@ -620,17 +620,144 @@ public class TableLayoutPanel : Panel
     }
 
  private int GetBorderWidth()
-    {
-       return BorderStyle switch
-        {
-            BorderStyle.Fixed3D => 2,
-            BorderStyle.FixedSingle => 1,
-            _ => 0
-        };
-    }
+ {
+    return BorderStyle switch
+     {
+         BorderStyle.Fixed3D => 2,
+         BorderStyle.FixedSingle => 1,
+         _ => 0
+     };
+ }
 
-    private sealed class TableLayoutInfo
-    {
+ // ---- CellBorderStyle rendering ----
+
+ protected internal override void OnPaint(PaintEventArgs e)
+ {
+     // Let Panel paint background + children first.
+     base.OnPaint(e);
+
+     if (_cellBorderStyle == TableLayoutPanelCellBorderStyle.None) return;
+     if (_columnCount <= 0 || _rowCount <= 0) return;
+
+     var borderWidth = GetBorderWidth();
+     var paddingX = Padding.Width;
+     var paddingY = Padding.Height;
+
+     var innerLeft = borderWidth + paddingX;
+     var innerTop = borderWidth + paddingY;
+     var innerWidth = System.Math.Max(0, Width - (borderWidth * 2) - (paddingX * 2));
+     var innerHeight = System.Math.Max(0, Height - (borderWidth * 2) - (paddingY * 2));
+
+     var colWidths = ComputeTrackSizes(isColumn: true, _columnStyles, _columnCount, innerWidth);
+     var rowHeights = ComputeTrackSizes(isColumn: false, _rowStyles, _rowCount, innerHeight);
+
+     var g = e.Graphics;
+
+     switch (_cellBorderStyle)
+     {
+         case TableLayoutPanelCellBorderStyle.Single:
+             DrawCellGrid(g, innerLeft, innerTop, colWidths, rowHeights, 1,
+                 CanvasColor.FromArgb(172, 172, 172));
+             break;
+
+         case TableLayoutPanelCellBorderStyle.Inset:
+             DrawCellGrid3D(g, innerLeft, innerTop, colWidths, rowHeights,
+                 CanvasColor.FromArgb(128, 128, 128), CanvasColor.FromArgb(255, 255, 255));
+             break;
+
+         case TableLayoutPanelCellBorderStyle.InsetDouble:
+             DrawCellGrid3D(g, innerLeft, innerTop, colWidths, rowHeights,
+                 CanvasColor.FromArgb(128, 128, 128), CanvasColor.FromArgb(255, 255, 255));
+             DrawCellGrid3D(g, innerLeft + 1, innerTop + 1,
+                 ShiftSizes(colWidths, -2), ShiftSizes(rowHeights, -2),
+                 CanvasColor.FromArgb(160, 160, 160), CanvasColor.FromArgb(235, 235, 235));
+             break;
+
+         case TableLayoutPanelCellBorderStyle.Outset:
+             DrawCellGrid3D(g, innerLeft, innerTop, colWidths, rowHeights,
+                 CanvasColor.FromArgb(255, 255, 255), CanvasColor.FromArgb(128, 128, 128));
+             break;
+
+         case TableLayoutPanelCellBorderStyle.OutsetDouble:
+         case TableLayoutPanelCellBorderStyle.OutsetPartial:
+             DrawCellGrid3D(g, innerLeft, innerTop, colWidths, rowHeights,
+                 CanvasColor.FromArgb(255, 255, 255), CanvasColor.FromArgb(128, 128, 128));
+             DrawCellGrid3D(g, innerLeft + 1, innerTop + 1,
+                 ShiftSizes(colWidths, -2), ShiftSizes(rowHeights, -2),
+                 CanvasColor.FromArgb(235, 235, 235), CanvasColor.FromArgb(160, 160, 160));
+             break;
+     }
+ }
+
+ private static void DrawCellGrid(Graphics g, int left, int top, int[] colWidths, int[] rowHeights,
+     int penWidth, CanvasColor color)
+ {
+     using var pen = new Pen(color);
+
+     // Vertical lines (including right edge)
+     var x = left;
+     for (var c = 0; c <= colWidths.Length; c++)
+     {
+         var totalH = 0;
+         foreach (var h in rowHeights) totalH += h;
+         g.DrawLine(pen, x, top, x, top + totalH);
+         if (c < colWidths.Length) x += colWidths[c];
+     }
+
+     // Horizontal lines (including bottom edge)
+     var y = top;
+     for (var r = 0; r <= rowHeights.Length; r++)
+     {
+         var totalW = 0;
+         foreach (var w in colWidths) totalW += w;
+         g.DrawLine(pen, left, y, left + totalW, y);
+         if (r < rowHeights.Length) y += rowHeights[r];
+     }
+ }
+
+ private static void DrawCellGrid3D(Graphics g, int left, int top, int[] colWidths, int[] rowHeights,
+     CanvasColor topLeftColor, CanvasColor bottomRightColor)
+ {
+     using var tlPen = new Pen(topLeftColor);
+     using var brPen = new Pen(bottomRightColor);
+
+     var x = left;
+     for (var c = 0; c <= colWidths.Length; c++)
+     {
+         var totalH = 0;
+         foreach (var h in rowHeights) totalH += h;
+         g.DrawLine(tlPen, x, top, x, top + totalH);
+         if (c < colWidths.Length && c + 1 <= colWidths.Length)
+         {
+             g.DrawLine(brPen, x + 1, top, x + 1, top + totalH);
+         }
+         if (c < colWidths.Length) x += colWidths[c];
+     }
+
+     var y = top;
+     for (var r = 0; r <= rowHeights.Length; r++)
+     {
+         var totalW = 0;
+         foreach (var w in colWidths) totalW += w;
+         g.DrawLine(tlPen, left, y, left + totalW, y);
+         if (r < rowHeights.Length)
+         {
+             g.DrawLine(brPen, left, y + 1, left + totalW, y + 1);
+         }
+         if (r < rowHeights.Length) y += rowHeights[r];
+     }
+ }
+
+ private static int[] ShiftSizes(int[] sizes, int delta)
+ {
+     var result = new int[sizes.Length];
+     for (var i = 0; i < sizes.Length; i++)
+         result[i] = System.Math.Max(0, sizes[i] + delta);
+     return result;
+ }
+
+ private sealed class TableLayoutInfo
+ {
         public int Column { get; set; } = -1;
         public int Row { get; set; } = -1;
         public int ColumnSpan { get; set; } = 1;
