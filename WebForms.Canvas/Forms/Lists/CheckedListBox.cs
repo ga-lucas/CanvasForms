@@ -176,7 +176,7 @@ public class CheckedListBox : ListControl
         );
 
         var needsScrollbar = NeedsScrollbar();
-        var contentWidth = contentBounds.Width - (needsScrollbar ? ScrollbarWidth : 0);
+        var contentWidth = contentBounds.Width - (needsScrollbar ? VerticalScrollbarHelper.Width : 0);
 
         // Calculate visible items
         var itemsPerPage = (contentBounds.Height - 4) / ItemHeight;
@@ -320,7 +320,7 @@ public class CheckedListBox : ListControl
         var needsScrollbar = NeedsScrollbar();
 
         // Check if clicking on scrollbar
-        if (needsScrollbar && e.X >= Width - ScrollbarWidth - BorderWidth)
+        if (needsScrollbar && e.X >= Width - VerticalScrollbarHelper.Width - BorderWidth)
         {
             HandleScrollbarMouseDown(e);
             base.OnMouseDown(e);
@@ -328,7 +328,7 @@ public class CheckedListBox : ListControl
         }
 
         // Check if clicking on an item
-        if (e.X >= contentBounds.X && e.X < contentBounds.Right - (needsScrollbar ? ScrollbarWidth : 0) &&
+        if (e.X >= contentBounds.X && e.X < contentBounds.Right - (needsScrollbar ? VerticalScrollbarHelper.Width : 0) &&
             e.Y >= contentBounds.Y && e.Y < contentBounds.Bottom)
         {
             var itemIndex = _topIndex + ((e.Y - contentBounds.Y - 2) / ItemHeight);
@@ -395,7 +395,7 @@ public class CheckedListBox : ListControl
         var contentBounds = new Rectangle(BorderWidth, BorderWidth, Width - BorderWidth * 2, Height - BorderWidth * 2);
         var needsScrollbar = NeedsScrollbar();
 
-        if (e.X >= contentBounds.X && e.X < contentBounds.Right - (needsScrollbar ? ScrollbarWidth : 0) &&
+        if (e.X >= contentBounds.X && e.X < contentBounds.Right - (needsScrollbar ? VerticalScrollbarHelper.Width : 0) &&
             e.Y >= contentBounds.Y && e.Y < contentBounds.Bottom)
         {
             var itemIndex = _topIndex + ((e.Y - contentBounds.Y - 2) / ItemHeight);

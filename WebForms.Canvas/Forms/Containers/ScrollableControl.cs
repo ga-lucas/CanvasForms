@@ -307,4 +307,96 @@ public class ScrollableControl : Control
     }
 
     public override object? CreateParams => null;
+
+    // ?? Scrollbar rendering ???????????????????????????????????????????????????
+    // Draws simple but visually accurate H/V scrollbars over the content area
+    // when AutoScroll is enabled and content overflows the viewport.
+
+    private const int ScrollBarThickness = 14;
+    private const int ScrollBarMinThumb  = 20;
+
+    protected internal override void OnPaint(PaintEventArgs e)
+    {
+        base.OnPaint(e);
+
+        if (!AutoScroll || Width <= 0 || Height <= 0) return;
+
+        var (contentW, contentH) = GetContentSize();
+        var needsH = contentW > Width;
+        var needsV = contentH > Height;
+
+        // If both bars are needed, shrink each viewport dimension by bar thickness.
+        var viewW = needsV ? Width  - ScrollBarThickness : Width;
+        var viewH = needsH ? Height - ScrollBarThickness : Height;
+
+        // Re-check after accounting for the bars consuming space.
+        needsH = contentW > viewW;
+        needsV = contentH > viewH;
+
+        var offset = GetScrollOffset();
+
+        if (needsV) DrawVerticalScrollBar(e.Graphics, offset, contentH, viewW, viewH, needsH);
+        if (needsH) DrawHorizontalScrollBar(e.Graphics, offset, contentW, viewW, viewH, needsV);
+
+        // Corner square when both bars are visible.
+        if (needsH && needsV)
+        {
+            using var cornerBrush = new SolidBrush(CanvasColor.FromArgb(240, 240, 240));
+            e.Graphics.FillRectangle(cornerBrush,
+                viewW, viewH, ScrollBarThickness, ScrollBarThickness);
+        }
+    }
+
+    private void DrawVerticalScrollBar(Graphics g,
+        System.Drawing.Point offset, int contentH,
+        int viewW, int viewH, bool hasHBar)
+    {
+        var trackX = viewW;
+        var trackY = 0;
+        var trackH = viewH;
+
+        // Track background.
+        using var trackBrush = new SolidBrush(CanvasColor.FromArgb(240, 240, 240));
+        g.FillRectangle(trackBrush, trackX, trackY, ScrollBarThickness, trackH);
+
+        // Track border.
+        using var borderPen = new Pen(CanvasColor.FromArgb(205, 205, 205));
+        g.DrawLine(borderPen, trackX, trackY, trackX, trackY + trackH);
+
+        // Thumb.
+        var maxOffset = Math.Max(1, contentH - viewH);
+        var thumbRatio = Math.Min(1.0, (double)viewH / contentH);
+        var thumbH     = Math.Max(ScrollBarMinThumb, (int)(trackH * thumbRatio));
+        var thumbY     = trackY + (int)((trackH - thumbH) * Math.Min(1.0, (double)offset.Y / maxOffset));
+
+        using var thumbBrush = new SolidBrush(CanvasColor.FromArgb(180, 180, 180));
+        g.FillRectangle(thumbBrush, trackX + 2, thumbY + 1, ScrollBarThickness - 4, thumbH - 2);
+    }
+
+    private void DrawHorizontalScrollBar(Graphics g,
+        System.Drawing.Point offset, int contentW,
+        int viewW, int viewH, bool hasVBar)
+    {
+        var trackX = 0;
+        var trackY = viewH;
+        var trackW = viewW;
+
+        // Track background.
+        using var trackBrush = new SolidBrush(CanvasColor.FromArgb(240, 240, 240));
+        g.FillRectangle(trackBrush, trackX, trackY, trackW, ScrollBarThickness);
+
+        // Track border.
+        using var borderPen = new Pen(CanvasColor.FromArgb(205, 205, 205));
+        g.DrawLine(borderPen, trackX, trackY, trackX + trackW, trackY);
+
+        // Thumb.
+        var maxOffset = Math.Max(1, contentW - viewW);
+        var thumbRatio = Math.Min(1.0, (double)viewW / contentW);
+        var thumbW     = Math.Max(ScrollBarMinThumb, (int)(trackW * thumbRatio));
+        var thumbX     = trackX + (int)((trackW - thumbW) * Math.Min(1.0, (double)offset.X / maxOffset));
+
+        using var thumbBrush = new SolidBrush(CanvasColor.FromArgb(180, 180, 180));
+        g.FillRectangle(thumbBrush, thumbX + 1, trackY + 2, thumbW - 2, ScrollBarThickness - 4);
+    }
 }
+

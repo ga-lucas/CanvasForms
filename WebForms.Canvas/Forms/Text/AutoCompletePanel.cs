@@ -14,7 +14,7 @@ internal class AutoCompletePanel
     private const int MaxVisibleItems = 8;
     private const int ItemHeight = 18;
     private const int ItemPadding = 3;
-    private const int ScrollbarWidth = 16;
+    // ScrollbarWidth removed — now use VerticalScrollbarHelper.Width
     private bool _isDraggingScrollbar = false;
     private int _scrollbarDragStartY = 0;
     private int _scrollbarDragStartTopIndex = 0;
@@ -82,7 +82,7 @@ internal class AutoCompletePanel
 
         var bounds = GetBounds();
         var needsScrollbar = _suggestions.Count > MaxVisibleItems;
-        var contentWidth = bounds.Width - 4 - (needsScrollbar ? ScrollbarWidth : 0);
+        var contentWidth = bounds.Width - 4 - (needsScrollbar ? VerticalScrollbarHelper.Width : 0);
 
         // Background
         using var bgBrush = new SolidBrush(Color.White);
@@ -143,32 +143,12 @@ internal class AutoCompletePanel
 
     private void DrawScrollbar(Graphics g, Rectangle panelBounds)
     {
-        var scrollbarBounds = new Rectangle(
-            panelBounds.Right - ScrollbarWidth - 2,
+        var track = new Rectangle(
+            panelBounds.Right - VerticalScrollbarHelper.Width - 2,
             panelBounds.Y + 2,
-            ScrollbarWidth,
-            panelBounds.Height - 4
-        );
-
-        // Background
-        using var scrollBgBrush = new SolidBrush(Color.FromArgb(240, 240, 240));
-        g.FillRectangle(scrollBgBrush, scrollbarBounds);
-
-        // Calculate thumb
-        var thumbHeight = Math.Max(20, (MaxVisibleItems * scrollbarBounds.Height) / Math.Max(1, _suggestions.Count));
-        var maxTopIndex = Math.Max(1, _suggestions.Count - MaxVisibleItems);
-        var thumbTop = (_topIndex * (scrollbarBounds.Height - thumbHeight)) / maxTopIndex;
-
-        var thumbBounds = new Rectangle(
-            scrollbarBounds.X + 2,
-            scrollbarBounds.Y + thumbTop,
-            ScrollbarWidth - 4,
-            thumbHeight
-        );
-
-        // Thumb
-        using var thumbBrush = new SolidBrush(Color.FromArgb(205, 205, 205));
-        g.FillRectangle(thumbBrush, thumbBounds);
+            VerticalScrollbarHelper.Width,
+            panelBounds.Height - 4);
+        new VerticalScrollbarHelper(track, _suggestions.Count, MaxVisibleItems, _topIndex).Draw(g);
     }
 
     /// <summary>
@@ -187,7 +167,7 @@ internal class AutoCompletePanel
             e.X >= bounds.X && e.X < bounds.Right)
         {
             // Check scrollbar click
-            if (needsScrollbar && e.X >= bounds.Right - ScrollbarWidth - 2)
+            if (needsScrollbar && e.X >= bounds.Right - VerticalScrollbarHelper.Width - 2)
             {
                 HandleScrollbarClick(e, bounds);
                 return true;
@@ -211,36 +191,40 @@ internal class AutoCompletePanel
 
     private void HandleScrollbarClick(MouseEventArgs e, Rectangle panelBounds)
     {
-        var scrollbarBounds = new Rectangle(
-            panelBounds.Right - ScrollbarWidth - 2,
-            panelBounds.Y + 2,
-            ScrollbarWidth,
-            panelBounds.Height - 4
-        );
+        var sb = MakeScrollbarHelper(panelBounds);
+        var hit = sb.HitTest(e.X, e.Y);
+        if (hit == ScrollbarHit.None) return;
 
-        var thumbHeight = Math.Max(20, (MaxVisibleItems * scrollbarBounds.Height) / Math.Max(1, _suggestions.Count));
-        var maxTopIndex = Math.Max(0, _suggestions.Count - MaxVisibleItems);
-        var thumbTop = scrollbarBounds.Y + (_topIndex * (scrollbarBounds.Height - thumbHeight)) / Math.Max(1, maxTopIndex);
-
-        if (e.Y < thumbTop)
+        if (hit == ScrollbarHit.Thumb)
         {
-            // Page up
-            _topIndex = Math.Max(0, _topIndex - MaxVisibleItems);
-        }
-        else if (e.Y > thumbTop + thumbHeight)
-        {
-            // Page down
-            _topIndex = Math.Min(maxTopIndex, _topIndex + MaxVisibleItems);
-        }
-        else
-        {
-            // Start thumb drag
             _isDraggingScrollbar = true;
             _scrollbarDragStartY = e.Y;
             _scrollbarDragStartTopIndex = _topIndex;
         }
+        else if (hit == ScrollbarHit.ArrowUp)
+        {
+            _topIndex = sb.ClampTopIndex(_topIndex - 1);
+        }
+        else if (hit == ScrollbarHit.ArrowDown)
+        {
+            _topIndex = sb.ClampTopIndex(_topIndex + 1);
+        }
+        else
+        {
+            _topIndex = sb.ComputePageTopIndex(e.Y, _topIndex);
+        }
 
         _owner.Invalidate();
+    }
+
+    private VerticalScrollbarHelper MakeScrollbarHelper(Rectangle panelBounds)
+    {
+        var track = new Rectangle(
+            panelBounds.Right - VerticalScrollbarHelper.Width - 2,
+            panelBounds.Y + 2,
+            VerticalScrollbarHelper.Width,
+            panelBounds.Height - 4);
+        return new VerticalScrollbarHelper(track, _suggestions.Count, MaxVisibleItems, _topIndex);
     }
 
     /// <summary>
@@ -262,7 +246,7 @@ internal class AutoCompletePanel
 
         // Update hover state
         if (e.Y >= bounds.Y && e.Y < bounds.Bottom &&
-            e.X >= bounds.X && e.X < bounds.Right - (needsScrollbar ? ScrollbarWidth : 0))
+            e.X >= bounds.X && e.X < bounds.Right - (needsScrollbar ? VerticalScrollbarHelper.Width : 0))
         {
             var relativeY = e.Y - bounds.Y - 2;
             var itemIndex = _topIndex + (relativeY / ItemHeight);
@@ -289,19 +273,12 @@ internal class AutoCompletePanel
 
     private void HandleScrollbarDrag(MouseEventArgs e)
     {
-        var bounds = GetBounds();
-        var scrollbarHeight = bounds.Height - 4;
-        var thumbHeight = Math.Max(20, (MaxVisibleItems * scrollbarHeight) / Math.Max(1, _suggestions.Count));
-        var trackHeight = scrollbarHeight - thumbHeight;
-        var maxTopIndex = Math.Max(0, _suggestions.Count - MaxVisibleItems);
+        var newTop = MakeScrollbarHelper(GetBounds())
+            .ComputeDragTopIndex(e.Y, _scrollbarDragStartY, _scrollbarDragStartTopIndex);
 
-        var deltaY = e.Y - _scrollbarDragStartY;
-        var indexDelta = (int)((deltaY * maxTopIndex) / Math.Max(1, trackHeight));
-        var newTopIndex = Math.Clamp(_scrollbarDragStartTopIndex + indexDelta, 0, maxTopIndex);
-
-        if (newTopIndex != _topIndex)
+        if (newTop != _topIndex)
         {
-            _topIndex = newTopIndex;
+            _topIndex = newTop;
             _owner.Invalidate();
         }
     }

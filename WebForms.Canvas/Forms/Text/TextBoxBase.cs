@@ -369,6 +369,26 @@ public abstract class TextBoxBase : Control
         base.OnGotFocus(e);
     }
 
+    /// <summary>
+    /// Returns the exact line height measured by the browser for the current font.
+    /// Uses the JS-measured value from the cache when available; falls back to
+    /// Font.Size + 2 until the async prime completes and triggers a repaint.
+    /// </summary>
+    private int GetLineHeight()
+    {
+        var measureService = FindForm()?.TextMeasurementService;
+        return measureService?.GetFontHeightEstimate(Font.Family, (int)Font.Size)
+               ?? GetLineHeight();
+    }
+
+    /// <summary>Primes the font-height cache for the current font.</summary>
+    private async Task PrimeFontHeightAsync()
+    {
+        var measureService = FindForm()?.TextMeasurementService;
+        if (measureService == null) return;
+        await measureService.GetFontHeightAsync(Font.Family, (int)Font.Size);
+    }
+
     private async Task MeasureTextForCacheAsync(int requestId)
     {
         var measureService = FindForm()?.TextMeasurementService;
@@ -379,12 +399,75 @@ public abstract class TextBoxBase : Control
 
         try
         {
-            await measureService.MeasureTextAsync(displayText, Font.Family, (int)Font.Size);
+            // Always prime font height � it's font-only, cheap, and needed before first render.
+            var fontHeightTask = measureService.GetFontHeightAsync(Font.Family, (int)Font.Size);
 
-            var caret = Math.Max(0, Math.Min(_caretPosition, displayText.Length));
-            if (caret > 0)
+            if (_multiline)
             {
-                await measureService.MeasureTextAsync(displayText.Substring(0, caret), Font.Family, (int)Font.Size);
+                // Prime each line individually � DrawMultilineText and DrawCaret
+                // measure per-line substrings, not the whole text blob.
+                var lines = displayText.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+                var measureTasks = new List<Task<int>>(lines.Length * 2 + 4);
+
+                foreach (var line in lines)
+                {
+                    if (!string.IsNullOrEmpty(line))
+                        measureTasks.Add(measureService.MeasureTextAsync(line, Font.Family, (int)Font.Size));
+                }
+
+                // Also prime the caret prefix within its line.
+                var caretLine   = GetLineFromCharIndex(_caretPosition);
+                var lineStart   = GetFirstCharIndexFromLine(caretLine);
+                var posInLine   = _caretPosition - lineStart;
+
+                if (caretLine < lines.Length && posInLine > 0)
+                {
+                    var caretLineText = lines[caretLine];
+                    var prefix = posInLine <= caretLineText.Length
+                        ? caretLineText[..posInLine]
+                        : caretLineText;
+                    measureTasks.Add(measureService.MeasureTextAsync(prefix, Font.Family, (int)Font.Size));
+                }
+
+                // Prime selection substrings so highlights are accurate.
+                if (_selectionLength > 0)
+                {
+                    var selStart = _selectionStart;
+                    var selEnd   = _selectionStart + _selectionLength;
+
+                    foreach (var (idx, line) in lines.Select((l, i) => (i, l)))
+                    {
+                        var ls  = GetFirstCharIndexFromLine(idx);
+                        var le  = ls + line.Length;
+                        if (selEnd <= ls || selStart >= le) continue;
+
+                        var selLineStart = Math.Max(0, selStart - ls);
+                        var selLineEnd   = Math.Min(line.Length, selEnd - ls);
+
+                        if (selLineStart > 0)
+                            measureTasks.Add(measureService.MeasureTextAsync(
+                                line[..selLineStart], Font.Family, (int)Font.Size));
+
+                        var selText = line[selLineStart..selLineEnd];
+                        if (!string.IsNullOrEmpty(selText))
+                            measureTasks.Add(measureService.MeasureTextAsync(
+                                selText, Font.Family, (int)Font.Size));
+                    }
+                }
+
+                await Task.WhenAll(measureTasks.Append(fontHeightTask));
+            }
+            else
+            {
+                await Task.WhenAll(
+                    fontHeightTask,
+                    measureService.MeasureTextAsync(displayText, Font.Family, (int)Font.Size));
+
+                var caret = Math.Max(0, Math.Min(_caretPosition, displayText.Length));
+                if (caret > 0)
+                {
+                    await measureService.MeasureTextAsync(displayText[..caret], Font.Family, (int)Font.Size);
+                }
             }
         }
         catch
@@ -574,16 +657,35 @@ public abstract class TextBoxBase : Control
     /// </summary>
     public int GetFirstCharIndexFromLine(int lineNumber)
     {
-        var lines = Lines;
-        if (lineNumber < 0 || lineNumber >= lines.Length)
-            return -1;
+        if (lineNumber <= 0) return 0;
+
+        var text = Text;
+        if (string.IsNullOrEmpty(text)) return 0;
 
         int charIndex = 0;
-        for (int i = 0; i < lineNumber; i++)
+        int line = 0;
+        int i = 0;
+
+        while (i < text.Length && line < lineNumber)
         {
-            charIndex += lines[i].Length + Environment.NewLine.Length;
+            if (text[i] == '\r')
+            {
+                line++;
+                i++;
+                if (i < text.Length && text[i] == '\n') i++; // \r\n
+            }
+            else if (text[i] == '\n')
+            {
+                line++;
+                i++;
+            }
+            else
+            {
+                i++;
+            }
         }
-        return charIndex;
+
+        return i;
     }
 
     /// <summary>
@@ -654,7 +756,7 @@ public abstract class TextBoxBase : Control
             var width = measureService.MeasureTextEstimate(textBeforeInLine, _font.Family, (int)_font.Size);
 
             // Calculate vertical position (line number * line height)
-            var lineHeight = (int)_font.Size + 4; // Font size + padding
+            var lineHeight = GetLineHeight(); // Font size + padding
             var y = borderWidth + textPadding + (lineNumber * lineHeight) - _scrollOffsetY;
 
             return new Point(
@@ -714,7 +816,7 @@ public abstract class TextBoxBase : Control
         else
         {
             // Multi-line: determine line number, then position within line
-            var lineHeight = (int)_font.Size + 4;
+            var lineHeight = GetLineHeight();
             var lineNumber = Math.Max(0, relativeY / lineHeight);
 
             var lines = Lines;
@@ -951,11 +1053,17 @@ public abstract class TextBoxBase : Control
         // Get display text
         var displayText = GetDisplayText();
 
+        // Shrink text area when a vertical scrollbar is visible so text and
+        // caret don't bleed underneath it.
+        var scrollBarW = (_multiline && _scrollBars != ScrollBars.None && NeedsVerticalScrollbar())
+            ? VerticalScrollbarHelper.Width
+            : 0;
+
         const int textPadding = 3;
         var textBounds = new Rectangle(
             borderWidth + textPadding,
             borderWidth + textPadding,
-            Width - (borderWidth * 2) - (textPadding * 2),
+            Width - (borderWidth * 2) - (textPadding * 2) - scrollBarW,
             Height - (borderWidth * 2) - (textPadding * 2)
         );
 
@@ -981,10 +1089,56 @@ public abstract class TextBoxBase : Control
 
         g.Restore();
 
+        // Draw scrollbars if multiline and scrollbars are enabled
+        if (_multiline && _scrollBars != ScrollBars.None)
+        {
+            DrawScrollbars(g, bounds, borderWidth);
+        }
+
         base.OnPaint(e);
     }
 
+    private void DrawScrollbars(Graphics g, Rectangle bounds, int borderWidth)
+    {
+        var lineHeight   = GetLineHeight();
+        var totalLines   = GetLineCount();
+        var visibleLines = Math.Max(1, (bounds.Height - borderWidth * 2 - 6) / lineHeight);
+        var showV        = (_scrollBars == ScrollBars.Vertical || _scrollBars == ScrollBars.Both)
+                           && NeedsVerticalScrollbar();
+
+        if (showV)
+        {
+            var track = new Rectangle(
+                bounds.Right - VerticalScrollbarHelper.Width - borderWidth,
+                borderWidth,
+                VerticalScrollbarHelper.Width,
+                bounds.Height - borderWidth * 2);
+            var topLine = _scrollOffsetY / Math.Max(1, lineHeight);
+            new VerticalScrollbarHelper(track, totalLines, visibleLines, topLine).Draw(g);
+        }
+    }
+
+    private bool NeedsVerticalScrollbar()
+    {
+        var lineHeight   = GetLineHeight();
+        var borderWidth  = GetBorderWidth();
+        var totalLines   = GetLineCount();
+        var visibleLines = (Height - borderWidth * 2 - 6) / Math.Max(1, lineHeight);
+        return totalLines > visibleLines;
+    }
+
+    private int GetLineCount()
+    {
+        if (string.IsNullOrEmpty(Text)) return 1;
+        return Text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None).Length;
+    }
+
     #endregion
+
+    // Scrollbar interaction state
+    private bool _isDraggingScrollbar = false;
+    private int  _scrollbarDragStartY = 0;
+    private int  _scrollbarDragStartTopLine = 0;
 
     #region Mouse Input
 
@@ -998,6 +1152,10 @@ public abstract class TextBoxBase : Control
 
         if (e.Button == MouseButtons.Left)
         {
+            // Intercept scrollbar clicks before text hit-testing
+            if (_multiline && _scrollBars != ScrollBars.None && HandleScrollbarMouseDown(e))
+                return;
+
             var displayText = GetDisplayText();
             var borderWidth = GetBorderWidth();
             const int textPadding = 3;
@@ -1038,6 +1196,9 @@ public abstract class TextBoxBase : Control
             return;
         }
 
+        if (_multiline && _scrollBars != ScrollBars.None && HandleScrollbarMouseMove(e))
+            return;
+
         if (_isSelecting)
         {
             var displayText = GetDisplayText();
@@ -1069,8 +1230,87 @@ public abstract class TextBoxBase : Control
 
     protected internal override void OnMouseUp(MouseEventArgs e)
     {
+        _isDraggingScrollbar = false;
         _isSelecting = false;
         base.OnMouseUp(e);
+    }
+
+    protected internal override void OnMouseWheel(MouseEventArgs e)
+    {
+        if (_multiline && _scrollBars != ScrollBars.None && e.Delta != 0)
+        {
+            var lineHeight  = GetLineHeight();
+            var linesToScroll = 3; // match Windows default of 3 lines per notch
+            var pixelDelta  = (e.Delta / 120) * linesToScroll * lineHeight;
+            var maxOffset   = Math.Max(0, (GetLineCount() - 1) * lineHeight);
+            _scrollOffsetY  = Math.Clamp(_scrollOffsetY - pixelDelta, 0, maxOffset);
+            Invalidate();
+            return;
+        }
+
+        base.OnMouseWheel(e);
+    }
+
+    private VerticalScrollbarHelper MakeTextScrollbarHelper()
+    {
+        var borderWidth  = GetBorderWidth();
+        var lineHeight   = GetLineHeight();
+        var totalLines   = GetLineCount();
+        var visibleLines = Math.Max(1, (Height - borderWidth * 2 - 6) / lineHeight);
+        var topLine      = _scrollOffsetY / Math.Max(1, lineHeight);
+        var track = new Rectangle(
+            Width - VerticalScrollbarHelper.Width - borderWidth,
+            borderWidth,
+            VerticalScrollbarHelper.Width,
+            Height - borderWidth * 2);
+        return new VerticalScrollbarHelper(track, totalLines, visibleLines, topLine);
+    }
+
+    private bool HandleScrollbarMouseDown(MouseEventArgs e)
+    {
+        var sb  = MakeTextScrollbarHelper();
+        var hit = sb.HitTest(e.X, e.Y);
+        if (hit == ScrollbarHit.None) return false;
+
+        Focus();
+
+        var lineHeight = GetLineHeight();
+        if (hit == ScrollbarHit.Thumb)
+        {
+            _isDraggingScrollbar       = true;
+            _scrollbarDragStartY       = e.Y;
+            _scrollbarDragStartTopLine = _scrollOffsetY / Math.Max(1, lineHeight);
+        }
+        else if (hit == ScrollbarHit.ArrowUp)
+        {
+            _scrollOffsetY = Math.Max(0, _scrollOffsetY - lineHeight);
+            Invalidate();
+        }
+        else if (hit == ScrollbarHit.ArrowDown)
+        {
+            var maxOffset = Math.Max(0, (GetLineCount() - 1) * lineHeight);
+            _scrollOffsetY = Math.Min(maxOffset, _scrollOffsetY + lineHeight);
+            Invalidate();
+        }
+        else
+        {
+            var newTop     = sb.ComputePageTopIndex(e.Y, sb.TopIndex);
+            _scrollOffsetY = newTop * lineHeight;
+            Invalidate();
+        }
+
+        return true;
+    }
+
+    private bool HandleScrollbarMouseMove(MouseEventArgs e)
+    {
+        if (!_isDraggingScrollbar) return false;
+        var lineHeight = GetLineHeight();
+        var sb         = MakeTextScrollbarHelper();
+        var newTop     = sb.ComputeDragTopIndex(e.Y, _scrollbarDragStartY, _scrollbarDragStartTopLine);
+        _scrollOffsetY = newTop * lineHeight;
+        Invalidate();
+        return true;
     }
 
     protected virtual bool TryGetCharIndexFromMouse(Point pt, Rectangle textBounds, string displayText, TextMeasurementService? measureService, out int index)
@@ -1112,7 +1352,7 @@ public abstract class TextBoxBase : Control
                 return true;
             }
 
-            var lineHeight = (int)_font.Size + 4;
+            var lineHeight = GetLineHeight();
             var lineNumber = lineHeight > 0 ? Math.Clamp(relativeY / lineHeight, 0, lines.Length - 1) : 0;
             var lineText = lines[lineNumber];
 
@@ -1231,6 +1471,7 @@ public abstract class TextBoxBase : Control
                 {
                     InsertText(Environment.NewLine);
                     handled = true;
+                    e.Handled = true;  // Prevent form's default button from intercepting
                 }
                 break;
 
@@ -1260,14 +1501,78 @@ public abstract class TextBoxBase : Control
                 Invalidate();
                 break;
 
+            case Keys.Up:
+                if (_multiline)
+                {
+                    MoveCaretVertically(-1, e.Shift);
+                    EnsureCaretVisible();
+                    handled = true;
+                    Invalidate();
+                }
+                break;
+
+            case Keys.Down:
+                if (_multiline)
+                {
+                    MoveCaretVertically(1, e.Shift);
+                    EnsureCaretVisible();
+                    handled = true;
+                    Invalidate();
+                }
+                break;
+
+            case Keys.PageUp:
+                if (_multiline)
+                {
+                    var visiblePageLines = Math.Max(1, (Height - GetBorderWidth() * 2 - 6) / GetLineHeight());
+                    MoveCaretVertically(-visiblePageLines, e.Shift);
+                    EnsureCaretVisible();
+                    handled = true;
+                    Invalidate();
+                }
+                break;
+
+            case Keys.PageDown:
+                if (_multiline)
+                {
+                    var visiblePageLines = Math.Max(1, (Height - GetBorderWidth() * 2 - 6) / GetLineHeight());
+                    MoveCaretVertically(visiblePageLines, e.Shift);
+                    EnsureCaretVisible();
+                    handled = true;
+                    Invalidate();
+                }
+                break;
+
             case Keys.Home:
-                MoveCaretTo(0, e.Shift);
+                if (_multiline && !e.Control)
+                {
+                    var homeLine  = GetLineFromCharIndex(_caretPosition);
+                    var homeStart = GetFirstCharIndexFromLine(homeLine);
+                    MoveCaretTo(homeStart < 0 ? 0 : homeStart, e.Shift);
+                }
+                else
+                {
+                    MoveCaretTo(0, e.Shift);
+                }
+                EnsureCaretVisible();
                 handled = true;
                 Invalidate();
                 break;
 
             case Keys.End:
-                MoveCaretTo(Text.Length, e.Shift);
+                if (_multiline && !e.Control)
+                {
+                    var endLineNum   = GetLineFromCharIndex(_caretPosition);
+                    var endLineStart = GetFirstCharIndexFromLine(endLineNum);
+                    var endLines     = Lines;
+                    var endLineLen   = endLineNum < endLines.Length ? endLines[endLineNum].Length : 0;
+                    MoveCaretTo(endLineStart < 0 ? Text.Length : endLineStart + endLineLen, e.Shift);
+                }
+                else
+                {
+                    MoveCaretTo(Text.Length, e.Shift);
+                }
+                EnsureCaretVisible();
                 handled = true;
                 Invalidate();
                 break;
@@ -1332,6 +1637,12 @@ public abstract class TextBoxBase : Control
         if (handled)
         {
             e.Handled = true;
+            // Re-prime measurement cache so caret/selection rendering is accurate.
+            if (_multiline)
+            {
+                var requestId = System.Threading.Interlocked.Increment(ref _measureRequestId);
+                _ = MeasureTextForCacheAsync(requestId);
+            }
             return;
         }
 
@@ -1342,6 +1653,50 @@ public abstract class TextBoxBase : Control
     {
         var newCaret = Math.Max(0, Math.Min(Text.Length, _caretPosition + delta));
         MoveCaretTo(newCaret, extendSelection);
+    }
+
+    private void MoveCaretVertically(int lineDelta, bool extendSelection)
+    {
+        if (!_multiline) return;
+
+        var lineHeight = GetLineHeight();
+        var lines = Lines;
+        var currentLine = GetLineFromCharIndex(_caretPosition);
+        var targetLine = Math.Clamp(currentLine + lineDelta, 0, lines.Length - 1);
+
+        if (targetLine == currentLine) return;
+
+        // Keep horizontal position (column) as close as possible
+        var lineStart = GetFirstCharIndexFromLine(currentLine);
+        var posInLine = _caretPosition - lineStart;
+
+        var targetLineStart = GetFirstCharIndexFromLine(targetLine);
+        var targetLineLen   = lines[targetLine].Length;
+        var targetPos       = Math.Min(posInLine, targetLineLen);
+
+        MoveCaretTo(targetLineStart + targetPos, extendSelection);
+    }
+
+    /// <summary>
+    /// Adjusts _scrollOffsetY so the caret line is visible.
+    /// </summary>
+    private void EnsureCaretVisible()
+    {
+        if (!_multiline) return;
+
+        var lineHeight   = GetLineHeight();
+        var borderWidth  = GetBorderWidth();
+        const int pad    = 3;
+        var viewHeight   = Height - borderWidth * 2 - pad * 2;
+        var visibleLines = Math.Max(1, viewHeight / lineHeight);
+
+        var caretLine = GetLineFromCharIndex(_caretPosition);
+        var topLine   = _scrollOffsetY / Math.Max(1, lineHeight);
+
+        if (caretLine < topLine)
+            _scrollOffsetY = caretLine * lineHeight;
+        else if (caretLine >= topLine + visibleLines)
+            _scrollOffsetY = (caretLine - visibleLines + 1) * lineHeight;
     }
 
     private void MoveCaretTo(int newCaret, bool extendSelection)
@@ -1453,7 +1808,9 @@ public abstract class TextBoxBase : Control
         _selectionStart = _caretPosition;
         _selectionLength = 0;
         _modified = true;
-        OnTextChanged(EventArgs.Empty);
+        // Note: setting Text above already fires OnTextChanged (and thus MeasureTextForCacheAsync).
+        // Do NOT call OnTextChanged again here � it would re-prime with the old caret position.
+        EnsureCaretVisible();
         Invalidate();
     }
 
@@ -1527,7 +1884,7 @@ public abstract class TextBoxBase : Control
     protected virtual void DrawMultilineText(Graphics g, string displayText, Rectangle textBounds, System.Drawing.Color textColor, bool hasFocus, TextMeasurementService? measureService)
     {
         var lines = displayText.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
-        var lineHeight = (int)_font.Size + 4;
+        var lineHeight = GetLineHeight();
         var y = textBounds.Y - _scrollOffsetY;
 
         for (int i = 0; i < lines.Length; i++)
@@ -1646,14 +2003,14 @@ public abstract class TextBoxBase : Control
                 var line = lines[lineNumber];
                 var textBeforeCaret = posInLine > 0 && posInLine <= line.Length ? line.Substring(0, posInLine) : "";
                 var width = measureService.MeasureTextEstimate(textBeforeCaret, _font.Family, (int)_font.Size);
-                var lineHeight = (int)_font.Size + 4;
+                var lineHeight = GetLineHeight();
 
                 var caretX = textBounds.X + width - _scrollOffsetX;
                 var caretY = textBounds.Y + (lineNumber * lineHeight) - _scrollOffsetY;
 
                 // Only draw if visible
                 if (caretX >= textBounds.X && caretX <= textBounds.Right &&
-                    caretY >= textBounds.Y && caretY + lineHeight <= textBounds.Bottom)
+                    caretY >= textBounds.Y && caretY < textBounds.Bottom)
                 {
                     using var pen = new Pen(Color.Black, 1);
                     g.DrawLine(pen, caretX, caretY, caretX, caretY + lineHeight);

@@ -477,6 +477,28 @@ window.measureTextBatch = (fontFamily, fontSize, texts) => {
     }
 };
 
+// Measure the exact line height for a given font using canvas TextMetrics.
+// Returns fontBoundingBoxAscent + fontBoundingBoxDescent, which is the full
+// cell height the browser allocates per line regardless of the actual text content.
+// Falls back to fontSize if the browser doesn't support those metrics (old Safari).
+window.measureFontHeight = (fontFamily, fontSize) => {
+    if (!__measureCtx) return fontSize;
+    try {
+        __measureCtx.font = `${fontSize}px ${fontFamily}`;
+        const m = __measureCtx.measureText('Mg|');
+        if (m.fontBoundingBoxAscent !== undefined && m.fontBoundingBoxDescent !== undefined) {
+            return Math.ceil(m.fontBoundingBoxAscent + m.fontBoundingBoxDescent);
+        }
+        // Fallback: actualBoundingBoxAscent/Descent (content-based, slightly smaller)
+        if (m.actualBoundingBoxAscent !== undefined && m.actualBoundingBoxDescent !== undefined) {
+            return Math.ceil(m.actualBoundingBoxAscent + m.actualBoundingBoxDescent);
+        }
+        return fontSize;
+    } catch (e) {
+        return fontSize;
+    }
+};
+
     // Render the entire form chrome (title bar, borders, close button) on canvas
     window.renderFormCanvas = (canvas, width, height, title, backColor, clientX, clientY, clientWidth, clientHeight, closeButtonHover, minimizeButtonHover, maximizeButtonHover, isMaximized) => {
         // Safety check for null canvas

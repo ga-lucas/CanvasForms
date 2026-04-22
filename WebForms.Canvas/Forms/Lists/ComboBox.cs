@@ -352,7 +352,7 @@ public class ComboBox : ListControl
         var dropDownHeight = GetActualDropDownHeight();
         var dropDownBounds = new Rectangle(0, Height, dropDownWidth, dropDownHeight);
         var needsScrollbar = DropDownNeedsScrollbar();
-        var contentWidth = dropDownWidth - 2 - (needsScrollbar ? ScrollbarWidth : 0);
+        var contentWidth = dropDownWidth - 2 - (needsScrollbar ? VerticalScrollbarHelper.Width : 0);
 
         // Drop-down background
         using var bgBrush = new SolidBrush(BackColor);
@@ -417,34 +417,15 @@ public class ComboBox : ListControl
 
     private void DrawDropDownScrollbar(Graphics g, Rectangle dropDownBounds)
     {
-        var scrollbarBounds = new Rectangle(
-            dropDownBounds.Right - ScrollbarWidth - 1,
+        var track = new Rectangle(
+            dropDownBounds.Right - VerticalScrollbarHelper.Width - 1,
             dropDownBounds.Y + 1,
-            ScrollbarWidth,
-            dropDownBounds.Height - 2
-        );
+            VerticalScrollbarHelper.Width,
+            dropDownBounds.Height - 2);
 
-        // Scrollbar background
-        using var scrollBgBrush = new SolidBrush(Color.FromArgb(240, 240, 240));
-        g.FillRectangle(scrollBgBrush, scrollbarBounds);
-
-        // Calculate thumb
-        var dropDownHeight = dropDownBounds.Height - 2;
-        var itemsPerPage = dropDownHeight / ItemHeight;
-        var thumbHeight = Math.Max(20, (itemsPerPage * scrollbarBounds.Height) / Math.Max(1, Items.Count));
-        var maxTopIndex = Math.Max(1, Items.Count - itemsPerPage);
-        var thumbTop = (_topIndex * (scrollbarBounds.Height - thumbHeight)) / maxTopIndex;
-
-        var thumbBounds = new Rectangle(
-            scrollbarBounds.X + 2,
-            scrollbarBounds.Y + thumbTop,
-            ScrollbarWidth - 4,
-            thumbHeight
-        );
-
-        // Thumb
-        using var thumbBrush = new SolidBrush(Color.FromArgb(205, 205, 205));
-        g.FillRectangle(thumbBrush, thumbBounds);
+        var itemsPerPage = (dropDownBounds.Height - 2) / ItemHeight;
+        var sb = new VerticalScrollbarHelper(track, Items.Count, itemsPerPage, _topIndex);
+        sb.Draw(g);
     }
 
     protected internal override void OnMouseDown(MouseEventArgs e)
@@ -493,7 +474,7 @@ public class ComboBox : ListControl
         {
             var dropDownHeight = GetActualDropDownHeight();
             var needsScrollbar = DropDownNeedsScrollbar();
-            var scrollbarX = Width - ScrollbarWidth - 1;
+            var scrollbarX = Width - VerticalScrollbarHelper.Width - 1;
 
             // Check scrollbar click
             if (needsScrollbar && e.X >= scrollbarX)
@@ -518,31 +499,42 @@ public class ComboBox : ListControl
 
     private void HandleDropDownScrollbarClick(MouseEventArgs e)
     {
-        var dropDownHeight = GetActualDropDownHeight() - 2;
-        var itemsPerPage = dropDownHeight / ItemHeight;
-        var thumbHeight = Math.Max(20, (itemsPerPage * dropDownHeight) / Math.Max(1, Items.Count));
-        var maxTopIndex = Math.Max(0, Items.Count - itemsPerPage);
-        var thumbTop = Height + 1 + (_topIndex * (dropDownHeight - thumbHeight)) / Math.Max(1, maxTopIndex);
+        var sb = MakeDropDownScrollbarHelper();
+        var hit = sb.HitTest(e.X, e.Y);
+        if (hit == ScrollbarHit.None) return;
 
-        if (e.Y < thumbTop)
+        if (hit == ScrollbarHit.Thumb)
         {
-            // Page up
-            _topIndex = Math.Max(0, _topIndex - itemsPerPage);
-        }
-        else if (e.Y > thumbTop + thumbHeight)
-        {
-            // Page down
-            _topIndex = Math.Min(maxTopIndex, _topIndex + itemsPerPage);
-        }
-        else
-        {
-            // Start thumb drag
             _isDraggingScrollbar = true;
             _scrollbarDragStartY = e.Y;
             _scrollbarDragStartTopIndex = _topIndex;
         }
+        else if (hit == ScrollbarHit.ArrowUp)
+        {
+            _topIndex = sb.ClampTopIndex(_topIndex - 1);
+        }
+        else if (hit == ScrollbarHit.ArrowDown)
+        {
+            _topIndex = sb.ClampTopIndex(_topIndex + 1);
+        }
+        else
+        {
+            _topIndex = sb.ComputePageTopIndex(e.Y, _topIndex);
+        }
 
         Invalidate();
+    }
+
+    private VerticalScrollbarHelper MakeDropDownScrollbarHelper()
+    {
+        var dropDownHeight = GetActualDropDownHeight() - 2;
+        var track = new Rectangle(
+            Width - VerticalScrollbarHelper.Width - 1,
+            Height + 1,
+            VerticalScrollbarHelper.Width,
+            dropDownHeight);
+        var itemsPerPage = dropDownHeight / ItemHeight;
+        return new VerticalScrollbarHelper(track, Items.Count, itemsPerPage, _topIndex);
     }
 
     protected internal override void OnMouseUp(MouseEventArgs e)
@@ -562,19 +554,12 @@ public class ComboBox : ListControl
         // Handle scrollbar dragging
         if (_isDraggingScrollbar && _isDroppedDown)
         {
-            var dropDownHeight = GetActualDropDownHeight() - 2;
-            var itemsPerPage = dropDownHeight / ItemHeight;
-            var maxTopIndex = Math.Max(0, Items.Count - itemsPerPage);
-            var thumbHeight = Math.Max(20, (itemsPerPage * dropDownHeight) / Math.Max(1, Items.Count));
-            var trackHeight = dropDownHeight - thumbHeight;
+            var newTop = MakeDropDownScrollbarHelper()
+                .ComputeDragTopIndex(e.Y, _scrollbarDragStartY, _scrollbarDragStartTopIndex);
 
-            var deltaY = e.Y - _scrollbarDragStartY;
-            var indexDelta = (int)((deltaY * maxTopIndex) / Math.Max(1, trackHeight));
-            var newTopIndex = Math.Clamp(_scrollbarDragStartTopIndex + indexDelta, 0, maxTopIndex);
-
-            if (newTopIndex != _topIndex)
+            if (newTop != _topIndex)
             {
-                _topIndex = newTopIndex;
+                _topIndex = newTop;
                 Invalidate();
             }
 
@@ -587,7 +572,7 @@ public class ComboBox : ListControl
         {
             var dropDownHeight = GetActualDropDownHeight();
             var needsScrollbar = DropDownNeedsScrollbar();
-            var scrollbarX = Width - ScrollbarWidth - 1;
+            var scrollbarX = Width - VerticalScrollbarHelper.Width - 1;
 
             // Don't hover if over scrollbar
             if (needsScrollbar && e.X >= scrollbarX)

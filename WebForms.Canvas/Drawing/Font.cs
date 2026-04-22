@@ -6,8 +6,10 @@ public class Font
     public float Size { get; set; }
     public FontStyle Style { get; set; }
 
-    // Approximate height based on size (typical ratio is 1.2-1.5x the size)
-    public int Height => (int)(Size * 1.3f);
+    // Line height used for multiline layout. Canvas renders with textBaseline='top'
+    // and fontSize=Size px, so glyphs fit within Size pixels. We add 2px inter-line
+    // spacing so consecutive lines don't touch, matching typical browser line-height.
+    public int Height => (int)Size + 2;
 
     public Font(string family, float size, FontStyle style = FontStyle.Regular)
     {

@@ -11,6 +11,7 @@ public class TextMeasurementService
 {
     private readonly IJSRuntime _jsRuntime;
     private readonly ConcurrentDictionary<string, int> _cache = new();
+    private readonly ConcurrentDictionary<string, int> _heightCache = new();
 
     public TextMeasurementService(IJSRuntime jsRuntime)
     {
@@ -154,6 +155,46 @@ public class TextMeasurementService
     public void ClearCache()
     {
         _cache.Clear();
+        _heightCache.Clear();
+    }
+
+    /// <summary>
+    /// Measures the exact line height for a font using JS canvas TextMetrics
+    /// (fontBoundingBoxAscent + fontBoundingBoxDescent).  Result is cached per
+    /// fontFamily+fontSize — no text content needed.
+    /// </summary>
+    public async Task<int> GetFontHeightAsync(string fontFamily, int fontSize)
+    {
+        var key = $"{fontFamily}|{fontSize}";
+        if (_heightCache.TryGetValue(key, out var cached))
+            return cached;
+
+        try
+        {
+            var height = await _jsRuntime.InvokeAsync<int>("measureFontHeight", fontFamily, fontSize);
+            if (height > 0)
+                _heightCache.TryAdd(key, height);
+            return height > 0 ? height : fontSize + 2;
+        }
+        catch
+        {
+            return fontSize + 2;
+        }
+    }
+
+    /// <summary>
+    /// Returns the cached font height synchronously, or a best-guess fallback
+    /// if the async measurement hasn't completed yet.
+    /// </summary>
+    public int GetFontHeightEstimate(string fontFamily, int fontSize)
+    {
+        var key = $"{fontFamily}|{fontSize}";
+        if (_heightCache.TryGetValue(key, out var cached))
+            return cached;
+
+        // Not yet measured — use fontSize as conservative fallback.
+        // The async prime will update the cache and trigger a repaint.
+        return fontSize + 2;
     }
 
     private int EstimateTextWidth(string text, int fontSize)
