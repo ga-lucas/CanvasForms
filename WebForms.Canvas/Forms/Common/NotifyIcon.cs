@@ -67,6 +67,3 @@ public class Icon : IDisposable
     public Icon(string path) => ResourcePath = path;
     public void Dispose() { }
 }
-
-/// <summary>Stub ContextMenuStrip for API compatibility</summary>
-public class ContextMenuStrip : System.ComponentModel.Component { }

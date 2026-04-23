@@ -207,7 +207,7 @@ public class ListBox : ListControl
             ? Color.White
             : (Enabled ? ForeColor : Color.FromArgb(109, 109, 109));
 
-        g.DrawString(text, bounds.X + ItemPadding, bounds.Y + ItemPadding, textColor);
+        g.DrawString(text, bounds.X + ItemPadding, bounds.Y + (bounds.Height - 12) / 2, textColor);
     }
 
     protected internal override void OnMouseDown(MouseEventArgs e)

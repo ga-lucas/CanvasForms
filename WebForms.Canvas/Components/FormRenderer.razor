@@ -193,6 +193,19 @@
                 // Will retry on next interaction
             }
 
+            // Suppress the browser native context menu on the canvas.
+            // We pass true when the form (or any child) has a ContextMenuStrip assigned,
+            // so Blazor's own right-click handler always wins.
+            try
+            {
+                var hasCtxMenu = FormHasContextMenuStrip(Form);
+                await JSRuntime.InvokeVoidAsync("setupContextMenuSuppression", _canvasRef, hasCtxMenu);
+            }
+            catch
+            {
+                // Non-critical; silently ignore if JS isn't ready
+            }
+
             // Set RequestRender and propagate to all children
             var renderFunc = () =>
             {
@@ -1465,5 +1478,22 @@
         }
 
         _dotNetRef?.Dispose();
+    }
+
+    // ── Context-menu suppression helper ───────────────────────────────────────
+
+    /// <summary>
+    /// Returns true when <paramref name="root"/> or any descendant has a
+    /// <see cref="Forms.ContextMenuStrip"/> assigned.  Used to tell JS whether
+    /// to suppress the browser's native context menu.
+    /// </summary>
+    private static bool FormHasContextMenuStrip(Forms.Control root)
+    {
+        if (root.ContextMenuStrip != null) return true;
+        foreach (var child in root.Controls)
+        {
+            if (FormHasContextMenuStrip(child)) return true;
+        }
+        return false;
     }
 }

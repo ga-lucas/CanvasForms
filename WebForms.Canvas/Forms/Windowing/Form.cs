@@ -305,11 +305,55 @@ public class Form : ContainerControl
                 g.Restore();
             }
 
+            // Paint any open ToolStripMenuItem dropdowns owned by MenuStrip items
+            if (control is MenuStrip menuStrip)
+            {
+                PaintMenuDropDownsRecursive(g, menuStrip.Items, childOffsetX, childOffsetY);
+            }
+
+            // Paint ContextMenuStrip if visible
+            if (control.ContextMenuStrip is { IsVisible: true } cms)
+            {
+                PaintDropDownOverlay(g, cms, 0, 0);
+            }
+
             if (control.HasChildren)
             {
                 PaintOverlaysRecursive(g, control, childOffsetX, childOffsetY);
             }
         }
+
+        // Also paint any ContextMenuStrip attached to the form itself
+        if (parent == this && ContextMenuStrip is { IsVisible: true } formCms)
+        {
+            PaintDropDownOverlay(g, formCms, 0, 0);
+        }
+    }
+
+    private static void PaintMenuDropDownsRecursive(Graphics g, ToolStripItemCollection items, int offsetX, int offsetY)
+    {
+        foreach (var item in items)
+        {
+            if (item is not ToolStripMenuItem mi) continue;
+            if (!mi.HasDropDownItems) continue;
+
+            var dd = mi.DropDown;
+            if (dd.IsVisible)
+            {
+                PaintDropDownOverlay(g, dd, 0, 0);
+                // Recurse into open sub-menus
+                PaintMenuDropDownsRecursive(g, dd.Items, 0, 0);
+            }
+        }
+    }
+
+    private static void PaintDropDownOverlay(Graphics g, ToolStripDropDown dd, int offsetX, int offsetY)
+    {
+        var loc = dd.PopupLocation;
+        g.Save();
+        g.TranslateTransform(loc.X + offsetX, loc.Y + offsetY);
+        dd.PaintDropDown(g);
+        g.Restore();
     }
 
     private static (int x, int y) GetChildScrollOffset(Control parent)
@@ -347,11 +391,107 @@ public class Form : ContainerControl
             return;
         }
 
+        // Right-click: try to show ContextMenuStrip on the hit control (or its ancestors)
+        if (e.Button == MouseButtons.Right)
+        {
+            var cms = FindContextMenuStrip(hit.control);
+            if (cms != null)
+            {
+                CloseAllOverlays(except: null);
+                cms.Show(e.X, e.Y);
+                return;
+            }
+        }
+
+        // Check if the click landed inside an open menu dropdown
+        if (TryRouteMouseToMenuDropDown(e.X, e.Y, e))
+            return;
+
         FocusedControl = hit.control;
         CloseAllOverlays(except: hit.control);
 
         var controlArgs = new MouseEventArgs(e.Button, e.Clicks, hit.x, hit.y);
         hit.control.OnMouseDown(controlArgs);
+    }
+
+    /// <summary>
+    /// Routes a mouse-down to the deepest open ToolStripDropDown at the given
+    /// form coordinates. Returns true if the event was consumed.
+    /// </summary>
+    private bool TryRouteMouseToMenuDropDown(int formX, int formY, MouseEventArgs e)
+    {
+        if (TryRouteToDropDowns(GetAllMenuStrips(this), formX, formY)) return true;
+        if (TryRouteToContextMenuStrip(this, formX, formY)) return true;
+        return false;
+    }
+
+    private static bool TryRouteToDropDowns(IEnumerable<MenuStrip> strips, int formX, int formY)
+    {
+        foreach (var ms in strips)
+        {
+            foreach (var item in ms.Items)
+            {
+                if (item is ToolStripMenuItem mi && mi.DropDownIsOpen)
+                {
+                    if (RouteToDropDown(mi.DropDown, formX, formY)) return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static bool TryRouteToContextMenuStrip(Control root, int formX, int formY)
+    {
+        if (root.ContextMenuStrip is { IsVisible: true } cms)
+        {
+            if (RouteToDropDown(cms, formX, formY)) return true;
+        }
+        foreach (var child in root.Controls)
+        {
+            if (TryRouteToContextMenuStrip(child, formX, formY)) return true;
+        }
+        return false;
+    }
+
+    private static bool RouteToDropDown(ToolStripDropDown dd, int formX, int formY)
+    {
+        if (!dd.IsVisible) return false;
+        var loc = dd.PopupLocation;
+        var w   = dd.ComputeDropWidth();
+        var h   = dd.ComputeDropHeight();
+        if (formX >= loc.X && formX < loc.X + w && formY >= loc.Y && formY < loc.Y + h)
+        {
+            int lx = formX - loc.X;
+            int ly = formY - loc.Y;
+            // First check sub-menus
+            var idx = dd.GetItemIndexAt(ly);
+            if (idx >= 0 && idx < dd.Items.Count && dd.Items[idx] is ToolStripMenuItem mi && mi.DropDownIsOpen)
+            {
+                if (RouteToDropDown(mi.DropDown, formX, formY)) return true;
+            }
+            dd.HandleMouseDown(lx, ly);
+            return true;
+        }
+        return false;
+    }
+
+    private static IEnumerable<MenuStrip> GetAllMenuStrips(Control root)
+    {
+        foreach (var child in root.Controls)
+        {
+            if (child is MenuStrip ms) yield return ms;
+            foreach (var sub in GetAllMenuStrips(child)) yield return sub;
+        }
+    }
+
+    private static ContextMenuStrip? FindContextMenuStrip(Control? control)
+    {
+        while (control != null)
+        {
+            if (control.ContextMenuStrip != null) return control.ContextMenuStrip;
+            control = control.Parent;
+        }
+        return null;
     }
 
     protected internal override void OnMouseUp(MouseEventArgs e)
@@ -394,6 +534,9 @@ public class Form : ContainerControl
             return;
         }
 
+        // Route hover into open menu dropdowns so item highlight updates.
+        if (TryRouteMouseMoveToMenuDropDown(e.X, e.Y)) return;
+
         var hit = FindDeepestHitControl(this, e.X, e.Y, offsetX: 0, offsetY: 0, includeDisabled: true);
         if (hit.control is not null)
         {
@@ -403,6 +546,48 @@ public class Form : ContainerControl
         }
 
         base.OnMouseMove(e);
+    }
+
+    // ── Menu overlay mouse-move routing ───────────────────────────────────────
+
+    private bool TryRouteMouseMoveToMenuDropDown(int formX, int formY)
+    {
+        foreach (var ms in GetAllMenuStrips(this))
+        {
+            foreach (var item in ms.Items)
+            {
+                if (item is ToolStripMenuItem mi && mi.DropDownIsOpen)
+                    if (RouteMoveToDdChain(mi.DropDown, formX, formY)) return true;
+            }
+        }
+        return TryRouteMoveToContextMenuStrip(this, formX, formY);
+    }
+
+    private static bool TryRouteMoveToContextMenuStrip(Control root, int formX, int formY)
+    {
+        if (root.ContextMenuStrip is { IsVisible: true } cms)
+            if (RouteMoveToDdChain(cms, formX, formY)) return true;
+        foreach (var child in root.Controls)
+            if (TryRouteMoveToContextMenuStrip(child, formX, formY)) return true;
+        return false;
+    }
+
+    private static bool RouteMoveToDdChain(ToolStripDropDown dd, int formX, int formY)
+    {
+        if (!dd.IsVisible) return false;
+        var loc = dd.PopupLocation;
+        var w   = dd.ComputeDropWidth();
+        var h   = dd.ComputeDropHeight();
+        if (formX >= loc.X && formX < loc.X + w && formY >= loc.Y && formY < loc.Y + h)
+        {
+            dd.HandleMouseMove(formX - loc.X, formY - loc.Y);
+            return true;
+        }
+        // Also check open sub-menus even when pointer is outside this level
+        foreach (var item in dd.Items)
+            if (item is ToolStripMenuItem mi && mi.DropDownIsOpen)
+                if (RouteMoveToDdChain(mi.DropDown, formX, formY)) return true;
+        return false;
     }
 
     protected internal override void OnMouseWheel(MouseEventArgs e)
@@ -545,6 +730,52 @@ public class Form : ContainerControl
             }
         }
 
+        // ToolStripMenuItem dropdowns (MenuStrip)
+        if (control is MenuStrip menuStrip)
+        {
+            if (IsPointInMenuDropDowns(menuStrip.Items, x, y, out localX, out localY))
+                return true;
+        }
+
+        // ContextMenuStrip
+        if (control.ContextMenuStrip is { IsVisible: true } cms)
+        {
+            var loc = cms.PopupLocation;
+            var w   = cms.ComputeDropWidth();
+            var h   = cms.ComputeDropHeight();
+            if (x >= loc.X && x < loc.X + w && y >= loc.Y && y < loc.Y + h)
+            {
+                localX = x - loc.X;
+                localY = y - loc.Y;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsPointInMenuDropDowns(ToolStripItemCollection items, int x, int y, out int localX, out int localY)
+    {
+        localX = 0; localY = 0;
+        foreach (var item in items)
+        {
+            if (item is not ToolStripMenuItem mi || !mi.HasDropDownItems) continue;
+            var dd = mi.DropDown;
+            if (!dd.IsVisible) continue;
+
+            var loc = dd.PopupLocation;
+            var w   = dd.ComputeDropWidth();
+            var h   = dd.ComputeDropHeight();
+            if (x >= loc.X && x < loc.X + w && y >= loc.Y && y < loc.Y + h)
+            {
+                localX = x - loc.X;
+                localY = y - loc.Y;
+                return true;
+            }
+            // Recurse into open sub-menus
+            if (IsPointInMenuDropDowns(dd.Items, x, y, out localX, out localY))
+                return true;
+        }
         return false;
     }
 
@@ -570,10 +801,35 @@ public class Form : ContainerControl
                 textBox.HideAutoCompletePanel();
             }
 
+            // Close any open MenuStrip dropdowns
+            if (control is MenuStrip menuStrip && control != except)
+            {
+                CloseMenuStripDropDowns(menuStrip.Items);
+            }
+
+            // Close any open ContextMenuStrip
+            if (control.ContextMenuStrip is { IsVisible: true } cms && control != except)
+            {
+                cms.Close();
+            }
+
             if (control.HasChildren)
             {
                 CloseAllOverlaysRecursive(control, except);
             }
+        }
+
+        // Close form-level ContextMenuStrip
+        if (ContextMenuStrip is { IsVisible: true } formCms)
+            formCms.Close();
+    }
+
+    private static void CloseMenuStripDropDowns(ToolStripItemCollection items)
+    {
+        foreach (var item in items)
+        {
+            if (item is ToolStripMenuItem mi && mi.DropDownIsOpen)
+                mi.CloseDropDown();
         }
     }
 

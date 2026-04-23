@@ -21,7 +21,7 @@ public class WelcomeForm : Form
     {
         Text = "Welcome - Windows Forms Canvas Clone";
         Width = 700;
-        Height = 650;
+        Height = 620;
         BackColor = Color.White;
         AllowResize = true;
         AllowMove = true;
@@ -235,10 +235,10 @@ public class WelcomeForm : Form
 
         _btnFileDialogDemo = new Button
         {
-            Text = "File Dialogs (Host + Upload)",
+            Text = "File Dialogs",
             Left = 250,
             Top = 380,
-            Width = 410,
+            Width = 200,
             Height = 50
         };
         _btnFileDialogDemo.Click += (s, e) =>
@@ -270,6 +270,21 @@ public class WelcomeForm : Form
             }, TaskScheduler.Default);
         };
         Controls.Add(_btnFileDialogDemo);
+
+        // Row 4 col 3 — Menus & ToolStrip demo
+        var btnMenuDemo = new Button
+        {
+            Text = "Menus & ToolStrip",
+            Left = 460,
+            Top = 380,
+            Width = 200,
+            Height = 50
+        };
+        btnMenuDemo.Click += (s, e) =>
+        {
+            Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<MenuDemoForm>();
+        };
+        Controls.Add(btnMenuDemo);
 
         // Links section
         var linksLabel = new Label

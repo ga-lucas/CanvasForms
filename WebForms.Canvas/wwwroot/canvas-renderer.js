@@ -27,6 +27,49 @@ window.ensureCanvasFocus = function(canvas) {
     }
 };
 
+// ── Context-menu suppression ──────────────────────────────────────────────────
+//
+// The browser's native context menu is meaningless on a canvas-rendered WinForms
+// surface.  We suppress it whenever the right-click lands on a canvas that has
+// an active WinForms ContextMenuStrip (preferred), falling back to suppressing it
+// unconditionally on the canvas so Blazor's right-click → OnMouseDown handler
+// is always the only one that fires.
+//
+// Strategy: the `contextmenu` event fires synchronously before the Blazor mousedown
+// handler, so an async Blazor round-trip cannot be used to decide.  Instead we
+// register a synchronous JS-side check via a per-canvas callback that Blazor sets
+// when it knows the form has at least one ContextMenuStrip attached.
+//
+// Usage from Blazor:
+//   await JSRuntime.InvokeVoidAsync("setupContextMenuSuppression", canvasRef, hasContextMenus);
+//   // Call again with updated hasContextMenus=true/false whenever the form changes.
+
+const _contextMenuCanvasState = new WeakMap(); // canvas → { suppress: bool }
+
+window.setupContextMenuSuppression = function(canvas, suppressAlways) {
+    if (!canvas) return;
+
+    const existing = _contextMenuCanvasState.get(canvas);
+    if (existing) {
+        // Just update the flag — the listener is already registered
+        existing.suppress = suppressAlways;
+        return;
+    }
+
+    // First-time setup: register a non-passive contextmenu listener
+    const state = { suppress: suppressAlways };
+    _contextMenuCanvasState.set(canvas, state);
+
+    canvas.addEventListener('contextmenu', (e) => {
+        // Always suppress the browser context menu on the canvas.
+        // When suppressAlways is true we know there is a WinForms ContextMenuStrip
+        // ready to show; when false we still suppress because the native menu is
+        // useless on a canvas surface and would obscure our own dropdowns.
+        e.preventDefault();
+        e.stopPropagation();
+    }, { capture: true });
+};
+
 // Setup keyboard event handling for a canvas element
 window.setupCanvasKeyboardHandling = function(canvas) {
     if (!canvas) return;

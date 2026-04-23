@@ -361,7 +361,7 @@ public class ControlPropertyFunctionalityTests
         Assert.NotNull(control.ContextMenu);
 #pragma warning restore CS0618
 
-        control.ContextMenuStrip = new object();
+        control.ContextMenuStrip = new ContextMenuStrip();
         Assert.NotNull(control.ContextMenuStrip);
     }
 

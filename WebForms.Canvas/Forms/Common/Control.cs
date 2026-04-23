@@ -476,7 +476,7 @@ public abstract class Control
     // Context menus (obsolete/stub)
     [Obsolete("Use ContextMenuStrip instead")]
     public object? ContextMenu { get; set; }
-    public object? ContextMenuStrip { get; set; }
+    public ContextMenuStrip? ContextMenuStrip { get; set; }
 
     // Data binding (stubs)
     public object? BindingContext { get; set; }
