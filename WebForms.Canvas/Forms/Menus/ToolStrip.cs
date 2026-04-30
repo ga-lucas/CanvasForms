@@ -233,6 +233,20 @@ public class ToolStrip : ScrollableControl
     protected virtual void OnBeginDrag(EventArgs e)      => BeginDrag?.Invoke(this, e);
     protected virtual void OnEndDrag(EventArgs e)        => EndDrag?.Invoke(this, e);
 
+    /// <summary>
+    /// Creates the default item type for this strip when adding via text/image/handler.
+    /// Override in derived classes to change the default item type
+    /// (e.g. <see cref="StatusStrip"/> returns <see cref="ToolStripStatusLabel"/>).
+    /// </summary>
+    protected internal virtual ToolStripItem CreateDefaultItem(string? text, Image? image, EventHandler? onClick)
+    {
+        if (text == "-")
+            return new ToolStripSeparator();
+        var btn = new ToolStripButton(text ?? string.Empty, image);
+        if (onClick is not null) btn.Click += onClick;
+        return btn;
+    }
+
     // ── Hover tracking ──────────────────────────────────────────────────────
 
     private int _hoveredIndex = -1;

@@ -32,8 +32,8 @@ public class MenuDemoForm : Form
     private static readonly Image IconGrid    = Icon("grid.svg");
 
     // ── State ──────────────────────────────────────────────────────────────────
-    private ListBox?  _log;
-    private Label?    _statusLabel;
+    private ListBox?              _log;
+    private ToolStripStatusLabel? _statusLabel;
     private bool      _boldOn;
     private bool      _italicOn;
     private bool      _gridOn;
@@ -219,22 +219,19 @@ public class MenuDemoForm : Form
         };
         Controls.Add(_log);
 
-        // Status bar strip at the bottom
-        var statusStrip = new Panel
+        // Status bar at the bottom using StatusStrip
+        var statusStrip = new StatusStrip();
+        _statusLabel = new ToolStripStatusLabel
         {
-            Left = 0, Top = Height - 56, Width = Width, Height = 22,
-            BackColor = Color.FromArgb(0, 122, 204),
-            Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom
+            Spring      = true,
+            Text        = "Ready",
+            Alignment   = ToolStripItemAlignment.Left,
+            BorderSides = ToolStripStatusLabelBorderSides.None
         };
-        _statusLabel = new Label
-        {
-            Text = "Ready",
-            Left = 8, Top = 3, Width = Width - 20, Height = 16,
-            ForeColor = Color.White,
-            BackColor = Color.Transparent,
-            Anchor = AnchorStyles.Left | AnchorStyles.Right
-        };
-        statusStrip.Controls.Add(_statusLabel);
+        var zoomLabel = new ToolStripStatusLabel { Text = "Zoom: 100%", Alignment = ToolStripItemAlignment.Right };
+        statusStrip.Items.Add(_statusLabel);
+        statusStrip.Items.Add(new ToolStripSeparator());
+        statusStrip.Items.Add(zoomLabel);
         Controls.Add(statusStrip);
     }
 
@@ -323,5 +320,6 @@ public class MenuDemoForm : Form
         parts.Add($"Zoom: {_zoom}%");
         if (msg is not null) parts.Insert(0, msg);
         _statusLabel.Text = string.Join("  |  ", parts);
+        _statusLabel.Owner?.Invalidate();
     }
 }

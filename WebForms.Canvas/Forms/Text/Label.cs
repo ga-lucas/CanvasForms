@@ -38,7 +38,7 @@ public class Label : Control
                 var line = lines[i] ?? string.Empty;
                 var x = GetLineX(line);
                 var y = y0 + (i * charHeight);
-                g.DrawString(line, "Arial", 12, textBrush, x, y);
+                g.DrawString(line, Font, textBrush, x, y);
             }
         }
 
@@ -47,48 +47,47 @@ public class Label : Control
 
     protected (int x0, int y0, int charHeight) GetTextBlockPosition(string[] lines)
     {
-        // Approximate character width and height
-        const int charWidth = 7;
-        const int charHeight = 14;
-        const int baselineOffset = 2; // Offset to account for 'top' baseline in canvas
+        // Scale character metrics with the current font size.
+        // ~0.6× width-to-height ratio is a reasonable proportional-font approximation.
+        var charHeight  = Font.Height;                      // Font.Height already adds 2px inter-line
+        var charWidth   = (int)Math.Round(Font.Size * 0.6f);
+        const int baselineOffset = 2;
 
         var maxLineLen = 0;
         foreach (var l in lines)
-        {
-            if (l == null) continue;
-            maxLineLen = Math.Max(maxLineLen, l.Length);
-        }
+            maxLineLen = Math.Max(maxLineLen, (l ?? string.Empty).Length);
 
-        var textWidth = maxLineLen * charWidth;
+        var textWidth  = maxLineLen * charWidth;
         var textHeight = lines.Length * charHeight;
 
         var (baseX, baseY) = TextAlign switch
         {
-            ContentAlignment.TopLeft => (0, 0),
-            ContentAlignment.TopCenter => ((Width - textWidth) / 2, 0),
-            ContentAlignment.TopRight => (Width - textWidth, 0),
-            ContentAlignment.MiddleLeft => (0, (Height - textHeight) / 2),
+            ContentAlignment.TopLeft     => (0, 0),
+            ContentAlignment.TopCenter   => ((Width - textWidth) / 2, 0),
+            ContentAlignment.TopRight    => (Width - textWidth, 0),
+            ContentAlignment.MiddleLeft  => (0, (Height - textHeight) / 2),
             ContentAlignment.MiddleCenter => ((Width - textWidth) / 2, (Height - textHeight) / 2),
             ContentAlignment.MiddleRight => (Width - textWidth, (Height - textHeight) / 2),
-            ContentAlignment.BottomLeft => (0, Height - textHeight),
+            ContentAlignment.BottomLeft  => (0, Height - textHeight),
             ContentAlignment.BottomCenter => ((Width - textWidth) / 2, Height - textHeight),
             ContentAlignment.BottomRight => (Width - textWidth, Height - textHeight),
             _ => (0, 0)
         };
 
-        // Add baseline offset to Y coordinate for better vertical alignment
         return (baseX, baseY + baselineOffset, charHeight);
     }
 
     protected int GetLineX(string line)
     {
-        const int charWidth = 7;
+        var charWidth = (int)Math.Round(Font.Size * 0.6f);
         var lineWidth = (line ?? string.Empty).Length * charWidth;
 
         return TextAlign switch
         {
-            ContentAlignment.TopCenter or ContentAlignment.MiddleCenter or ContentAlignment.BottomCenter => Math.Max(0, (Width - lineWidth) / 2),
-            ContentAlignment.TopRight or ContentAlignment.MiddleRight or ContentAlignment.BottomRight => Math.Max(0, Width - lineWidth),
+            ContentAlignment.TopCenter or ContentAlignment.MiddleCenter or ContentAlignment.BottomCenter
+                => Math.Max(0, (Width - lineWidth) / 2),
+            ContentAlignment.TopRight or ContentAlignment.MiddleRight or ContentAlignment.BottomRight
+                => Math.Max(0, Width - lineWidth),
             _ => 0
         };
     }

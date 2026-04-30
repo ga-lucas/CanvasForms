@@ -15,7 +15,7 @@ public class WelcomeForm : Form
     private Button? _btnSplitContainerDemo;
     private Button? _btnTabControlDemo;
 
-    private Button? _btnFileDialogDemo;
+    private Button? _btnDialogDemo;
 
     public WelcomeForm()
     {
@@ -233,43 +233,19 @@ public class WelcomeForm : Form
         };
         Controls.Add(_btnTabControlDemo);
 
-        _btnFileDialogDemo = new Button
+        _btnDialogDemo = new Button
         {
-            Text = "File Dialogs",
+            Text = "Dialog Demos",
             Left = 250,
             Top = 380,
             Width = 200,
             Height = 50
         };
-        _btnFileDialogDemo.Click += (s, e) =>
+        _btnDialogDemo.Click += (s, e) =>
         {
-            var dlg = new OpenFileDialog
-            {
-                Title = "Open text file or image",
-                Filter = "All supported|*.txt;*.cs;*.json;*.xml;*.md;*.log;*.png;*.jpg;*.jpeg;*.gif;*.bmp|Text files|*.txt;*.cs;*.json;*.xml;*.md;*.log|Images|*.png;*.jpg;*.jpeg;*.gif;*.bmp|All files (*.*)|*.*",
-                FilterIndex = 1,
-                Multiselect = true,
-                EnableUpload = Canvas.Windows.Forms.CanvasFormsOptions.EnableFileDialogUpload
-            };
-
-            dlg.ShowDialogAsync().ContinueWith(t =>
-            {
-                try
-                {
-                    if (t.Status == TaskStatus.RanToCompletion && t.Result == DialogResult.OK)
-                    {
-                        // Open a FileViewerForm for each selected file
-                        foreach (var fileName in dlg.FileNames)
-                        {
-                            var viewerForm = new FileViewerForm(fileName);
-                            Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowForm(viewerForm);
-                        }
-                    }
-                }
-                catch { }
-            }, TaskScheduler.Default);
+            Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<DialogDemoForm>();
         };
-        Controls.Add(_btnFileDialogDemo);
+        Controls.Add(_btnDialogDemo);
 
         // Row 4 col 3 — Menus & ToolStrip demo
         var btnMenuDemo = new Button

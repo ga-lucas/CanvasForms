@@ -114,8 +114,8 @@ public class LabelRenderingTests
 
         var text = Assert.Single(g.GetCommands().OfType<DrawStringCommand>());
 
-        // textWidth = 2 * 7 = 14 => (100 - 14) / 2 = 43
-        Assert.Equal(43, text.X);
+        // textWidth = 2 * charWidth(5) = 10 => (100 - 10) / 2 = 45  (charWidth = round(Font.Size * 0.6) = round(9*0.6) = 5)
+        Assert.Equal(45, text.X);
         Assert.Equal(2, text.Y);
     }
 
@@ -135,8 +135,8 @@ public class LabelRenderingTests
 
         var text = Assert.Single(g.GetCommands().OfType<DrawStringCommand>());
 
-        // textWidth = 2 * 7 = 14 => 100 - 14 = 86
-        Assert.Equal(86, text.X);
+        // textWidth = 2 * charWidth(5) = 10 => 100 - 10 = 90
+        Assert.Equal(90, text.X);
         Assert.Equal(2, text.Y);
     }
 
@@ -156,9 +156,9 @@ public class LabelRenderingTests
 
         var text = Assert.Single(g.GetCommands().OfType<DrawStringCommand>());
 
-        // textHeight = 1 * 14 = 14 => (40 - 14) / 2 = 13; + baseline offset 2 => 15
+        // textHeight = 1 * charHeight(Font.Height=11) = 11 => (40 - 11) / 2 = 14; + baseline offset 2 => 16
         Assert.Equal(0, text.X);
-        Assert.Equal(15, text.Y);
+        Assert.Equal(16, text.Y);
     }
 
     [Fact]
@@ -184,6 +184,6 @@ public class LabelRenderingTests
 
         Assert.Equal("B", texts[1].Text);
         Assert.Equal(0, texts[1].X);
-        Assert.Equal(2 + 14, texts[1].Y);
+        Assert.Equal(2 + 11, texts[1].Y);  // 2 (baseline offset) + charHeight (Font.Height = 11)
     }
 }

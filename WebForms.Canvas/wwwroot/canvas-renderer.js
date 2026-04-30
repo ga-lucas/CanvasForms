@@ -278,11 +278,29 @@ window.renderClientAreaCommands = async (canvas, offsetX, offsetY, commands) => 
                         break;
                     }
                     case Op.DrawText: {
-                        // [op, text, fontFamily, fontSize, x, y, color]
-                        ctx.font = `${cmd[3]}px ${cmd[2]}`;
+                        // [op, text, fontFamily, fontSize, x, y, color, fontStyle?]
+                        // fontStyle bitmask: 1=Bold, 2=Italic, 4=Underline, 8=Strikeout
+                        const dtStyle = cmd[7] | 0;
+                        const dtBold   = (dtStyle & 1) !== 0 ? 'bold '   : '';
+                        const dtItalic = (dtStyle & 2) !== 0 ? 'italic ' : '';
+                        ctx.font = `${dtBold}${dtItalic}${cmd[3]}px ${cmd[2]}`;
                         ctx.textBaseline = 'top';
                         ctx.fillStyle = cmd[6];
                         ctx.fillText(cmd[1], cmd[4], cmd[5]);
+                        // Underline
+                        if ((dtStyle & 4) !== 0) {
+                            const dtUw = ctx.measureText(cmd[1]).width;
+                            ctx.strokeStyle = cmd[6];
+                            ctx.lineWidth = Math.max(1, cmd[3] / 14);
+                            ctx.beginPath(); ctx.moveTo(cmd[4], cmd[5] + cmd[3] + 1); ctx.lineTo(cmd[4] + dtUw, cmd[5] + cmd[3] + 1); ctx.stroke();
+                        }
+                        // Strikeout
+                        if ((dtStyle & 8) !== 0) {
+                            const dtSw = ctx.measureText(cmd[1]).width;
+                            ctx.strokeStyle = cmd[6];
+                            ctx.lineWidth = Math.max(1, cmd[3] / 12);
+                            ctx.beginPath(); ctx.moveTo(cmd[4], cmd[5] + cmd[3] / 2); ctx.lineTo(cmd[4] + dtSw, cmd[5] + cmd[3] / 2); ctx.stroke();
+                        }
                         break;
                     }
                     case Op.Clear: {

@@ -905,6 +905,17 @@ public abstract class Control
 
     protected internal virtual void OnMouseDoubleClick(MouseEventArgs e)
     {
+        if (IsMouseRoutingContainer && Enabled)
+        {
+            var child = FindChildAt(e.X, e.Y);
+            if (child != null)
+            {
+                var (cx, cy) = ToChildCoordinates(child, e.X, e.Y);
+                child.OnMouseDoubleClick(new MouseEventArgs(e.Button, e.Clicks, cx, cy));
+                MouseDoubleClick?.Invoke(this, e);
+                return;
+            }
+        }
         MouseDoubleClick?.Invoke(this, e);
     }
 

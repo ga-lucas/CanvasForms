@@ -209,37 +209,73 @@ public class DrawStringCommand : DrawingCommand
     public string Text { get; }
     public string FontFamily { get; }
     public int FontSize { get; }
+    public FontStyle Style { get; }
     public Brush Brush { get; }
     public int X { get; }
     public int Y { get; }
 
     public DrawStringCommand(string text, string fontFamily, int fontSize, Brush brush, int x, int y)
+        : this(text, fontFamily, fontSize, FontStyle.Regular, brush, x, y) { }
+
+    public DrawStringCommand(string text, string fontFamily, int fontSize, FontStyle style, Brush brush, int x, int y)
     {
         Text = text;
         FontFamily = fontFamily;
         FontSize = fontSize;
+        Style = style;
         Brush = brush;
         X = x;
         Y = y;
     }
 
+    private string CssFontString()
+    {
+        var parts = new System.Text.StringBuilder();
+        if ((Style & FontStyle.Bold)   != 0) parts.Append("bold ");
+        if ((Style & FontStyle.Italic) != 0) parts.Append("italic ");
+        parts.Append($"{FontSize}px ");
+        parts.Append(FontFamily);
+        return parts.ToString();
+    }
+
     public override string ToJavaScript()
     {
         var sb = new StringBuilder();
-        sb.AppendLine($"ctx.font = '{FontSize}px {FontFamily}';");
-        sb.AppendLine("ctx.textBaseline = 'top';"); // Use top baseline for consistent positioning
-        if (Brush is SolidBrush solidBrush)
-        {
-            sb.AppendLine($"ctx.fillStyle = '{solidBrush.Color.ToRgbaString()}';");
-        }
+        sb.AppendLine($"ctx.font = '{CssFontString()}';");
+        sb.AppendLine("ctx.textBaseline = 'top';");
+        var color = Brush is SolidBrush solidBrush ? solidBrush.Color.ToRgbaString() : "rgba(0,0,0,1)";
+        sb.AppendLine($"ctx.fillStyle = '{color}';");
         sb.AppendLine($"ctx.fillText('{Text.Replace("'", "\\'")}', {X}, {Y});");
+
+        // Strikeout: horizontal line through the visual midpoint of the text
+        if ((Style & FontStyle.Strikeout) != 0)
+        {
+            int midY = Y + FontSize / 2;
+            sb.AppendLine($"var __sw = ctx.measureText('{Text.Replace("'", "\\'")}').width;");
+            sb.AppendLine($"ctx.strokeStyle = '{color}';");
+            sb.AppendLine($"ctx.lineWidth = Math.max(1, {FontSize} / 12);");
+            sb.AppendLine($"ctx.beginPath(); ctx.moveTo({X}, {midY}); ctx.lineTo({X} + __sw, {midY}); ctx.stroke();");
+        }
+
+        // Underline: line just below the text baseline
+        if ((Style & FontStyle.Underline) != 0)
+        {
+            int underY = Y + FontSize + 1;
+            sb.AppendLine($"var __uw = ctx.measureText('{Text.Replace("'", "\\'")}').width;");
+            sb.AppendLine($"ctx.strokeStyle = '{color}';");
+            sb.AppendLine($"ctx.lineWidth = Math.max(1, {FontSize} / 14);");
+            sb.AppendLine($"ctx.beginPath(); ctx.moveTo({X}, {underY}); ctx.lineTo({X} + __uw, {underY}); ctx.stroke();");
+        }
+
         return sb.ToString();
     }
 
     public override object[] ToCommand()
     {
         var color = Brush is SolidBrush solidBrush ? solidBrush.Color.ToRgbaString() : "rgba(0,0,0,1)";
-        return new object[] { CanvasCommandOp.DrawText, Text, FontFamily, FontSize, X, Y, color };
+        // [op, text, fontFamily, fontSize, x, y, color, fontStyle]
+        // fontStyle is a bitmask: 1=Bold 2=Italic 4=Underline 8=Strikeout  (matches FontStyle enum)
+        return new object[] { CanvasCommandOp.DrawText, Text, FontFamily, FontSize, X, Y, color, (int)Style };
     }
 }
 

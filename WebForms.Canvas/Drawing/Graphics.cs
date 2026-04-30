@@ -129,13 +129,13 @@ public class Graphics : IDisposable
     // Overload with Font
     public void DrawString(string text, Font font, Brush brush, int x, int y)
     {
-        DrawString(text, font.Family, (int)font.Size, brush, x, y);
+        _commands.Add(new DrawStringCommand(text, font.Family, (int)font.Size, font.Style, brush, x + _translateX, y + _translateY));
     }
 
     // Overload with Font and Color
     public void DrawString(string text, Font font, Color color, int x, int y)
     {
-        DrawString(text, font.Family, (int)font.Size, new SolidBrush(color), x, y);
+        _commands.Add(new DrawStringCommand(text, font.Family, (int)font.Size, font.Style, new SolidBrush(color), x + _translateX, y + _translateY));
     }
 
     // Draw image

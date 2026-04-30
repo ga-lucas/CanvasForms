@@ -321,6 +321,95 @@ The control list above is the authoritative snapshot of which WinForms controls 
 
 For a more detailed narrative review (including gaps and missing members), see `COMPATIBILITY_REVIEW.md` and `CONTROLS_IMPLEMENTATION_STRATEGY.md`.
 
+---
+
+## Controls roadmap
+
+Status legend: ✅ Good &nbsp;|&nbsp; ⚠️ Partial &nbsp;|&nbsp; 🧩 Stub &nbsp;|&nbsp; 🔲 Not started
+
+Items are ordered by estimated prevalence in designer-generated / translated WinForms apps.
+
+### Tier 1 — High priority
+
+| Status | Control | Notes |
+|--------|---------|-------|
+| ✅ | `Button` / `ButtonBase` | Hover, pressed, focus, keyboard |
+| ✅ | `CheckBox` | Toggle + indicator |
+| ✅ | `RadioButton` | Mutual exclusion within parent |
+| ⚠️ | `TextBox` / `TextBoxBase` | Editing, selection, shortcuts; autocomplete evolving |
+| ⚠️ | `Label` | Multi-line, alignment, approximate measurement |
+| ⚠️ | `ComboBox` | Drop-down + selection; autocomplete partial |
+| ⚠️ | `ListBox` | Selection + navigation; advanced modes missing |
+| ⚠️ | `Panel` / `ScrollableControl` | Child painting, input routing, scroll offset |
+| ⚠️ | `GroupBox` | Border/caption + child routing |
+| ⚠️ | `TabControl` | Tab strip + page switching |
+| ⚠️ | `MenuStrip` | Top-level menu bar with dropdowns |
+| ⚠️ | `ContextMenuStrip` | Right-click overlay menus |
+| ⚠️ | `ToolStrip` | Toolbar with icons, hover, checked state |
+| ⚠️ | `StatusStrip` / `ToolStripStatusLabel` | Status bar; Spring, BorderSides, SizingGrip |
+| ⚠️ | `SplitContainer` | Resizable pane splitter |
+| ⚠️ | `FlowLayoutPanel` | FlowDirection + wrap/break |
+| ⚠️ | `TableLayoutPanel` | Row/column styles + spans |
+| ⚠️ | `DateTimePicker` | Simplified text + drop-down calendar |
+| ⚠️ | `NumericUpDown` | Spinner UI + value clamping |
+| ⚠️ | `PictureBox` | URL-based image loading |
+| ⚠️ | `ProgressBar` | Blocks/continuous/marquee |
+| ⚠️ | `TreeView` | Nodes, expand/collapse, selection |
+| ⚠️ | `ListView` | Details view + columns; growing |
+| ⚠️ | `OpenFileDialog` | Host FS + browser upload |
+| 🧩 | `ToolTip` | API present; rendering may be incomplete |
+| 🔲 | **`DataGridView`** | ⭐ Highest-impact missing control; used in nearly every business app |
+| ✅ | `Timer` | `PeriodicTimer`-based async loop; `Interval`, `Enabled`, `Start()`, `Stop()`, `Tick`, `Tag`, `IContainer` ctor; fires on captured `SynchronizationContext` |
+| 🔲 | **`ErrorProvider`** | Standard form validation; common in data-entry forms |
+| ⚠️ | `SaveFileDialog` | Inherits full FileDialog UI; `CreatePrompt`, `OverwritePrompt`, `OpenFile()` |
+| ⚠️ | `FolderBrowserDialog` | `SelectedPath`, `Description`, `RootFolder`, `ShowNewFolderButton`, `InitialDirectory`; host FS aware |
+| ⚠️ | `ColorDialog` | Swatch palette + Hex/RGB/HSV inputs; `Color`, `AllowFullOpen`, `CustomColors`, `FullOpen` |
+| ⚠️ | `FontDialog` | Family/style/size lists; `ShowEffects`, `ShowColor`, `MinSize`/`MaxSize`, `Apply` event |
+
+### Tier 2 — Medium priority
+
+| Status | Control | Notes |
+|--------|---------|-------|
+| ⚠️ | `RichTextBox` | Stores RTF, renders as plain text |
+| ⚠️ | `MaskedTextBox` | Masked display + basic validation |
+| ⚠️ | `CheckedListBox` | Basic checked item behaviour |
+| ⚠️ | `MonthCalendar` | Single-month view + keyboard/mouse |
+| 🧩 | `NotifyIcon` | API present; system tray stub |
+| 🧩 | `UserControl` | Base present; full composite lifecycle partial |
+| 🧩 | `ToolStripMenuItem` | Dropdowns, check state, shortcuts |
+| 🧩 | `ToolStripContainer` / `ToolStripPanel` | Dockable strip host |
+| 🔲 | **`PropertyGrid`** | Common in tools and settings panels |
+| 🔲 | **`TrackBar`** | Slider; common in settings/media UIs |
+| 🔲 | **`HScrollBar` / `VScrollBar`** | Standalone scrollbars used in legacy apps |
+| 🔲 | **`DomainUpDown`** | Text-based up-down; pair to `NumericUpDown` |
+| 🔲 | **`HelpProvider`** | F1 help integration |
+| 🔲 | **`ToolStripProgressBar`** | Common in status strips for background tasks |
+| 🔲 | **`ToolStripSplitButton`** | Split-action toolbar button |
+| 🔲 | **`PrintDialog`** | Print workflow; business-app compat |
+| 🔲 | **`PrintPreviewDialog`** | Paired with `PrintDialog` |
+| 🔲 | **`PrintDocument`** | Underlying print model |
+
+### Tier 3 — Lower priority / legacy compat
+
+| Status | Control | Notes |
+|--------|---------|-------|
+| 🔲 | **`DataGrid`** (legacy) | Older apps use instead of `DataGridView` |
+| 🔲 | **`BindingSource`** | Data-binding plumbing; used with `DataGridView` |
+| 🔲 | **`BindingNavigator`** | Record-navigation bar; paired with `BindingSource` |
+| 🔲 | **`StatusBar`** (legacy) | Pre-`StatusStrip`; thin wrapper for translator compat |
+| 🔲 | **`ToolBar`** (legacy) | Pre-`ToolStrip` |
+| 🔲 | **`MainMenu`** (legacy) | Pre-`MenuStrip` |
+| 🔲 | **`ContextMenu`** (legacy) | Pre-`ContextMenuStrip` |
+| 🔲 | **`Splitter`** (legacy) | Pre-`SplitContainer` |
+| 🔲 | **`PrintPreviewControl`** | Embedded (non-dialog) print preview |
+| 🔲 | **`Screen`** | Multi-monitor info; `Screen.PrimaryScreen` stub needed |
+| 🔲 | **`Clipboard`** | Cut/Copy/Paste; requires JS bridge |
+| 🔲 | **`WebBrowser` / WebView2** | Embedded web content; stub for compatibility |
+| 🔲 | **MDI (`MdiClient`, MDI Forms)** | MDI window management; enterprise apps |
+| 🔲 | **`DataGridViewColumn` types** | TextBox/CheckBox/ComboBox/Button/Image/Link column variants |
+
+> **Updating this table:** when a control reaches ✅/⚠️/🧩 status, update its row here. The Tier 1 table drives the PoC roadmap; Tier 3 is tracked for completeness.
+
 ## Limitations (current)
 
 ---

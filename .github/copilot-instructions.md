@@ -8,6 +8,12 @@
 - The project scope is Mode A (host-run logic + canvas-rendered UI), intended for same-machine/local-network development use only for now; do not design for internet exposure. Security concerns can be scoped accordingly (localhost/limited origins acceptable).
 - Evolve this repository as a proof of concept (PoC) to gradually increase WinForms compatibility for translated (ILTranslator) WinForms apps (designer-generated). Ensure that apps utilize the host/server for storage.
 
+### Controls roadmap maintenance
+- When implementing or completing WinForms controls in the CanvasForms workspace (C:\Users\verda\source\repos\WebForms), always update the Controls Roadmap table in README.md.
+- Change the control's status icon as progress is made: 🔲 (not started) → 🧩 (stub) → ⚠️ (partial) → ✅ (good).
+- Update the roadmap located in the "## Controls roadmap" section of README.md, organized into Tier 1, Tier 2, and Tier 3 tables.
+- Keep entries concise and accurate; record only the control name and the appropriate status icon.
+
 ## Known Issues
 - Currently experiencing a runtime launch failure when a translated app sets `Form.BackColor`. Investigate and resolve this issue.
 - Custom drawing support is desired; refer to `SampleDrawingForm` for implementation guidance.

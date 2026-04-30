@@ -179,6 +179,10 @@
         {
             _initialized = true;
 
+            // Fire Form.Load — matches WinForms firing WM_LOAD on first show.
+            // Translated designer-generated code may handle this event for deferred init.
+            Form.RaiseLoad();
+
             // Initialize text measurement service
             Form.TextMeasurementService = new TextMeasurementService(JSRuntime);
 

@@ -77,6 +77,31 @@ public class Form : ContainerControl
         Activated?.Invoke(this, e);
     }
 
+    // ── Load event ────────────────────────────────────────────────────────────
+    // Fired once after the form is fully initialised and shown for the first time.
+    // WinForms: Control defines Load + OnLoad; Form inherits it and fires it
+    // from WM_LOAD. Translated designer-generated code subscribes via:
+    //   this.Load += new System.EventHandler(this.MyForm_Load);
+
+    /// <summary>
+    /// Occurs before the form is displayed for the first time.
+    /// Matches WinForms <c>Form.Load</c>.
+    /// </summary>
+    public event EventHandler? Load;
+
+    /// <summary>
+    /// Raises the <see cref="Load"/> event.
+    /// Override in subclasses to run initialisation code after the form is ready.
+    /// Matches WinForms <c>Form.OnLoad(EventArgs)</c>.
+    /// </summary>
+    protected virtual void OnLoad(EventArgs e) => Load?.Invoke(this, e);
+
+    /// <summary>
+    /// Called by the hosting infrastructure after the form tree is ready.
+    /// Equivalent to WinForms firing WM_LOAD on the first Show.
+    /// </summary>
+    public void RaiseLoad() => OnLoad(EventArgs.Empty);
+
     // Track the close reason for the current close operation
     private CloseReason _closeReason = CloseReason.None;
 
