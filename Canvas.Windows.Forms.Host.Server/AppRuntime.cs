@@ -4,6 +4,7 @@ using Canvas.Windows.Forms.RemoteProtocol;
 using System.Windows.Forms;
 using Canvas.Windows.Forms;
 using Canvas.Windows.Forms.Drawing;
+using Canvas.Windows.Forms.Host.Server.Data;
 
 namespace Canvas.Windows.Forms.Host.Server;
 
@@ -14,6 +15,8 @@ namespace Canvas.Windows.Forms.Host.Server;
 public sealed class AppRuntime : IDisposable
 {
     private readonly ILogger<AppRuntime> _logger;
+    private readonly ServerCanvasDataService? _dataService;
+    private readonly CanvasProviderResolver? _providerResolver;
     private readonly object _lock = new();
 
     private AssemblyLoadContext? _appLoadContext;
@@ -23,9 +26,14 @@ public sealed class AppRuntime : IDisposable
 
     public event Action? DesktopChanged;
 
-    public AppRuntime(ILogger<AppRuntime> logger)
+    public AppRuntime(
+        ILogger<AppRuntime> logger,
+        ServerCanvasDataService? dataService = null,
+        CanvasProviderResolver? providerResolver = null)
     {
         _logger = logger;
+        _dataService = dataService;
+        _providerResolver = providerResolver;
     }
 
     public bool IsRunning => _mainForm != null;
@@ -82,6 +90,9 @@ public sealed class AppRuntime : IDisposable
                     }
                     return null;
                 };
+
+                // Auto-load canvas-connections.json from the app directory
+                TryLoadConnectionsConfig(assemblyDir);
 
                 var assembly = _appLoadContext.LoadFromAssemblyPath(assemblyPath);
 
@@ -188,11 +199,30 @@ public sealed class AppRuntime : IDisposable
             _currentAppId = null;
             _isNativeApp = false;
 
+            // Clear app-registered data providers so next app starts clean
+            _dataService?.ClearAppProviders();
+
             // Clear any forms from CanvasApplication
             CanvasApplication.Exit();
 
             DesktopChanged?.Invoke();
         }
+    }
+
+    // ── Connection config auto-loader ─────────────────────────────────────────
+
+    private void TryLoadConnectionsConfig(string appDirectory)
+    {
+        if (_dataService == null || _providerResolver == null) return;
+
+        var config = CanvasConnectionsConfig.TryLoad(appDirectory, _logger);
+        if (config == null)
+        {
+            _logger.LogDebug("canvas-connections: no config file found in {Dir}", appDirectory);
+            return;
+        }
+
+        config.Apply(_dataService, _providerResolver, _logger);
     }
 
     /// <summary>

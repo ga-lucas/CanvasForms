@@ -1,9 +1,11 @@
 using Canvas.Windows.Forms.Host.Server;
+using Canvas.Windows.Forms.Host.Server.Data;
 using Canvas.Windows.Forms.Host.Server.Hubs;
 using Canvas.Windows.Forms.RemoteProtocol;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.StaticFiles;
+using System.Windows.Forms;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,7 +19,20 @@ builder.Services.AddSignalR();
 builder.Services.AddSingleton<AppRuntime>();
 builder.Services.AddSingleton<AppManager>();
 
+// ── Canvas data services ─────────────────────────────────────────────────────
+builder.Services.AddSingleton<CanvasProviderResolver>();
+builder.Services.AddSingleton<SqliteDataConnection>();
+builder.Services.AddSingleton<ServerCanvasDataService>();
+builder.Services.AddSingleton<ICanvasDataService>(sp => sp.GetRequiredService<ServerCanvasDataService>());
+
 var app = builder.Build();
+
+// ── Initialize Canvas data services ─────────────────────────────────────────
+var sqliteConn = app.Services.GetRequiredService<SqliteDataConnection>();
+sqliteConn.EnsureSeeded();
+var dataService = app.Services.GetRequiredService<ServerCanvasDataService>();
+dataService.RegisterHostProvider("Default", () => sqliteConn.CreateConnection());
+CanvasDataService.Current = dataService;
 
 app.UseRouting();
 app.UseWebSockets();

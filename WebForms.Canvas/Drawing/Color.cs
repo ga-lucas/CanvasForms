@@ -7,13 +7,28 @@ public struct Color
     public byte G { get; }
     public byte B { get; }
 
-    private Color(byte a, byte r, byte g, byte b)
+    // True only for the Empty sentinel — matches System.Drawing.Color.IsEmpty semantics.
+    private readonly bool _isEmpty;
+
+    private Color(byte a, byte r, byte g, byte b, bool isEmpty = false)
     {
         A = a;
         R = r;
         G = g;
         B = b;
+        _isEmpty = isEmpty;
     }
+
+    /// <summary>
+    /// Gets a value indicating whether this Color structure is uninitialized / unset.
+    /// Matches System.Drawing.Color.IsEmpty — distinct from Color.Transparent.
+    /// </summary>
+    public bool IsEmpty => _isEmpty;
+
+    /// <summary>
+    /// Represents an unset color. Equivalent to System.Drawing.Color.Empty.
+    /// </summary>
+    public static Color Empty => new Color(0, 0, 0, 0, isEmpty: true);
 
     public static Color FromArgb(int argb)
     {
@@ -44,10 +59,10 @@ public struct Color
         return $"#{R:X2}{G:X2}{B:X2}";
     }
 
-    // Equality
+    // Equality — _isEmpty is part of identity (Empty != Transparent)
     public bool Equals(Color other)
     {
-        return A == other.A && R == other.R && G == other.G && B == other.B;
+        return _isEmpty == other._isEmpty && A == other.A && R == other.R && G == other.G && B == other.B;
     }
 
     public override bool Equals(object? obj)
@@ -106,6 +121,14 @@ public struct Color
     public static Color Aqua => FromArgb(0, 255, 255);
     public static Color Fuchsia => FromArgb(255, 0, 255);
 
-    public static implicit operator Color(System.Drawing.Color c) => FromArgb(c.A, c.R, c.G, c.B);
-    public static implicit operator System.Drawing.Color(Color c) => System.Drawing.Color.FromArgb(c.A, c.R, c.G, c.B);
+    public static implicit operator Color(System.Drawing.Color c)
+    {
+        if (c.IsEmpty) return Empty;
+        return FromArgb(c.A, c.R, c.G, c.B);
+    }
+    public static implicit operator System.Drawing.Color(Color c)
+    {
+        if (c._isEmpty) return System.Drawing.Color.Empty;
+        return System.Drawing.Color.FromArgb(c.A, c.R, c.G, c.B);
+    }
 }

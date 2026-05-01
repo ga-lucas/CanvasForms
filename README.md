@@ -358,7 +358,7 @@ Items are ordered by estimated prevalence in designer-generated / translated Win
 | ⚠️ | `ListView` | Details view + columns; growing |
 | ⚠️ | `OpenFileDialog` | Host FS + browser upload |
 | 🧩 | `ToolTip` | API present; rendering may be incomplete |
-| 🔲 | **`DataGridView`** | ⭐ Highest-impact missing control; used in nearly every business app |
+| ⚠️ | **`DataGridView`** | In-process `DataSource` binding (IList, BindingSource, DataTable); auto-column gen; virtualised scroll; row selection; sort; column types: TextBox/CheckBox/Button/ComboBox/Image/Link |
 | ✅ | `Timer` | `PeriodicTimer`-based async loop; `Interval`, `Enabled`, `Start()`, `Stop()`, `Tick`, `Tag`, `IContainer` ctor; fires on captured `SynchronizationContext` |
 | 🔲 | **`ErrorProvider`** | Standard form validation; common in data-entry forms |
 | ⚠️ | `SaveFileDialog` | Inherits full FileDialog UI; `CreatePrompt`, `OverwritePrompt`, `OpenFile()` |
@@ -394,7 +394,7 @@ Items are ordered by estimated prevalence in designer-generated / translated Win
 | Status | Control | Notes |
 |--------|---------|-------|
 | 🔲 | **`DataGrid`** (legacy) | Older apps use instead of `DataGridView` |
-| 🔲 | **`BindingSource`** | Data-binding plumbing; used with `DataGridView` |
+| ⚠️ | **`BindingSource`** | IList/IBindingList wrapper with `ListChanged`; `Current`/`Position` navigation; server-backed via `CanvasDataService` |
 | 🔲 | **`BindingNavigator`** | Record-navigation bar; paired with `BindingSource` |
 | 🔲 | **`StatusBar`** (legacy) | Pre-`StatusStrip`; thin wrapper for translator compat |
 | 🔲 | **`ToolBar`** (legacy) | Pre-`ToolStrip` |
@@ -406,7 +406,8 @@ Items are ordered by estimated prevalence in designer-generated / translated Win
 | 🔲 | **`Clipboard`** | Cut/Copy/Paste; requires JS bridge |
 | 🔲 | **`WebBrowser` / WebView2** | Embedded web content; stub for compatibility |
 | 🔲 | **MDI (`MdiClient`, MDI Forms)** | MDI window management; enterprise apps |
-| 🔲 | **`DataGridViewColumn` types** | TextBox/CheckBox/ComboBox/Button/Image/Link column variants |
+| ✅ | **`DataGridViewColumn` types** | TextBox/CheckBox/ComboBox/Button/Image/Link column variants; `DataGridViewCellStyle`; `DataGridViewRow`/`DataGridViewCell` model |
+| ✅ | **`CanvasDataService`** | Server-backed ADO.NET provider; `ICanvasDataService.Fill(DataTable, sql)`; SQLite default; ambient `CanvasDataService.Current` accessor for native and translated apps |
 
 > **Updating this table:** when a control reaches ✅/⚠️/🧩 status, update its row here. The Tier 1 table drives the PoC roadmap; Tier 3 is tracked for completeness.
 

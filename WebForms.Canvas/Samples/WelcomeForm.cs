@@ -16,12 +16,14 @@ public class WelcomeForm : Form
     private Button? _btnTabControlDemo;
 
     private Button? _btnDialogDemo;
+    private Button? _btnDataGridDemo;
+    private Button? _btnServerDataDemo;
 
     public WelcomeForm()
     {
         Text = "Welcome - Windows Forms Canvas Clone";
         Width = 700;
-        Height = 620;
+        Height = 760;
         BackColor = Color.White;
         AllowResize = true;
         AllowMove = true;
@@ -247,6 +249,34 @@ public class WelcomeForm : Form
         };
         Controls.Add(_btnDialogDemo);
 
+        _btnDataGridDemo = new Button
+        {
+            Text = "DataGridView",
+            Left = 40,
+            Top = 450,
+            Width = 200,
+            Height = 50
+        };
+        _btnDataGridDemo.Click += (s, e) =>
+        {
+            Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<DataGridDemoForm>();
+        };
+        Controls.Add(_btnDataGridDemo);
+
+        _btnServerDataDemo = new Button
+        {
+            Text = "Server Data (ADO.NET)",
+            Left = 250,
+            Top = 450,
+            Width = 200,
+            Height = 50
+        };
+        _btnServerDataDemo.Click += (s, e) =>
+        {
+            Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<ServerDataDemoForm>();
+        };
+        Controls.Add(_btnServerDataDemo);
+
         // Row 4 col 3 — Menus & ToolStrip demo
         var btnMenuDemo = new Button
         {
@@ -267,7 +297,7 @@ public class WelcomeForm : Form
         {
             Text = "Links:",
             Left = 20,
-            Top = 450,
+            Top = 590,
             Width = 660,
             Height = 25,
             ForeColor = Color.FromArgb(60, 60, 60),
@@ -281,7 +311,7 @@ public class WelcomeForm : Form
             Text = "View on GitHub",
             LinkUrl = "https://github.com/ga-lucas/CanvasForms",
             Left = 40,
-            Top = 480,
+            Top = 620,
             Width = 150,
             Height = 20
         };
@@ -298,7 +328,7 @@ public class WelcomeForm : Form
             Text = "Documentation",
             LinkUrl = "https://docs.microsoft.com/en-us/dotnet/desktop/winforms/",
             Left = 200,
-            Top = 480,
+            Top = 620,
             Width = 150,
             Height = 20
         };
@@ -310,7 +340,7 @@ public class WelcomeForm : Form
             Text = "WinForms Examples",
             LinkUrl = "https://github.com/dotnet/winforms",
             Left = 360,
-            Top = 480,
+            Top = 620,
             Width = 150,
             Height = 20
         };
