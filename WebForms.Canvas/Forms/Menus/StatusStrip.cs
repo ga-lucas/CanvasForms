@@ -316,7 +316,7 @@ public class StatusStrip : ToolStrip
         {
             int iconSize = Math.Min(bounds.Height - 4, 16);
             int iconY    = midY - iconSize / 2;
-            g.DrawImage(item.Image!.Source, contentX, iconY, iconSize, iconSize);
+            g.DrawImage(item.Image!.Source ?? string.Empty, contentX, iconY, iconSize, iconSize);
             contentX += iconSize + 4;
         }
 

@@ -20,7 +20,74 @@ public class Form : ContainerControl
     public int MaximumWidth { get; set; } = 0; // 0 = no limit
     public int MaximumHeight { get; set; } = 0; // 0 = no limit
 
-    // Z-order for stacking
+    // ── Chrome / appearance ──────────────────────────────────────────────────
+
+    private FormBorderStyle _formBorderStyle = FormBorderStyle.Sizable;
+
+    /// <summary>
+    /// Gets or sets the border style of the form.
+    /// Affects whether the chrome shows resize handles. Fixed styles disable resizing.
+    /// </summary>
+    public FormBorderStyle FormBorderStyle
+    {
+        get => _formBorderStyle;
+        set
+        {
+            _formBorderStyle = value;
+            // Fixed border styles disable user resizing
+            AllowResize = value is FormBorderStyle.Sizable or FormBorderStyle.SizableToolWindow;
+            Invalidate();
+        }
+    }
+
+    /// <summary>Gets or sets whether the Minimize button is shown in the title bar.</summary>
+    public bool MinimizeBox { get; set; } = true;
+
+    /// <summary>Gets or sets whether the Maximize button is shown in the title bar.</summary>
+    public bool MaximizeBox { get; set; } = true;
+
+    /// <summary>Gets or sets whether the control box (icon + sys-menu + close button) is shown.</summary>
+    public bool ControlBox { get; set; } = true;
+
+    private bool _topMost;
+    /// <summary>
+    /// Gets or sets whether the form is always on top of other forms.
+    /// In canvas mode this sets an elevated base z-order.
+    /// </summary>
+    public bool TopMost
+    {
+        get => _topMost;
+        set
+        {
+            _topMost = value;
+            if (value) BringToFront();
+        }
+    }
+
+    private double _opacity = 1.0;
+    /// <summary>
+    /// Gets or sets the opacity of the form (0.0 = transparent, 1.0 = opaque).
+    /// Communicated to the canvas host via <see cref="FormOpacity"/>.
+    /// </summary>
+    public double Opacity
+    {
+        get => _opacity;
+        set => _opacity = Math.Clamp(value, 0.0, 1.0);
+    }
+
+    /// <summary>Opacity value exposed to the JS/Blazor renderer (same as <see cref="Opacity"/>).</summary>
+    public double FormOpacity => _opacity;
+
+    /// <summary>
+    /// Gets or sets the icon for the form. Stub — no canvas rendering, but keeps designer-generated code compatible.
+    /// </summary>
+    public object? Icon { get; set; }
+
+    /// <summary>
+    /// Gets or sets the <see cref="MenuStrip"/> that is the main menu container for the form.
+    /// Setting this provides a hint to the canvas chrome; it does not change the control tree.
+    /// </summary>
+    public MenuStrip? MainMenuStrip { get; set; }
     public int ZIndex { get; set; } = 0;
 
     // Window state
@@ -76,6 +143,49 @@ public class Form : ContainerControl
     {
         Activated?.Invoke(this, e);
     }
+
+    /// <summary>Occurs when the form loses focus and is no longer the active form.</summary>
+    public event EventHandler? Deactivate;
+
+    protected virtual void OnDeactivate(EventArgs e) => Deactivate?.Invoke(this, e);
+
+    /// <summary>
+    /// Occurs after the form is first shown (after <see cref="Load"/>).
+    /// Matches WinForms <c>Form.Shown</c>.
+    /// </summary>
+    public event EventHandler? Shown;
+
+    protected virtual void OnShown(EventArgs e) => Shown?.Invoke(this, e);
+
+    /// <summary>
+    /// Called by the hosting infrastructure after the form is rendered for the first time.
+    /// Fires <see cref="Shown"/>.
+    /// </summary>
+    public void RaiseShown() => OnShown(EventArgs.Empty);
+
+    /// <summary>Occurs when the user begins resizing the form.</summary>
+    public event EventHandler? ResizeBegin;
+
+    protected virtual void OnResizeBegin(EventArgs e) => ResizeBegin?.Invoke(this, e);
+
+    /// <summary>Occurs when the user finishes resizing the form.</summary>
+    public event EventHandler? ResizeEnd;
+
+    protected virtual void OnResizeEnd(EventArgs e) => ResizeEnd?.Invoke(this, e);
+
+    /// <summary>Notifies the form that a resize operation has started (called by the chrome host).</summary>
+    public void RaiseResizeBegin() => OnResizeBegin(EventArgs.Empty);
+
+    /// <summary>Notifies the form that a resize operation has ended (called by the chrome host).</summary>
+    public void RaiseResizeEnd() => OnResizeEnd(EventArgs.Empty);
+
+    /// <summary>Occurs when the form is moved.</summary>
+    public new event EventHandler? Move;
+
+    protected override void OnMove(EventArgs e) => Move?.Invoke(this, e);
+
+    /// <summary>Notifies the form that it was moved (called by the chrome host).</summary>
+    public void RaiseMove() => OnMove(EventArgs.Empty);
 
     // ── Load event ────────────────────────────────────────────────────────────
     // Fired once after the form is fully initialised and shown for the first time.
@@ -152,7 +262,21 @@ public class Form : ContainerControl
         {
             if (_focusedControl != value)
             {
+                var previous = _focusedControl;
                 _focusedControl = value;
+
+                if (previous != null)
+                {
+                    previous.Focused = false;
+                    previous.OnLostFocus(EventArgs.Empty);
+                }
+
+                if (value != null)
+                {
+                    value.Focused = true;
+                    value.OnGotFocus(EventArgs.Empty);
+                }
+
                 Invalidate();
             }
         }
@@ -160,6 +284,137 @@ public class Form : ContainerControl
 
     // Text measurement service for accurate text rendering
     public TextMeasurementService? TextMeasurementService { get; set; }
+
+    // ── Ownership ────────────────────────────────────────────────────────────
+
+    private Form? _owner;
+    private readonly List<Form> _ownedForms = [];
+
+    /// <summary>Gets or sets the form that owns this form.</summary>
+    public Form? Owner
+    {
+        get => _owner;
+        set
+        {
+            if (_owner == value) return;
+            _owner?.RemoveOwnedForm(this);
+            _owner = value;
+            _owner?.AddOwnedForm(this);
+        }
+    }
+
+    /// <summary>Returns an array of forms that are owned by this form.</summary>
+    public Form[] OwnedForms => [.. _ownedForms];
+
+    internal void AddOwnedForm(Form form)
+    {
+        if (!_ownedForms.Contains(form))
+            _ownedForms.Add(form);
+    }
+
+    internal void RemoveOwnedForm(Form form) => _ownedForms.Remove(form);
+
+    // ── Dialog support ───────────────────────────────────────────────────────
+
+    private DialogResult _dialogResult = DialogResult.None;
+
+    /// <summary>
+    /// Gets or sets the dialog result for the form.
+    /// Setting this to anything other than <see cref="DialogResult.None"/> closes a modal dialog.
+    /// </summary>
+    public DialogResult DialogResult
+    {
+        get => _dialogResult;
+        set
+        {
+            _dialogResult = value;
+            if (value != DialogResult.None && _modalTcs is not null)
+            {
+                _modalTcs.TrySetResult(value);
+                Close(CloseReason.UserClosing);
+            }
+        }
+    }
+
+    private TaskCompletionSource<DialogResult>? _modalTcs;
+
+    /// <summary>
+    /// Shows the form as a modal dialog and returns the <see cref="DialogResult"/>.
+    /// Awaitable — does not block the WASM thread.
+    /// </summary>
+    public Task<DialogResult> ShowDialogAsync() => ShowDialogAsync(owner: null);
+
+    /// <summary>
+    /// Shows the form as a modal dialog owned by <paramref name="owner"/> and returns the <see cref="DialogResult"/>.
+    /// </summary>
+    public Task<DialogResult> ShowDialogAsync(Form? owner)
+    {
+        if (owner != null) Owner = owner;
+        _modalTcs = new TaskCompletionSource<DialogResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _dialogResult = DialogResult.None;
+        Show();
+        BringToFront();
+        return _modalTcs.Task;
+    }
+
+    /// <summary>
+    /// Synchronous ShowDialog stub — returns <see cref="DialogResult.None"/>.
+    /// Use <see cref="ShowDialogAsync()"/> for proper async modal behaviour.
+    /// </summary>
+    public DialogResult ShowDialog() => ShowDialog(owner: null);
+
+    /// <summary>
+    /// Synchronous ShowDialog stub with owner — returns <see cref="DialogResult.None"/>.
+    /// Use <see cref="ShowDialogAsync(Form?)"/> for proper async modal behaviour.
+    /// </summary>
+    public DialogResult ShowDialog(Form? owner)
+    {
+        if (owner != null) Owner = owner;
+        Show();
+        BringToFront();
+        return _dialogResult;
+    }
+
+    // ── ActiveControl (alias for FocusedControl) ─────────────────────────────
+
+    /// <summary>
+    /// Gets or sets the active (focused) control on the form.
+    /// This is an alias for <see cref="FocusedControl"/>.
+    /// </summary>
+    public new Control? ActiveControl
+    {
+        get => FocusedControl;
+        set => FocusedControl = value;
+    }
+
+    // ── Auto-scaling ─────────────────────────────────────────────────────────
+
+    /// <summary>Stub for designer compat — no-op in canvas mode.</summary>
+    public new System.Drawing.SizeF AutoScaleDimensions { get; set; } = new System.Drawing.SizeF(6f, 13f);
+
+    /// <summary>Stub for designer compat — auto-scaling is not needed in canvas mode.</summary>
+    public new AutoScaleMode AutoScaleMode { get; set; } = AutoScaleMode.None;
+
+    // ── MDI stubs (Tier 3 — not yet implemented) ─────────────────────────────
+
+    /// <summary>Stub. MDI container support is not yet implemented.</summary>
+    public bool IsMdiContainer { get; set; } = false;
+
+    /// <summary>Stub. Returns null — MDI parent is not yet implemented.</summary>
+    public Form? MdiParent { get; set; } = null;
+
+    /// <summary>Stub. Returns an empty array — MDI child enumeration is not yet implemented.</summary>
+    public Form[] MdiChildren => [];
+
+    // ── StartPosition ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Gets or sets the starting position of the form at run time.
+    /// <see cref="FormStartPosition.CenterScreen"/> and <see cref="FormStartPosition.CenterParent"/>
+    /// are applied when <see cref="ApplyStartPosition"/> is called by the host after the desktop
+    /// dimensions are known.
+    /// </summary>
+    public FormStartPosition StartPosition { get; set; } = FormStartPosition.WindowsDefaultLocation;
 
     // Client area dimensions (excluding title bar)
     public int ClientWidth => Width;
@@ -178,6 +433,65 @@ public class Form : ContainerControl
     // Override layout dimensions to use client area (excludes title bar)
     protected override int LayoutWidth => ClientWidth;
     protected override int LayoutHeight => ClientHeight;
+
+    // ── Position helpers ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Sets the desktop location of the form (equivalent to setting <see cref="Control.Left"/> and <see cref="Control.Top"/>).
+    /// </summary>
+    public void SetDesktopLocation(int x, int y) { Left = x; Top = y; }
+
+    /// <summary>
+    /// Sets the position and size of the form on the desktop.
+    /// </summary>
+    public void SetDesktopBounds(int x, int y, int width, int height)
+    {
+        Left = x; Top = y; Width = width; Height = height;
+    }
+
+    /// <summary>
+    /// Centers the form on the screen using the supplied desktop dimensions.
+    /// </summary>
+    public void CenterToScreen(int desktopWidth, int desktopHeight)
+    {
+        Left = Math.Max(0, (desktopWidth  - Width)  / 2);
+        Top  = Math.Max(0, (desktopHeight - Height) / 2);
+    }
+
+    /// <summary>
+    /// Centers the form over its <see cref="Owner"/>.
+    /// Falls back to <see cref="CenterToScreen"/> when there is no owner.
+    /// </summary>
+    public void CenterToParent(int desktopWidth, int desktopHeight)
+    {
+        if (Owner != null)
+        {
+            Left = Owner.Left + (Owner.Width  - Width)  / 2;
+            Top  = Owner.Top  + (Owner.Height - Height) / 2;
+        }
+        else
+        {
+            CenterToScreen(desktopWidth, desktopHeight);
+        }
+    }
+
+    /// <summary>
+    /// Called by the host after desktop dimensions are known.
+    /// Applies <see cref="StartPosition"/> by repositioning the form.
+    /// </summary>
+    public void ApplyStartPosition(int desktopWidth, int desktopHeight)
+    {
+        switch (StartPosition)
+        {
+            case FormStartPosition.CenterScreen:
+                CenterToScreen(desktopWidth, desktopHeight);
+                break;
+            case FormStartPosition.CenterParent:
+                CenterToParent(desktopWidth, desktopHeight);
+                break;
+            // Manual / WindowsDefaultLocation / WindowsDefaultBounds — leave position as-is
+        }
+    }
 
     public Form()
     {
@@ -236,9 +550,11 @@ public class Form : ContainerControl
     {
         var g = e.Graphics;
 
-        // Draw form background
+        // Draw form background — use the clip rectangle so we fill only the
+        // client-area buffer passed by FormRenderer (which excludes chrome).
         using var bgBrush = new SolidBrush(BackColor);
-        g.FillRectangle(bgBrush, 0, 0, Width, Height);
+        var clip = e.ClipRectangle;
+        g.FillRectangle(bgBrush, clip.X, clip.Y, clip.Width, clip.Height);
 
         // Let user code handle Paint event first
         base.OnPaint(e);
@@ -804,6 +1120,63 @@ public class Form : ContainerControl
         return false;
     }
 
+    // ── Tab-order navigation ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Collects all tab-stop controls in tab-index order (depth-first), matching WinForms tab traversal.
+    /// </summary>
+    private List<Control> GetTabStops()
+    {
+        var stops = new List<Control>();
+        CollectTabStops(this, stops);
+        return stops;
+    }
+
+    private static void CollectTabStops(Control parent, List<Control> stops)
+    {
+        // Sort children by TabIndex, then by Controls insertion order for ties
+        var sorted = parent.Controls
+            .OrderBy(c => c.TabIndex)
+            .ToList();
+
+        foreach (var child in sorted)
+        {
+            if (!child.Visible || !child.Enabled) continue;
+
+            if (child.HasChildren)
+            {
+                // Container — recurse, but also add the container itself if it's a tab stop
+                if (child.TabStop)
+                    stops.Add(child);
+                CollectTabStops(child, stops);
+            }
+            else if (child.TabStop)
+            {
+                stops.Add(child);
+            }
+        }
+    }
+
+    private Control? GetNextTabStop(Control? current)
+    {
+        var stops = GetTabStops();
+        if (stops.Count == 0) return null;
+        if (current == null) return stops[0];
+        var idx = stops.IndexOf(current);
+        if (idx < 0) return stops[0];
+        return stops[(idx + 1) % stops.Count];
+    }
+
+    private Control? GetPreviousTabStop(Control? current)
+    {
+        var stops = GetTabStops();
+        if (stops.Count == 0) return null;
+        if (current == null) return stops[^1];
+        var idx = stops.IndexOf(current);
+        if (idx < 0) return stops[^1];
+        return stops[(idx - 1 + stops.Count) % stops.Count];
+    }
+
     private void CloseAllOverlays(Control? except)
     {
         CloseAllOverlaysRecursive(this, except);
@@ -858,14 +1231,74 @@ public class Form : ContainerControl
         }
     }
 
+    // ── Keyboard policy ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Gets or sets whether the form receives key events before they are dispatched to the focused control.
+    /// When true, the form's <c>KeyDown</c>, <c>KeyPress</c>, and <c>KeyUp</c> events fire first;
+    /// setting <see cref="KeyEventArgs.Handled"/> (or <see cref="KeyPressEventArgs.Handled"/>) suppresses delivery to the control.
+    /// </summary>
+    public bool KeyPreview { get; set; } = false;
+
+    /// <summary>
+    /// Gets or sets the button that is clicked when the user presses Enter,
+    /// unless the focused control handles Enter itself (e.g. a multiline TextBox).
+    /// </summary>
+    public IButtonControl? AcceptButton { get; set; }
+
+    /// <summary>
+    /// Gets or sets the button that is clicked when the user presses Escape.
+    /// </summary>
+    public IButtonControl? CancelButton { get; set; }
+
     protected internal override void OnKeyDown(KeyEventArgs e)
     {
-        // Route keyboard events to focused control
-        if (FocusedControl != null && FocusedControl.Enabled)
+        // KeyPreview: let the form see the event first
+        if (KeyPreview)
+        {
+            base.OnKeyDown(e);
+            if (e.Handled) return;
+        }
+
+        // AcceptButton (Enter) — only when focused control is not a multiline TextBox or button
+        if (!e.Handled && e.KeyCode == Keys.Enter && AcceptButton is Control acceptCtrl && acceptCtrl.Enabled)
+        {
+            var isSelf = FocusedControl is TextBox { Multiline: true } or ButtonBase;
+            if (!isSelf)
+            {
+                e.Handled = true;
+                AcceptButton.PerformClick();
+                return;
+            }
+        }
+
+        // CancelButton (Escape)
+        if (!e.Handled && e.KeyCode == Keys.Escape && CancelButton is Control cancelCtrl && cancelCtrl.Enabled)
+        {
+            e.Handled = true;
+            CancelButton.PerformClick();
+            return;
+        }
+
+        // Tab / Shift+Tab — move focus between tab-stop controls
+        if (!e.Handled && e.KeyCode == Keys.Tab)
+        {
+            var next = e.Shift
+                ? GetPreviousTabStop(FocusedControl)
+                : GetNextTabStop(FocusedControl);
+            if (next != null)
+            {
+                FocusedControl = next;
+                e.Handled = true;
+                return;
+            }
+        }
+
+        if (!e.Handled && FocusedControl != null && FocusedControl.Enabled)
         {
             FocusedControl.OnKeyDown(e);
         }
-        else
+        else if (!e.Handled)
         {
             base.OnKeyDown(e);
         }
@@ -873,7 +1306,12 @@ public class Form : ContainerControl
 
     protected internal override void OnKeyUp(KeyEventArgs e)
     {
-        // Route keyboard events to focused control
+        if (KeyPreview)
+        {
+            base.OnKeyUp(e);
+            if (e.Handled) return;
+        }
+
         if (FocusedControl != null && FocusedControl.Enabled)
         {
             FocusedControl.OnKeyUp(e);
@@ -886,7 +1324,12 @@ public class Form : ContainerControl
 
     protected internal override void OnKeyPress(KeyPressEventArgs e)
     {
-        // Route keyboard events to focused control
+        if (KeyPreview)
+        {
+            base.OnKeyPress(e);
+            if (e.Handled) return;
+        }
+
         if (FocusedControl != null && FocusedControl.Enabled)
         {
             FocusedControl.OnKeyPress(e);
@@ -1112,4 +1555,51 @@ public enum FormWindowState
     /// A maximized window (fills the desktop)
     /// </summary>
     Maximized
+}
+
+/// <summary>
+/// Specifies the initial position of a form.
+/// </summary>
+public enum FormStartPosition
+{
+    /// <summary>The position is determined by the <c>Left</c> and <c>Top</c> properties.</summary>
+    Manual = 0,
+    /// <summary>Centered on the current screen.</summary>
+    CenterScreen = 1,
+    /// <summary>Default OS-determined position (treated as Manual in canvas).</summary>
+    WindowsDefaultLocation = 2,
+    /// <summary>Default OS-determined position and size.</summary>
+    WindowsDefaultBounds = 3,
+    /// <summary>Centered over the owner form (falls back to CenterScreen when owner is null).</summary>
+    CenterParent = 4,
+}
+
+/// <summary>
+/// Specifies the border style of a form.
+/// </summary>
+public enum FormBorderStyle
+{
+    None           = 0,
+    FixedSingle    = 1,
+    Fixed3D        = 2,
+    FixedDialog    = 3,
+    Sizable        = 4,
+    FixedToolWindow   = 5,
+    SizableToolWindow = 6,
+}
+
+/// <summary>
+/// Defines the interface for a control that acts as a button (can be clicked via AcceptButton/CancelButton).
+/// Matches <c>System.Windows.Forms.IButtonControl</c>.
+/// </summary>
+public interface IButtonControl
+{
+    /// <summary>Gets or sets the value returned to the parent form when the button is clicked.</summary>
+    DialogResult DialogResult { get; set; }
+
+    /// <summary>Notifies the button that it is the default button and alters appearance accordingly.</summary>
+    void NotifyDefault(bool value);
+
+    /// <summary>Programmatically performs a click.</summary>
+    void PerformClick();
 }

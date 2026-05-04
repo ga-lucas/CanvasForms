@@ -12,7 +12,7 @@ public class MenuDemoForm : Form
     // When a translated WinForms app is loaded, its images would be in the same
     // location alongside the host application.
 
-    private static Image Icon(string filename)
+    private static new Image Icon(string filename)
         => new Image { Source = $"/images/{filename}", Width = 16, Height = 16 };
 
     private static readonly Image IconNew     = Icon("new.svg");

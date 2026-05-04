@@ -120,7 +120,7 @@ public abstract class TextBoxBase : Control
             if (_acceptsReturn != value)
             {
                 _acceptsReturn = value;
-                OnAcceptsTabChanged(EventArgs.Empty);
+                OnAcceptsReturnChanged(EventArgs.Empty);
             }
         }
     }
@@ -162,6 +162,11 @@ public abstract class TextBoxBase : Control
     /// Gets a value indicating whether the user can undo the previous operation
     /// </summary>
     public virtual bool CanUndo => _undoStack.Count > 0;
+
+    /// <summary>
+    /// Gets a value indicating whether there is an operation to redo
+    /// </summary>
+    public virtual bool CanRedo => _redoStack.Count > 0;
 
     /// <summary>
     /// Gets or sets whether the selection is hidden when the control loses focus
@@ -372,13 +377,13 @@ public abstract class TextBoxBase : Control
     /// <summary>
     /// Returns the exact line height measured by the browser for the current font.
     /// Uses the JS-measured value from the cache when available; falls back to
-    /// Font.Size + 2 until the async prime completes and triggers a repaint.
+    /// Font.Size + 4 until the async prime completes and triggers a repaint.
     /// </summary>
     private int GetLineHeight()
     {
         var measureService = FindForm()?.TextMeasurementService;
         return measureService?.GetFontHeightEstimate(Font.Family, (int)Font.Size)
-               ?? GetLineHeight();
+               ?? ((int)Font.Size + 4);
     }
 
     /// <summary>Primes the font-height cache for the current font.</summary>
@@ -634,6 +639,21 @@ public abstract class TextBoxBase : Control
     }
 
     /// <summary>
+    /// Redoes the last undone operation
+    /// </summary>
+    public void Redo()
+    {
+        if (_redoStack.Count > 0)
+        {
+            _undoStack.Push(Text);
+            Text = _redoStack.Pop();
+            _modified = true;
+            OnTextChanged(EventArgs.Empty);
+            Invalidate();
+        }
+    }
+
+    /// <summary>
     /// Scrolls contents to the caret position
     /// </summary>
     public void ScrollToCaret()
@@ -662,7 +682,6 @@ public abstract class TextBoxBase : Control
         var text = Text;
         if (string.IsNullOrEmpty(text)) return 0;
 
-        int charIndex = 0;
         int line = 0;
         int i = 0;
 
@@ -948,6 +967,14 @@ public abstract class TextBoxBase : Control
     }
 
     /// <summary>
+    /// Raises the AcceptsReturnChanged event
+    /// </summary>
+    protected virtual void OnAcceptsReturnChanged(EventArgs e)
+    {
+        AcceptsReturnChanged?.Invoke(this, e);
+    }
+
+    /// <summary>
     /// Raises the BorderStyleChanged event
     /// </summary>
     protected virtual void OnBorderStyleChanged(EventArgs e)
@@ -995,6 +1022,11 @@ public abstract class TextBoxBase : Control
     /// Occurs when AcceptsTab property changes
     /// </summary>
     public event EventHandler? AcceptsTabChanged;
+
+    /// <summary>
+    /// Occurs when AcceptsReturn property changes
+    /// </summary>
+    public event EventHandler? AcceptsReturnChanged;
 
     /// <summary>
     /// Occurs when BorderStyle property changes
@@ -1235,6 +1267,43 @@ public abstract class TextBoxBase : Control
         base.OnMouseUp(e);
     }
 
+    protected internal override void OnMouseDoubleClick(MouseEventArgs e)
+    {
+        if (!Enabled || e.Button != MouseButtons.Left)
+        {
+            base.OnMouseDoubleClick(e);
+            return;
+        }
+
+        // Select the word under the caret (standard WinForms double-click behavior)
+        if (!string.IsNullOrEmpty(Text))
+        {
+            var start = _caretPosition;
+            var end   = _caretPosition;
+
+            // Scan left to word boundary
+            while (start > 0 && IsWordChar(Text[start - 1]))
+                start--;
+
+            // Scan right to word boundary
+            while (end < Text.Length && IsWordChar(Text[end]))
+                end++;
+
+            if (end > start)
+            {
+                _selectionStart  = start;
+                _selectionLength = end - start;
+                _caretPosition   = end;
+                _selectionAnchor = start;
+                Invalidate();
+            }
+        }
+
+        base.OnMouseDoubleClick(e);
+    }
+
+    private static bool IsWordChar(char c) => char.IsLetterOrDigit(c) || c == '_';
+
     protected internal override void OnMouseWheel(MouseEventArgs e)
     {
         if (_multiline && _scrollBars != ScrollBars.None && e.Delta != 0)
@@ -1453,6 +1522,10 @@ public abstract class TextBoxBase : Control
                     Undo();
                     e.Handled = true;
                     return;
+                case Keys.Y:
+                    Redo();
+                    e.Handled = true;
+                    return;
             }
         }
 
@@ -1585,6 +1658,22 @@ public abstract class TextBoxBase : Control
                         SaveUndoState();
                         SelectedText = string.Empty;
                     }
+                    else if (e.Control)
+                    {
+                        // Ctrl+Backspace: delete previous word
+                        var wordStart = GetPreviousWordPosition();
+                        if (wordStart < _caretPosition)
+                        {
+                            SaveUndoState();
+                            var newText = Text.Remove(wordStart, _caretPosition - wordStart);
+                            _caretPosition   = wordStart;
+                            _selectionAnchor = wordStart;
+                            _selectionStart  = wordStart;
+                            _selectionLength = 0;
+                            Text = newText;
+                            _modified = true;
+                        }
+                    }
                     else if (_caretPosition > 0)
                     {
                         SaveUndoState();
@@ -1615,6 +1704,21 @@ public abstract class TextBoxBase : Control
                     {
                         SaveUndoState();
                         SelectedText = string.Empty;
+                    }
+                    else if (e.Control)
+                    {
+                        // Ctrl+Delete: delete next word
+                        var wordEnd = GetNextWordPosition();
+                        if (wordEnd > _caretPosition)
+                        {
+                            SaveUndoState();
+                            var newText = Text.Remove(_caretPosition, wordEnd - _caretPosition);
+                            _selectionAnchor = _caretPosition;
+                            _selectionStart  = _caretPosition;
+                            _selectionLength = 0;
+                            Text = newText;
+                            _modified = true;
+                        }
                     }
                     else if (_caretPosition < Text.Length)
                     {
@@ -1848,27 +1952,29 @@ public abstract class TextBoxBase : Control
     protected virtual void DrawTextContent(Graphics g, string displayText, Rectangle textBounds, bool hasFocus, TextMeasurementService? measureService)
     {
         var textColor = Enabled ? ForeColor : System.Drawing.Color.FromArgb(109, 109, 109);
+        // WinForms: when HideSelection=false, selection is always visible; otherwise only when focused.
+        var showSelection = hasFocus || !_hideSelection;
 
         if (_multiline)
         {
-            DrawMultilineText(g, displayText, textBounds, textColor, hasFocus, measureService);
+            DrawMultilineText(g, displayText, textBounds, textColor, showSelection, measureService);
         }
         else
         {
-            DrawSingleLineText(g, displayText, textBounds, textColor, hasFocus, measureService);
+            DrawSingleLineText(g, displayText, textBounds, textColor, showSelection, measureService);
         }
     }
 
     /// <summary>
     /// Draws single-line text with selection
     /// </summary>
-    protected virtual void DrawSingleLineText(Graphics g, string displayText, Rectangle textBounds, System.Drawing.Color textColor, bool hasFocus, TextMeasurementService? measureService)
+    protected virtual void DrawSingleLineText(Graphics g, string displayText, Rectangle textBounds, System.Drawing.Color textColor, bool showSelection, TextMeasurementService? measureService)
     {
         var textX = textBounds.X - _scrollOffsetX;
         var textY = textBounds.Y;
 
         // Draw selection if any
-        if (_selectionLength > 0 && hasFocus && measureService != null)
+        if (_selectionLength > 0 && showSelection && measureService != null)
         {
             DrawTextWithSelection(g, displayText, textX, textY, textColor, measureService);
         }
@@ -1881,7 +1987,7 @@ public abstract class TextBoxBase : Control
     /// <summary>
     /// Draws multiline text with selection
     /// </summary>
-    protected virtual void DrawMultilineText(Graphics g, string displayText, Rectangle textBounds, System.Drawing.Color textColor, bool hasFocus, TextMeasurementService? measureService)
+    protected virtual void DrawMultilineText(Graphics g, string displayText, Rectangle textBounds, System.Drawing.Color textColor, bool showSelection, TextMeasurementService? measureService)
     {
         var lines = displayText.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
         var lineHeight = GetLineHeight();
@@ -1902,7 +2008,7 @@ public abstract class TextBoxBase : Control
             var x = textBounds.X - _scrollOffsetX;
 
             // Check if this line contains selection
-            if (hasFocus && _selectionLength > 0 && measureService != null)
+            if (showSelection && _selectionLength > 0 && measureService != null)
             {
                 var lineStart = GetFirstCharIndexFromLine(i);
                 var lineEnd = lineStart + line.Length;

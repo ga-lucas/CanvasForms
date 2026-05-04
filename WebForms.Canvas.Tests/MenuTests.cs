@@ -237,7 +237,7 @@ public class ToolStripItemCollectionTests
     public void NewCollection_IsEmpty()
     {
         var col = MakeCollection();
-        Assert.Equal(0, col.Count);
+        Assert.Empty(col);
     }
 
     [Fact]
@@ -252,7 +252,7 @@ public class ToolStripItemCollectionTests
         var col  = MakeCollection();
         var item = new ToolStripMenuItem("A");
         col.Add(item);
-        Assert.Equal(1, col.Count);
+        Assert.Single(col);
     }
 
     [Fact]
@@ -304,7 +304,7 @@ public class ToolStripItemCollectionTests
         col.Add(item);
         var removed = col.Remove(item);
         Assert.True(removed);
-        Assert.Equal(0, col.Count);
+        Assert.Empty(col);
     }
 
     [Fact]
@@ -332,7 +332,7 @@ public class ToolStripItemCollectionTests
         col.Add("A");
         col.Add("B");
         col.Clear();
-        Assert.Equal(0, col.Count);
+        Assert.Empty(col);
     }
 
     [Fact]
@@ -341,14 +341,14 @@ public class ToolStripItemCollectionTests
         var col  = MakeCollection();
         var item = new ToolStripMenuItem("A");
         col.Add(item);
-        Assert.True(col.Contains(item));
+        Assert.Contains(item, col);
     }
 
     [Fact]
     public void Contains_ReturnsFalseForAbsentItem()
     {
         var col = MakeCollection();
-        Assert.False(col.Contains(new ToolStripMenuItem("Z")));
+        Assert.DoesNotContain(new ToolStripMenuItem("Z"), col);
     }
 
     [Fact]
@@ -456,7 +456,7 @@ public class ToolStripTests
     [Fact]
     public void Items_StartsEmpty()
     {
-        Assert.Equal(0, new ToolStrip().Items.Count);
+        Assert.Empty(new ToolStrip().Items);
     }
 
     [Fact]
@@ -778,7 +778,7 @@ public class ToolStripDropDownMenuTests
     {
         var dd = new ToolStripDropDownMenu();
         dd.Items.Add("Test");
-        Assert.Equal(1, dd.Items.Count);
+        Assert.Single(dd.Items);
     }
 }
 
@@ -1124,7 +1124,7 @@ public class MenuStripTests
     [Fact]
     public void Items_StartsEmpty()
     {
-        Assert.Equal(0, new MenuStrip().Items.Count);
+        Assert.Empty(new MenuStrip().Items);
     }
 
     [Fact]
@@ -1132,7 +1132,7 @@ public class MenuStripTests
     {
         var ms = new MenuStrip();
         ms.Items.Add(new ToolStripMenuItem("File"));
-        Assert.Equal(1, ms.Items.Count);
+        Assert.Single(ms.Items);
     }
 
     [Fact]
@@ -1471,7 +1471,7 @@ public class MenuIntegrationTests
         file.DropDownItems.Add(save);
         ms.Items.Add(file);
 
-        Assert.Equal(1, ms.Items.Count);
+        Assert.Single(ms.Items);
         Assert.Equal(3, file.DropDownItems.Count);
         Assert.True(file.HasDropDownItems);
         Assert.IsType<ToolStripSeparator>(file.DropDownItems[1]);

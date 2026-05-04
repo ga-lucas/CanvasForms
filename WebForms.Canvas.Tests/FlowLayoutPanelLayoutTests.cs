@@ -14,11 +14,11 @@ public class FlowLayoutPanelLayoutTests
             Height = 100,
             WrapContents = true,
             FlowDirection = FlowDirection.LeftToRight,
-            Padding = new Size(0, 0)
+            Padding = new Padding(0)
         };
 
-        var c1 = new Panel { Width = 40, Height = 10, Margin = new Size(0, 0) };
-        var c2 = new Panel { Width = 40, Height = 10, Margin = new Size(0, 0) };
+        var c1 = new Panel { Width = 40, Height = 10, Margin = new Padding(0) };
+        var c2 = new Panel { Width = 40, Height = 10, Margin = new Padding(0) };
 
         p.Controls.Add(c1);
         p.Controls.Add(c2);
@@ -42,11 +42,11 @@ public class FlowLayoutPanelLayoutTests
             Height = 40,
             WrapContents = true,
             FlowDirection = FlowDirection.TopDown,
-            Padding = new Size(0, 0)
+            Padding = new Padding(0)
         };
 
-        var c1 = new Panel { Width = 10, Height = 20, Margin = new Size(0, 0) };
-        var c2 = new Panel { Width = 10, Height = 20, Margin = new Size(0, 0) };
+        var c1 = new Panel { Width = 10, Height = 20, Margin = new Padding(0) };
+        var c2 = new Panel { Width = 10, Height = 20, Margin = new Padding(0) };
 
         p.Controls.Add(c1);
         p.Controls.Add(c2);

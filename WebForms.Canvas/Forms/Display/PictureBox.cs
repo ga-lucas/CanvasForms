@@ -9,11 +9,54 @@ public class PictureBox : Control
     private BorderStyle _borderStyle = BorderStyle.None;
     private bool _imageLoaded = false;
 
+    public event EventHandler? LoadCompleted;
+#pragma warning disable CS0067
+    public event EventHandler? LoadProgressChanged;
+#pragma warning restore CS0067
+
     public PictureBox()
     {
         Width = 100;
         Height = 100;
         BackColor = Color.FromArgb(240, 240, 240);
+    }
+
+    /// <summary>
+    /// Gets or sets the image by URL (WinForms compat: maps to ImageUrl)
+    /// </summary>
+    public string? Image
+    {
+        get => string.IsNullOrEmpty(_imageUrl) ? null : _imageUrl;
+        set => ImageUrl = value ?? string.Empty;
+    }
+
+    /// <summary>
+    /// Placeholder shown while image loads (stub — renders nothing extra)
+    /// </summary>
+    public string? InitialImage { get; set; }
+
+    /// <summary>
+    /// Image shown on load error (stub — renders nothing extra)
+    /// </summary>
+    public string? ErrorImage { get; set; }
+
+    /// <summary>
+    /// Loads an image from the given URL (synchronous alias for setting ImageUrl)
+    /// </summary>
+    public void Load(string url)
+    {
+        ImageUrl = url;
+        LoadCompleted?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Asynchronously loads an image from the given URL
+    /// </summary>
+    public async Task LoadAsync(string url)
+    {
+        ImageUrl = url;
+        await PreloadImageAsync();
+        LoadCompleted?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>

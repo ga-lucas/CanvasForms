@@ -48,47 +48,10 @@ public class Panel : ScrollableControl
         g.Save();
         g.SetClip(clientRect);
 
-        // Use DisplayRectangle (WinForms) to obtain scroll offset.
-        var scrollX = AutoScroll ? DisplayRectangle.X : 0;
-        var scrollY = AutoScroll ? DisplayRectangle.Y : 0;
-
-        // Let user code paint first (events etc.)
+        // Let user code handle Paint event (events, etc.)
         base.OnPaint(e);
 
-        // Paint child controls
-        foreach (var child in Controls)
-        {
-            if (!child.Visible) continue;
-
-            g.TranslateTransform(scrollX + child.Left, scrollY + child.Top);
-
-            var childArgs = new PaintEventArgs(
-                g,
-                new Rectangle(0, 0, child.Width, child.Height)
-            );
-
-            if (child is ComboBox comboBox)
-            {
-                comboBox.PaintWithoutDropDown(childArgs);
-            }
-            else if (child is DateTimePicker dateTimePicker)
-            {
-                dateTimePicker.PaintWithoutDropDown(childArgs);
-            }
-            else if (child is TextBox textBox)
-            {
-                textBox.PaintWithoutAutoComplete(childArgs);
-            }
-            else
-            {
-                child.OnPaint(childArgs);
-            }
-
-            g.TranslateTransform(-(scrollX + child.Left), -(scrollY + child.Top));
-        }
-
-        // Overlays (ComboBox drop-down, DateTimePicker popup, TextBox autocomplete) are painted
-        // by the Form in a final pass so they always appear top-most, even for nested controls.
+        // Child controls are painted by Form.PaintControlsRecursive — do not paint them here.
 
         g.Restore();
     }

@@ -20,6 +20,8 @@ public class SplitContainer : ContainerControl
 
     private bool _dragging;
     private int _dragOffset;
+    private int _defaultSplitterDistance = 50;
+    private bool _defaultSplitterDistanceSet = false;
 
     public SplitContainer()
     {
@@ -83,6 +85,7 @@ public class SplitContainer : ContainerControl
 
             if (_splitterDistance != newValue)
             {
+                if (!_defaultSplitterDistanceSet) { _defaultSplitterDistance = newValue; _defaultSplitterDistanceSet = true; }
                 _splitterDistance = newValue;
                 CoerceSplitterDistance();
                 PerformLayout();
@@ -372,6 +375,17 @@ public class SplitContainer : ContainerControl
         }
 
         base.OnMouseUp(e);
+    }
+
+    protected internal override void OnMouseDoubleClick(MouseEventArgs e)
+    {
+        if (!Enabled || _isSplitterFixed) { base.OnMouseDoubleClick(e); return; }
+        if (e.Button == MouseButtons.Left && IsInSplitter(e.X, e.Y))
+        {
+            SplitterDistance = _defaultSplitterDistance;
+            return;
+        }
+        base.OnMouseDoubleClick(e);
     }
 
     protected internal override void OnKeyDown(KeyEventArgs e)

@@ -386,6 +386,7 @@ public abstract class ToolStripItem : IDisposable
     public event EventHandler? PaddingChanged;     // raised when Padding changes
     public event EventHandler? MarginChanged;      // raised when Margin changes
     public event EventHandler? ParentChanged;      // raised when Owner/Parent changes
+#pragma warning disable CS0067
     public event DragEventHandler?   DragDrop;    // stub — drag not implemented
     public event DragEventHandler?   DragEnter;   // stub
     public event EventHandler?       DragLeave;   // stub
@@ -393,6 +394,7 @@ public abstract class ToolStripItem : IDisposable
     public event GiveFeedbackEventHandler? GiveFeedback;      // stub
     public event QueryContinueDragEventHandler? QueryContinueDrag; // stub
     public event QueryAccessibilityHelpEventHandler? QueryAccessibilityHelp; // stub
+#pragma warning restore CS0067
 
     // ── Virtual event raisers ─────────────────────────────────────────────────
 

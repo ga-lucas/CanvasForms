@@ -185,7 +185,7 @@ public class ScrollableControl : Control
         base.OnMouseWheel(e);
     }
 
-    protected override System.Drawing.Size GetPreferredSize(System.Drawing.Size proposedSize)
+    protected override Canvas.Windows.Forms.Drawing.Size GetPreferredSize(Canvas.Windows.Forms.Drawing.Size proposedSize)
     {
         if (!AutoScroll)
         {
@@ -193,7 +193,7 @@ public class ScrollableControl : Control
         }
 
         var (contentWidth, contentHeight) = GetContentSize();
-        return new System.Drawing.Size(contentWidth, contentHeight);
+        return new Canvas.Windows.Forms.Drawing.Size(contentWidth, contentHeight);
     }
 
     private (int width, int height) GetContentSize()

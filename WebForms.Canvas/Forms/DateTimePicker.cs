@@ -232,6 +232,13 @@ public class DateTimePicker : Control
         }
     }
 
+    public Font? CalendarFont { get; set; }
+    public Color CalendarForeColor { get; set; } = Color.Black;
+    public Color CalendarBackColor { get; set; } = Color.White;
+    public Color CalendarTitleBackColor { get; set; } = Color.FromArgb(0, 120, 215);
+    public Color CalendarTitleForeColor { get; set; } = Color.White;
+    public Color CalendarTrailingForeColor { get; set; } = Color.FromArgb(128, 128, 128);
+
     public bool DroppedDown
     {
         get => _droppedDown;

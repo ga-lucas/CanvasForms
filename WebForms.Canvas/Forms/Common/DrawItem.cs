@@ -51,7 +51,25 @@ public class DrawItemEventArgs : EventArgs
 
     public void DrawFocusRectangle()
     {
-        using var p = new Pen(Color.Black);
+        using var p = new Pen(Color.Black) { DashStyle = DashStyle.Dot };
         Graphics.DrawRectangle(p, Bounds);
     }
+}
+
+public delegate void MeasureItemEventHandler(object? sender, MeasureItemEventArgs e);
+
+public class MeasureItemEventArgs : EventArgs
+{
+    public MeasureItemEventArgs(Graphics graphics, int index, int itemHeight = 16)
+    {
+        Graphics = graphics;
+        Index = index;
+        ItemHeight = itemHeight;
+        ItemWidth = 0;
+    }
+
+    public Graphics Graphics { get; }
+    public int Index { get; }
+    public int ItemHeight { get; set; }
+    public int ItemWidth { get; set; }
 }

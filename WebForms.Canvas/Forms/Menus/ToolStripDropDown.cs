@@ -141,6 +141,9 @@ public class ToolStripDropDown : ToolStrip
 
     // ── Drawing ────────────────────────────────────────────────────────────────
 
+    private const int DropRadius = 4;
+    private const int ItemRadius = 3;
+
     /// <summary>
     /// Paints the dropdown at (0,0) within a Graphics clipped to the dropdown bounds.
     /// </summary>
@@ -149,11 +152,12 @@ public class ToolStripDropDown : ToolStrip
         var w = ComputeDropWidth();
         var h = ComputeDropHeight();
 
-        // Background + border
-        using var bgBrush     = new SolidBrush(BgColor);
-        using var borderPen   = new Pen(BorderColor);
-        g.FillRectangle(bgBrush, 0, 0, w, h);
-        g.DrawRectangle(borderPen, 0, 0, w - 1, h - 1);
+        // Rounded background + border
+        var outerRect = new Rectangle(0, 0, w, h);
+        using var bgBrush   = new SolidBrush(BgColor);
+        using var borderPen = new Pen(BorderColor);
+        g.FillRoundRect(bgBrush, outerRect, DropRadius);
+        g.DrawRoundRect(borderPen, outerRect, DropRadius);
 
         int y = BorderThick;
         for (int i = 0; i < Items.Count; i++)
@@ -163,7 +167,6 @@ public class ToolStripDropDown : ToolStrip
 
             if (item is ToolStripSeparator)
             {
-                // Separator line
                 using var sepPen = new Pen(SepColor);
                 int midY = y + SeparatorH / 2;
                 g.DrawLine(sepPen, CheckColW, midY, w - BorderThick, midY);
@@ -171,20 +174,27 @@ public class ToolStripDropDown : ToolStrip
                 continue;
             }
 
-            var itemRect = new Rectangle(BorderThick, y, w - BorderThick * 2, ItemHeight);
+            var itemRect    = new Rectangle(BorderThick + 2, y + 1, w - BorderThick * 2 - 4, ItemHeight - 2);
             bool isHovered  = i == _hoveredIndex && item.Enabled;
             bool isDisabled = !item.Enabled;
 
-            // Hover background
+            // Rounded hover highlight with gradient
             if (isHovered)
             {
-                using var hoverBrush = new SolidBrush(HoverBg);
-                g.FillRectangle(hoverBrush, itemRect);
+                var hoverTop    = CanvasColor.FromArgb(HoverBg.A,
+                    Math.Min(255, HoverBg.R + 30),
+                    Math.Min(255, HoverBg.G + 30),
+                    Math.Min(255, HoverBg.B + 30));
+                using var hoverBrush = new LinearGradientBrush(
+                    new Point(itemRect.Left, itemRect.Top),
+                    new Point(itemRect.Left, itemRect.Bottom),
+                    hoverTop, HoverBg);
+                g.FillRoundRect(hoverBrush, itemRect, ItemRadius);
             }
 
             var textColor = isDisabled ? DisabledText : (isHovered ? HoverText : NormalText);
 
-            // Check mark (if ToolStripMenuItem is checked)
+            // Check mark
             if (item is ToolStripMenuItem { Checked: true })
             {
                 using var checkPen = new Pen(textColor, 1.5f);

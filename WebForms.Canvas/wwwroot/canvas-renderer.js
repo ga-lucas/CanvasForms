@@ -165,6 +165,115 @@ window.setCanvasBounds = (canvas, left, top, width, height) => {
     }
 };
 
+// ── Drawing helpers ───────────────────────────────────────────────────────────
+
+/** roundRect polyfill: uses native ctx.roundRect if available, else manual path. */
+function _roundRect(ctx, x, y, w, h, r) {
+    r = Math.min(r, Math.min(w, h) / 2);
+    if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(x, y, w, h, r);
+    } else {
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y);
+        ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+        ctx.lineTo(x + w, y + h - r);
+        ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        ctx.lineTo(x + r, y + h);
+        ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath();
+    }
+}
+
+/**
+ * Resolves a fill style string to a CanvasGradient or passes it through as-is.
+ * Gradient tokens use '|' as field separator to avoid collision with rgba() commas:
+ *   LG:x1|y1|x2|y2|color1|color2[|offset:color|...]
+ *   RG:cx|cy|r|centerColor|surroundColor
+ */
+function _resolveFill(ctx, style, x, y, w, h) {
+    if (!style || (!style.startsWith('LG:') && !style.startsWith('RG:'))) return style;
+    if (style.startsWith('LG:')) {
+        const rest = style.slice(3).split('|');
+        const x1 = parseFloat(rest[0]), y1 = parseFloat(rest[1]);
+        const x2 = parseFloat(rest[2]), y2 = parseFloat(rest[3]);
+        const grad = ctx.createLinearGradient(x1, y1, x2, y2);
+        grad.addColorStop(0, rest[4]);
+        grad.addColorStop(1, rest[5]);
+        for (let i = 6; i < rest.length; i++) {
+            const parts = rest[i].split(':');
+            if (parts.length === 2) grad.addColorStop(parseFloat(parts[0]), parts[1]);
+        }
+        return grad;
+    }
+    // RG:cx|cy|r|centerColor|surroundColor
+    const rest = style.slice(3).split('|');
+    const cx = parseFloat(rest[0]), cy = parseFloat(rest[1]), r = parseFloat(rest[2]);
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    grad.addColorStop(0, rest[3]);
+    grad.addColorStop(1, rest[4]);
+    return grad;
+}
+
+// Path segment opcodes (must match GraphicsPath.Seg in C#)
+const _PathSeg = { MoveTo:1, LineTo:2, BezierTo:3, ArcTo:4, Close:5, RectTo:6, EllipseTo:7 };
+
+/** Replays serialised GraphicsPath segments onto the current canvas path. */
+function _replayPath(ctx, segs) {
+    ctx.beginPath();
+    let i = 0;
+    while (i < segs.length) {
+        const s = segs[i++];
+        switch (s) {
+            case _PathSeg.MoveTo:
+                ctx.moveTo(segs[i++], segs[i++]); break;
+            case _PathSeg.LineTo:
+                ctx.lineTo(segs[i++], segs[i++]); break;
+            case _PathSeg.BezierTo:
+                ctx.bezierCurveTo(segs[i++],segs[i++],segs[i++],segs[i++],segs[i++],segs[i++]); break;
+            case _PathSeg.ArcTo: {
+                const ax=segs[i++],ay=segs[i++],aw=segs[i++],ah=segs[i++];
+                const aStart=segs[i++]*Math.PI/180, aSweep=segs[i++]*Math.PI/180;
+                ctx.ellipse(ax+aw/2, ay+ah/2, aw/2, ah/2, 0, aStart, aStart+aSweep);
+                break;
+            }
+            case _PathSeg.Close:
+                ctx.closePath(); break;
+            case _PathSeg.RectTo:
+                ctx.rect(segs[i++],segs[i++],segs[i++],segs[i++]); break;
+            case _PathSeg.EllipseTo: {
+                const ex=segs[i++],ey=segs[i++],ew=segs[i++],eh=segs[i++];
+                ctx.ellipse(ex+ew/2,ey+eh/2,ew/2,eh/2,0,0,2*Math.PI);
+                break;
+            }
+        }
+    }
+}
+
+/**
+ * Applies a dash pattern to ctx based on the compact dash token produced by PenHelper.ToDashToken().
+ * Token format:  "d:0"  (Solid)  "d:1" (Dash) "d:2" (Dot) "d:3" (DashDot) "d:4" (DashDotDot)
+ *                "d:C:f1,f2,..." (Custom)
+ * Always resets to solid after each stroke call — callers must invoke _setLineDash BEFORE stroke/fill.
+ */
+function _setLineDash(ctx, token, lineWidth) {
+    if (!token || token === 'd:0') { ctx.setLineDash([]); return; }
+    const lw = lineWidth || 1;
+    if (token.startsWith('d:C:')) {
+        const parts = token.slice(4).split(',').map(Number);
+        ctx.setLineDash(parts.map(v => v * lw));
+        return;
+    }
+    switch (token) {
+        case 'd:1': ctx.setLineDash([4 * lw, 3 * lw]); break;          // Dash
+        case 'd:2': ctx.setLineDash([1, 3 * lw]); break;                // Dot
+        case 'd:3': ctx.setLineDash([4 * lw, 2 * lw, 1, 2 * lw]); break; // DashDot
+        case 'd:4': ctx.setLineDash([4 * lw, 2 * lw, 1, 2 * lw, 1, 2 * lw]); break; // DashDotDot
+        default:    ctx.setLineDash([]); break;
+    }
+}
+
 // Render user drawing commands in the client area using a structured command buffer.
 // commands: array of arrays. Each command is [op, ...args].
 // This avoids generating/evaluating JS source and is significantly faster/safer.
@@ -210,17 +319,29 @@ window.renderClientAreaCommands = async (canvas, offsetX, offsetY, commands) => 
 
     // Opcodes (must match CanvasCommandOp in C#)
     const Op = {
-        StrokeLine: 1,
-        StrokeRect: 2,
-        FillRect: 3,
+        StrokeLine:    1,
+        StrokeRect:    2,
+        FillRect:      3,
         StrokeEllipse: 4,
-        FillEllipse: 5,
-        DrawText: 6,
-        Clear: 7,
-        Save: 8,
-        Restore: 9,
-        ClipRect: 10,
-        DrawImage: 11
+        FillEllipse:   5,
+        DrawText:      6,
+        Clear:         7,
+        Save:          8,
+        Restore:       9,
+        ClipRect:      10,
+        DrawImage:     11,
+        // New ops
+        StrokeRoundRect:    12,
+        FillRoundRect:      13,
+        FillLinearGradient: 14,
+        FillRadialGradient: 15,
+        DrawPath:           16,
+        FillPath:           17,
+        DrawArc:            18,
+        DrawBezier:         19,
+        DrawPolygon:        20,
+        FillPolygon:        21,
+        TranslateTransform: 22,
     };
 
     try {
@@ -232,46 +353,52 @@ window.renderClientAreaCommands = async (canvas, offsetX, offsetY, commands) => 
 
                 switch (op) {
                     case Op.StrokeLine: {
-                        // [op, x1, y1, x2, y2, width, color]
+                        // [op, x1, y1, x2, y2, width, color, dash]
                         ctx.strokeStyle = cmd[6];
                         ctx.lineWidth = cmd[5];
+                        _setLineDash(ctx, cmd[7], cmd[5]);
                         ctx.beginPath();
                         ctx.moveTo(cmd[1], cmd[2]);
                         ctx.lineTo(cmd[3], cmd[4]);
                         ctx.stroke();
+                        ctx.setLineDash([]);
                         break;
                     }
                     case Op.StrokeRect: {
-                        // [op, x, y, w, h, width, color]
+                        // [op, x, y, w, h, width, color, dash]
                         ctx.strokeStyle = cmd[6];
                         ctx.lineWidth = cmd[5];
+                        _setLineDash(ctx, cmd[7], cmd[5]);
                         ctx.strokeRect(cmd[1], cmd[2], cmd[3], cmd[4]);
+                        ctx.setLineDash([]);
                         break;
                     }
                     case Op.FillRect: {
-                        // [op, x, y, w, h, color]
-                        ctx.fillStyle = cmd[5];
+                        // [op, x, y, w, h, fillStyle]  (solid rgba OR gradient token)
+                        ctx.fillStyle = _resolveFill(ctx, cmd[5], cmd[1], cmd[2], cmd[3], cmd[4]);
                         ctx.fillRect(cmd[1], cmd[2], cmd[3], cmd[4]);
                         break;
                     }
                     case Op.StrokeEllipse: {
-                        // [op, x, y, w, h, width, color]
+                        // [op, x, y, w, h, width, color, dash]
                         const x = cmd[1], y = cmd[2], w = cmd[3], h = cmd[4];
                         const cx = x + w / 2.0;
                         const cy = y + h / 2.0;
                         ctx.strokeStyle = cmd[6];
                         ctx.lineWidth = cmd[5];
+                        _setLineDash(ctx, cmd[7], cmd[5]);
                         ctx.beginPath();
                         ctx.ellipse(cx, cy, w / 2.0, h / 2.0, 0, 0, 2 * Math.PI);
                         ctx.stroke();
+                        ctx.setLineDash([]);
                         break;
                     }
                     case Op.FillEllipse: {
-                        // [op, x, y, w, h, color]
+                        // [op, x, y, w, h, fillStyle]  (solid rgba OR gradient token)
                         const x = cmd[1], y = cmd[2], w = cmd[3], h = cmd[4];
                         const cx = x + w / 2.0;
                         const cy = y + h / 2.0;
-                        ctx.fillStyle = cmd[5];
+                        ctx.fillStyle = _resolveFill(ctx, cmd[5], x, y, w, h);
                         ctx.beginPath();
                         ctx.ellipse(cx, cy, w / 2.0, h / 2.0, 0, 0, 2 * Math.PI);
                         ctx.fill();
@@ -325,6 +452,99 @@ window.renderClientAreaCommands = async (canvas, offsetX, offsetY, commands) => 
                     case Op.DrawImage: {
                         // [op, imageUrl, x, y, w, h]
                         await drawImageAsync(ctx, cmd[1], cmd[2], cmd[3], cmd[4], cmd[5]);
+                        break;
+                    }
+                    // ── RoundRect ─────────────────────────────────────────────
+                    case Op.StrokeRoundRect: {
+                        // [op, x, y, w, h, penWidth, color, radius, dash]
+                        ctx.strokeStyle = cmd[6];
+                        ctx.lineWidth = cmd[5];
+                        _setLineDash(ctx, cmd[8], cmd[5]);
+                        ctx.beginPath();
+                        _roundRect(ctx, cmd[1], cmd[2], cmd[3], cmd[4], cmd[7]);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                        break;
+                    }
+                    case Op.FillRoundRect: {
+                        // [op, x, y, w, h, fillStyle, radius]
+                        ctx.fillStyle = _resolveFill(ctx, cmd[5], cmd[1], cmd[2], cmd[3], cmd[4]);
+                        ctx.beginPath();
+                        _roundRect(ctx, cmd[1], cmd[2], cmd[3], cmd[4], cmd[6]);
+                        ctx.fill();
+                        break;
+                    }
+                    // ── FillRect / FillEllipse with gradient ──────────────────
+                    // These reuse Op.FillRect and Op.FillEllipse; gradient is detected
+                    // by the _resolveFill helper which checks for "LG:" / "RG:" prefix.
+                    // ── Arc ───────────────────────────────────────────────────
+                    case Op.DrawArc: {
+                        // [op, x, y, w, h, startAngle°, sweepAngle°, penWidth, color, dash]
+                        const ax = cmd[1], ay = cmd[2], aw = cmd[3], ah = cmd[4];
+                        const aStart = cmd[5] * Math.PI / 180;
+                        const aSweep = cmd[6] * Math.PI / 180;
+                        const acx = ax + aw / 2, acy = ay + ah / 2;
+                        ctx.strokeStyle = cmd[8];
+                        ctx.lineWidth = cmd[7];
+                        _setLineDash(ctx, cmd[9], cmd[7]);
+                        ctx.beginPath();
+                        ctx.ellipse(acx, acy, aw / 2, ah / 2, 0, aStart, aStart + aSweep);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                        break;
+                    }
+                    // ── Bezier ────────────────────────────────────────────────
+                    case Op.DrawBezier: {
+                        // [op, x1,y1, cx1,cy1, cx2,cy2, x2,y2, penWidth, color, dash]
+                        ctx.strokeStyle = cmd[10];
+                        ctx.lineWidth = cmd[9];
+                        _setLineDash(ctx, cmd[11], cmd[9]);
+                        ctx.beginPath();
+                        ctx.moveTo(cmd[1], cmd[2]);
+                        ctx.bezierCurveTo(cmd[3], cmd[4], cmd[5], cmd[6], cmd[7], cmd[8]);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                        break;
+                    }
+                    // ── Polygon ───────────────────────────────────────────────
+                    case Op.DrawPolygon:
+                    case Op.FillPolygon: {
+                        // [op, penWidth, penColor, dashToken, fillStyle, x0,y0, x1,y1, ...]
+                        ctx.beginPath();
+                        for (let pi = 5; pi < cmd.length - 1; pi += 2) {
+                            if (pi === 5) ctx.moveTo(cmd[pi], cmd[pi + 1]);
+                            else          ctx.lineTo(cmd[pi], cmd[pi + 1]);
+                        }
+                        ctx.closePath();
+                        if (op === Op.FillPolygon) {
+                            ctx.fillStyle = _resolveFill(ctx, cmd[4], 0, 0, 0, 0);
+                            ctx.fill();
+                        }
+                        ctx.strokeStyle = cmd[2];
+                        ctx.lineWidth = cmd[1];
+                        _setLineDash(ctx, cmd[3], cmd[1]);
+                        if (op === Op.DrawPolygon) ctx.stroke();
+                        ctx.setLineDash([]);
+                        break;
+                    }
+                    // ── GraphicsPath ──────────────────────────────────────────
+                    case Op.DrawPath:
+                    case Op.FillPath: {
+                        // DrawPath: [op, penWidth, penColor, dashToken, segCount, ...segs]
+                        // FillPath: [op, fillStyle, segCount, ...segs]
+                        const isStroke = (op === Op.DrawPath);
+                        const segs = isStroke ? cmd.slice(5) : cmd.slice(3);
+                        _replayPath(ctx, segs);
+                        if (isStroke) {
+                            ctx.strokeStyle = cmd[2];
+                            ctx.lineWidth = cmd[1];
+                            _setLineDash(ctx, cmd[3], cmd[1]);
+                            ctx.stroke();
+                            ctx.setLineDash([]);
+                        } else {
+                            ctx.fillStyle = _resolveFill(ctx, cmd[1], 0, 0, 0, 0);
+                            ctx.fill();
+                        }
                         break;
                     }
                 }

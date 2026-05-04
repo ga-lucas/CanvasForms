@@ -11,6 +11,9 @@ public struct Size
         Height = height;
     }
 
+    public static implicit operator System.Drawing.Size(Size s) => new System.Drawing.Size(s.Width, s.Height);
+    public static implicit operator Size(System.Drawing.Size s) => new Size(s.Width, s.Height);
+
     public static Size Empty => new(0, 0);
 
     public bool IsEmpty => Width == 0 && Height == 0;

@@ -39,7 +39,7 @@ public abstract class FileDialog : CommonDialog
     public bool RestoreDirectory { get; set; }
 
     public string SafeFileName => Path.GetFileName(FileName);
-    public string[] SafeFileNames => FileNames.Select(Path.GetFileName).ToArray();
+    public string[] SafeFileNames => FileNames.Select(f => Path.GetFileName(f) ?? string.Empty).ToArray();
 
     public event CancelEventHandler? FileOk;
 

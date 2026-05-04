@@ -120,8 +120,13 @@ public class MenuStrip : ToolStrip
                             : isHovered ? HoverBg
                             : BgColor;
 
-            using var itemBrush = new SolidBrush(bg);
-            g.FillRectangle(itemBrush, lx, 0, lw, Height - 1);
+            if (bg != BgColor)
+            {
+                // Rounded pill highlight for hovered/open item, inset by 1px top/bottom
+                var highlightRect = new Rectangle(lx, 1, lw, Height - 2);
+                using var itemBrush = new SolidBrush(bg);
+                g.FillRoundRect(itemBrush, highlightRect, 3);
+            }
 
             if (isOpen)
             {

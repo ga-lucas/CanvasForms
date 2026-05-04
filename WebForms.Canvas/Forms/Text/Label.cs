@@ -3,6 +3,12 @@ namespace System.Windows.Forms;
 
 public class Label : Control
 {
+    private bool _autoSize = false;
+    private bool _autoEllipsis = false;
+    private bool _useMnemonic = true;
+    private FlatStyle _flatStyle = FlatStyle.Standard;
+    private ContentAlignment _imageAlign = ContentAlignment.MiddleCenter;
+
     public Label()
     {
         Width = 100;
@@ -10,10 +16,90 @@ public class Label : Control
         BackColor = System.Drawing.Color.Transparent;
         ForeColor = System.Drawing.Color.Black;
         Text = "Label";
+        TabStop = false;
     }
 
     public ContentAlignment TextAlign { get; set; } = ContentAlignment.TopLeft;
-    public new bool AutoSize { get; set; } = false;
+
+    public new bool AutoSize
+    {
+        get => _autoSize;
+        set
+        {
+            if (_autoSize != value)
+            {
+                _autoSize = value;
+                if (_autoSize) PerformAutoSize();
+                Invalidate();
+            }
+        }
+    }
+
+    /// <summary>Gets or sets whether to add an ellipsis when text overflows the control width.</summary>
+    public bool AutoEllipsis
+    {
+        get => _autoEllipsis;
+        set { _autoEllipsis = value; Invalidate(); }
+    }
+
+    /// <summary>Gets or sets whether the label interprets &amp; as mnemonic prefix (underline next char).</summary>
+    public bool UseMnemonic
+    {
+        get => _useMnemonic;
+        set { _useMnemonic = value; Invalidate(); }
+    }
+
+    /// <summary>Gets or sets the flat style of the label border.</summary>
+    public FlatStyle FlatStyle
+    {
+        get => _flatStyle;
+        set { _flatStyle = value; Invalidate(); }
+    }
+
+    /// <summary>Gets or sets the alignment of any image within the label.</summary>
+    public ContentAlignment ImageAlign
+    {
+        get => _imageAlign;
+        set { _imageAlign = value; Invalidate(); }
+    }
+
+    /// <summary>Gets the preferred width of the label based on the current text and font.</summary>
+    public int PreferredWidth => MeasureTextWidth(DisplayText);
+
+    /// <summary>Gets the preferred height of the label based on the current font.</summary>
+    public int PreferredHeight => Font.Height + 4;
+
+    /// <summary>Gets or sets the border style (Label supports None/FixedSingle/Fixed3D).</summary>
+    public BorderStyle BorderStyle { get; set; } = BorderStyle.None;
+
+    // Returns the text that should be rendered (strips mnemonic prefix when UseMnemonic=true).
+    private string DisplayText
+    {
+        get
+        {
+            if (_useMnemonic && Text != null && Text.Contains('&'))
+                return Text.Replace("&&", "\x01").Replace("&", "").Replace("\x01", "&");
+            return Text ?? string.Empty;
+        }
+    }
+
+    private void PerformAutoSize()
+    {
+        var lines = DisplayText.Replace("\r", "").Split('\n');
+        int maxW = 0;
+        foreach (var l in lines) maxW = Math.Max(maxW, MeasureTextWidth(l));
+        Width  = maxW + 4;
+        Height = lines.Length * Font.Height + 4;
+    }
+
+    private int MeasureTextWidth(string text)
+        => (int)Math.Round((text ?? string.Empty).Length * Font.Size * 0.6f);
+
+    protected override void OnTextChanged(EventArgs e)
+    {
+        base.OnTextChanged(e);
+        if (_autoSize) PerformAutoSize();
+    }
 
     protected internal override void OnPaint(PaintEventArgs e)
     {
@@ -26,17 +112,56 @@ public class Label : Control
             g.FillRectangle(bgBrush, 0, 0, Width, Height);
         }
 
-        // Draw text
-        if (!string.IsNullOrEmpty(Text))
+        // Border
+        if (BorderStyle == BorderStyle.FixedSingle)
         {
-            var lines = Text.Replace("\r", string.Empty).Split('\n');
-            var (x0, y0, charHeight) = GetTextBlockPosition(lines);
+            using var bp = new Pen(System.Drawing.Color.FromArgb(122, 122, 122));
+            g.DrawRectangle(bp, 0, 0, Width - 1, Height - 1);
+        }
+        else if (BorderStyle == BorderStyle.Fixed3D)
+        {
+            using var dark = new Pen(System.Drawing.Color.FromArgb(128, 128, 128));
+            using var light = new Pen(System.Drawing.Color.FromArgb(223, 223, 223));
+            g.DrawLine(dark,  0, 0, Width - 1, 0);
+            g.DrawLine(dark,  0, 0, 0, Height - 1);
+            g.DrawLine(light, Width - 1, 0, Width - 1, Height - 1);
+            g.DrawLine(light, 0, Height - 1, Width - 1, Height - 1);
+        }
 
-            using var textBrush = new SolidBrush(ForeColor);
-            for (var i = 0; i < lines.Length; i++)
+        // Draw text
+        var displayText = DisplayText;
+        if (!string.IsNullOrEmpty(displayText))
+        {
+            var rawLines = displayText.Replace("\r", string.Empty).Split('\n');
+            var charHeight = Font.Height;
+            var (x0, y0, _) = GetTextBlockPosition(rawLines);
+
+            using var textBrush = new SolidBrush(Enabled ? ForeColor : System.Drawing.Color.FromArgb(109, 109, 109));
+
+            // Find mnemonic char index for underline drawing (only when UseMnemonic=true)
+            int mnemonicCharIdx = -1;
+            if (_useMnemonic && Text != null)
             {
-                var line = lines[i] ?? string.Empty;
-                var x = GetLineX(line);
+                var raw = Text.Replace("&&", "\x01");
+                int amp = raw.IndexOf('&');
+                if (amp >= 0 && amp + 1 < raw.Length)
+                {
+                    mnemonicCharIdx = amp; // approximate position for underline
+                }
+            }
+
+            for (var i = 0; i < rawLines.Length; i++)
+            {
+                var line = rawLines[i] ?? string.Empty;
+                // AutoEllipsis: truncate with "…" if line would overflow
+                if (_autoEllipsis)
+                {
+                    var charWidth = (int)Math.Round(Font.Size * 0.6f);
+                    int maxChars = Width / Math.Max(1, charWidth);
+                    if (line.Length > maxChars && maxChars > 1)
+                        line = line.Substring(0, maxChars - 1) + "…";
+                }
+                var x = GetLineX(rawLines, line);
                 var y = y0 + (i * charHeight);
                 g.DrawString(line, Font, textBrush, x, y);
             }
@@ -76,6 +201,10 @@ public class Label : Control
 
         return (baseX, baseY + baselineOffset, charHeight);
     }
+
+    // Overload that accepts all lines (used by updated OnPaint)
+    protected int GetLineX(string[] allLines, string line)
+        => GetLineX(line);
 
     protected int GetLineX(string line)
     {

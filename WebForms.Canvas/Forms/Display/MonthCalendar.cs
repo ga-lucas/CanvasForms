@@ -56,6 +56,60 @@ public class MonthCalendar : Control
     public bool ShowTodayCircle { get; set; } = true;
     public bool ShowWeekNumbers { get; set; } = false;
 
+    /// <summary>Gets or sets the selected range as a SelectionRange object.</summary>
+    public SelectionRange SelectionRange
+    {
+        get => new SelectionRange(_selectionStart, _selectionEnd);
+        set
+        {
+            if (value != null)
+            {
+                _selectionStart = value.Start;
+                _selectionEnd = value.End;
+                if (_selectionEnd < _selectionStart) _selectionEnd = _selectionStart;
+                Invalidate();
+            }
+        }
+    }
+
+    private readonly List<DateTime> _boldedDates = new();
+    private readonly List<DateTime> _annuallyBoldedDates = new();
+    private readonly List<DateTime> _monthlyBoldedDates = new();
+
+    public DateTime[] BoldedDates
+    {
+        get => _boldedDates.ToArray();
+        set { _boldedDates.Clear(); if (value != null) _boldedDates.AddRange(value); Invalidate(); }
+    }
+
+    public DateTime[] AnnuallyBoldedDates
+    {
+        get => _annuallyBoldedDates.ToArray();
+        set { _annuallyBoldedDates.Clear(); if (value != null) _annuallyBoldedDates.AddRange(value); Invalidate(); }
+    }
+
+    public DateTime[] MonthlyBoldedDates
+    {
+        get => _monthlyBoldedDates.ToArray();
+        set { _monthlyBoldedDates.Clear(); if (value != null) _monthlyBoldedDates.AddRange(value); Invalidate(); }
+    }
+
+    public void AddBoldedDate(DateTime date) { _boldedDates.Add(date.Date); Invalidate(); }
+    public void RemoveBoldedDate(DateTime date) { _boldedDates.Remove(date.Date); Invalidate(); }
+    public void AddAnnuallyBoldedDate(DateTime date) { _annuallyBoldedDates.Add(date.Date); Invalidate(); }
+    public void RemoveAnnuallyBoldedDate(DateTime date) { _annuallyBoldedDates.Remove(date.Date); Invalidate(); }
+    public void AddMonthlyBoldedDate(DateTime date) { _monthlyBoldedDates.Add(date.Date); Invalidate(); }
+    public void RemoveMonthlyBoldedDate(DateTime date) { _monthlyBoldedDates.Remove(date.Date); Invalidate(); }
+    public void UpdateBoldedDates() => Invalidate();
+
+    private bool IsBolded(DateTime date)
+    {
+        if (_boldedDates.Contains(date.Date)) return true;
+        if (_annuallyBoldedDates.Any(d => d.Month == date.Month && d.Day == date.Day)) return true;
+        if (_monthlyBoldedDates.Any(d => d.Day == date.Day)) return true;
+        return false;
+    }
+
     private int CalendarWidth => PaddingX * 2 + ColCount * CellW;
 
     protected internal override void OnPaint(PaintEventArgs e)
@@ -135,10 +189,12 @@ public class MonthCalendar : Control
             }
 
             // Day number
+            bool isBolded = IsBolded(date);
             var dayColor = isSelected ? Color.White : (date.DayOfWeek == DayOfWeek.Sunday ? Color.FromArgb(180, 0, 0) : ForeColor);
             using var dayBrush = new SolidBrush(dayColor);
             int numX = cellX + (CellW - day.ToString().Length * 7) / 2;
-            g.DrawString(day.ToString(), "Arial", 11, dayBrush, numX, cellY + 2);
+            var dayFont = isBolded ? $"{Font.Family},bold" : Font.Family;
+            g.DrawString(day.ToString(), dayFont, 11, dayBrush, numX, cellY + 2);
         }
 
         base.OnPaint(e);
@@ -251,4 +307,12 @@ public class DateRangeEventArgs : EventArgs
     public DateTime Start { get; }
     public DateTime End { get; }
     public DateRangeEventArgs(DateTime start, DateTime end) { Start = start; End = end; }
+}
+
+public class SelectionRange
+{
+    public DateTime Start { get; set; }
+    public DateTime End { get; set; }
+    public SelectionRange() { Start = End = DateTime.Today; }
+    public SelectionRange(DateTime start, DateTime end) { Start = start; End = end; }
 }

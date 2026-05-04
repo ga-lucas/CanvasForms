@@ -66,7 +66,7 @@ public class DemoInputControlsForm : Form
             Left = leftCol, Top = y, Width = 340, Height = 23,
             AutoCompleteMode = AutoCompleteMode.Suggest,
             AutoCompleteSource = AutoCompleteSource.CustomSource,
-            AutoCompleteCustomSource = new[] { "apple", "apricot", "banana", "blueberry", "cherry", "coconut", "date", "fig", "grape", "kiwi", "lemon", "mango", "orange", "peach", "pear", "plum", "strawberry" }
+            AutoCompleteCustomSource = new AutoCompleteStringCollection { "apple", "apricot", "banana", "blueberry", "cherry", "coconut", "date", "fig", "grape", "kiwi", "lemon", "mango", "orange", "peach", "pear", "plum", "strawberry" }
         };
         Controls.Add(autoCompleteTextBox);
         y += 30;

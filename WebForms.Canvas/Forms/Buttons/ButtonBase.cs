@@ -5,7 +5,7 @@ namespace System.Windows.Forms;
 /// Base class for button-like controls (Button, CheckBox, RadioButton)
 /// Provides common functionality for all button controls
 /// </summary>
-public abstract class ButtonBase : Control
+public abstract class ButtonBase : Control, IButtonControl
 {
     protected bool _isPressed = false;
     protected bool _isHovered = false;
@@ -117,6 +117,12 @@ public abstract class ButtonBase : Control
         Invalidate();
         base.OnTextChanged(e);
     }
+
+    /// <summary>Gets or sets the value returned to the parent form when the button is clicked.</summary>
+    public DialogResult DialogResult { get; set; } = DialogResult.None;
+
+    /// <summary>Notifies the button whether it is the default button (visual hint only).</summary>
+    public virtual void NotifyDefault(bool value) { /* visual hint — subclasses may override */ }
 
     /// <summary>
     /// Simulates a button click

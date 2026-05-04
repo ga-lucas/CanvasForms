@@ -49,7 +49,9 @@ public abstract class Control
             if (_left != value)
             {
                 _left = value;
+                OnLocationChanged(EventArgs.Empty);
                 Invalidate();
+                _parent?.Invalidate();
             }
         }
     }
@@ -62,7 +64,9 @@ public abstract class Control
             if (_top != value)
             {
                 _top = value;
+                OnLocationChanged(EventArgs.Empty);
                 Invalidate();
+                _parent?.Invalidate();
             }
         }
     }
@@ -75,6 +79,7 @@ public abstract class Control
             if (_width != value)
             {
                 _width = value;
+                OnResize(EventArgs.Empty);
                 Invalidate();
             }
         }
@@ -88,6 +93,7 @@ public abstract class Control
             if (_height != value)
             {
                 _height = value;
+                OnResize(EventArgs.Empty);
                 Invalidate();
             }
         }
@@ -101,6 +107,7 @@ public abstract class Control
             if (_dock != value)
             {
                 _dock = value;
+                OnDockChanged(EventArgs.Empty);
                 _parent?.PerformLayout();
                 Invalidate();
             }
@@ -120,6 +127,7 @@ public abstract class Control
         }
     }
 
+
     private System.Drawing.Color _backColor = System.Drawing.Color.White;
     private System.Drawing.Color _foreColor = System.Drawing.Color.Black;
 
@@ -131,6 +139,7 @@ public abstract class Control
             if (_backColor != value)
             {
                 _backColor = value;
+                OnBackColorChanged(EventArgs.Empty);
                 Invalidate();
             }
         }
@@ -144,12 +153,45 @@ public abstract class Control
             if (_foreColor != value)
             {
                 _foreColor = value;
+                OnForeColorChanged(EventArgs.Empty);
                 Invalidate();
             }
         }
     }
-    public bool Visible { get; set; } = true;
-    public bool Enabled { get; set; } = true;
+    private bool _visible = true;
+    private bool _enabled = true;
+
+    public bool Visible
+    {
+        get => _visible;
+        set
+        {
+            if (_visible != value)
+            {
+                _visible = value;
+                OnVisibleChanged(EventArgs.Empty);
+                Invalidate();
+                _parent?.Invalidate();
+            }
+        }
+    }
+
+    public bool Enabled
+    {
+        get => _enabled;
+        set
+        {
+            if (_enabled != value)
+            {
+                _enabled = value;
+                OnEnabledChanged(EventArgs.Empty);
+                // Propagate enabled state to children (WinForms behaviour)
+                foreach (var child in _controls)
+                    child.OnEnabledChanged(EventArgs.Empty);
+                Invalidate();
+            }
+        }
+    }
     public object? Tag { get; set; }
 
     // Calculated position properties
@@ -188,6 +230,7 @@ public abstract class Control
             if (_font != value)
             {
                 _font = value;
+                OnFontChanged(EventArgs.Empty);
                 Invalidate();
             }
         }
@@ -198,8 +241,8 @@ public abstract class Control
     // Size constraints
     private Canvas.Windows.Forms.Drawing.Size _minimumSize = Canvas.Windows.Forms.Drawing.Size.Empty;
     private Canvas.Windows.Forms.Drawing.Size _maximumSize = Canvas.Windows.Forms.Drawing.Size.Empty;
-    private Canvas.Windows.Forms.Drawing.Size _margin = new Canvas.Windows.Forms.Drawing.Size(3, 3);
-    private Canvas.Windows.Forms.Drawing.Size _padding = Canvas.Windows.Forms.Drawing.Size.Empty;
+    private Padding _margin = new Padding(3);
+    private Padding _padding = Padding.Empty;
 
     public Canvas.Windows.Forms.Drawing.Size MinimumSize
     {
@@ -227,7 +270,7 @@ public abstract class Control
         }
     }
 
-    public Canvas.Windows.Forms.Drawing.Size Margin
+    public Padding Margin
     {
         get => _margin;
         set
@@ -235,12 +278,13 @@ public abstract class Control
             if (_margin != value)
             {
                 _margin = value;
+                OnMarginChanged(EventArgs.Empty);
                 Invalidate();
             }
         }
     }
 
-    public Canvas.Windows.Forms.Drawing.Size Padding
+    public Padding Padding
     {
         get => _padding;
         set
@@ -248,6 +292,7 @@ public abstract class Control
             if (_padding != value)
             {
                 _padding = value;
+                OnPaddingChanged(EventArgs.Empty);
                 Invalidate();
             }
         }
@@ -265,6 +310,7 @@ public abstract class Control
             if (_tabIndex != value)
             {
                 _tabIndex = value;
+                OnTabIndexChanged(EventArgs.Empty);
             }
         }
     }
@@ -277,6 +323,7 @@ public abstract class Control
             if (_tabStop != value)
             {
                 _tabStop = value;
+                OnTabStopChanged(EventArgs.Empty);
             }
         }
     }
@@ -332,6 +379,7 @@ public abstract class Control
             if (_backgroundImage != value)
             {
                 _backgroundImage = value;
+                OnBackgroundImageChanged(EventArgs.Empty);
                 Invalidate();
             }
         }
@@ -345,6 +393,7 @@ public abstract class Control
             if (_backgroundImageLayout != value)
             {
                 _backgroundImageLayout = value;
+                OnBackgroundImageLayoutChanged(EventArgs.Empty);
                 Invalidate();
             }
         }
@@ -366,6 +415,7 @@ public abstract class Control
             if (_cursor != value)
             {
                 _cursor = value;
+                OnCursorChanged(EventArgs.Empty);
             }
         }
     }
@@ -385,6 +435,7 @@ public abstract class Control
             if (_region != value)
             {
                 _region = value;
+                OnRegionChanged(EventArgs.Empty);
                 Invalidate();
             }
         }
@@ -575,11 +626,11 @@ public abstract class Control
     public bool ScaleChildren => true;
 
     // Preferred size
-    public System.Drawing.Size PreferredSize => GetPreferredSize(System.Drawing.Size.Empty);
+    public System.Drawing.Size PreferredSize => new System.Drawing.Size(DefaultSize.Width, DefaultSize.Height);
 
-    protected virtual System.Drawing.Size GetPreferredSize(System.Drawing.Size proposedSize)
+    protected virtual Canvas.Windows.Forms.Drawing.Size GetPreferredSize(Canvas.Windows.Forms.Drawing.Size proposedSize)
     {
-        return Size;
+        return DefaultSize;
     }
 
     // Assembly info
@@ -600,13 +651,13 @@ public abstract class Control
     // Default static properties
     public static System.Drawing.Color DefaultBackColor => System.Drawing.Color.White;
     public static System.Drawing.Color DefaultForeColor => System.Drawing.Color.Black;
-    public static Font DefaultFont => new Font("Segoe UI", 9);
+    public static Font DefaultFont => new Font("Segoe UI", 12);
     public static Cursor DefaultCursor => Cursor.Default;
     public static ImeMode DefaultImeMode => ImeMode.NoControl;
-    public static Canvas.Windows.Forms.Drawing.Size DefaultMargin => new Canvas.Windows.Forms.Drawing.Size(3, 3);
+    public static Padding DefaultMargin => new Padding(3);
     public static Canvas.Windows.Forms.Drawing.Size DefaultMaximumSize => Canvas.Windows.Forms.Drawing.Size.Empty;
     public static Canvas.Windows.Forms.Drawing.Size DefaultMinimumSize => Canvas.Windows.Forms.Drawing.Size.Empty;
-    public static Canvas.Windows.Forms.Drawing.Size DefaultPadding => Canvas.Windows.Forms.Drawing.Size.Empty;
+    public static Padding DefaultPadding => Padding.Empty;
     public virtual Canvas.Windows.Forms.Drawing.Size DefaultSize => new Canvas.Windows.Forms.Drawing.Size(100, 20);
 
     // Location and Size helpers
@@ -997,7 +1048,7 @@ public abstract class Control
     protected void DrawFocusRect(Graphics g, int inset = 2)
     {
         if (!Focused || !Enabled) return;
-        using var pen = new Pen(Color.Black);
+        using var pen = new Pen(Color.Black) { DashStyle = DashStyle.Dot };
         g.DrawRectangle(pen, inset, inset, Width - inset * 2 - 1, Height - inset * 2 - 1);
     }
 
@@ -1008,7 +1059,7 @@ public abstract class Control
     protected void DrawFocusRect(Graphics g, Rectangle bounds)
     {
         if (!Focused || !Enabled) return;
-        using var pen = new Pen(Color.Black);
+        using var pen = new Pen(Color.Black) { DashStyle = DashStyle.Dot };
         g.DrawRectangle(pen, bounds);
     }
 
@@ -2454,6 +2505,7 @@ public abstract class Control
             control.Parent = _owner;
             control.RequestRender = _owner.RequestRender;
             _list.Add(control);
+            _owner.OnControlAdded(new ControlEventArgs(control));
             _owner.Invalidate();
         }
 
@@ -2470,15 +2522,18 @@ public abstract class Control
             if (_list.Remove(control))
             {
                 control.Parent = null;
+                _owner.OnControlRemoved(new ControlEventArgs(control));
                 _owner.Invalidate();
             }
         }
 
         public virtual void Clear()
         {
-            foreach (var control in _list)
+            var removed = _list.ToList();
+            foreach (var control in removed)
             {
                 control.Parent = null;
+                _owner.OnControlRemoved(new ControlEventArgs(control));
             }
             _list.Clear();
             _owner.Invalidate();

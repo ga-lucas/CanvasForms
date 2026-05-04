@@ -47,80 +47,8 @@ public class GroupBox : Control
         // Let user code handle Paint event.
         base.OnPaint(e);
 
-        // Clip child painting to the inside of the border.
-        var textHeight = Font.Height;
-        var borderTop = Math.Max(0, textHeight / 2);
-        var inner = new Rectangle(
-            1,
-            borderTop + 1,
-            Math.Max(0, Width - 2),
-            Math.Max(0, Height - (borderTop + 2))
-        );
-
-        g.Save();
-        g.SetClip(inner);
-
-        foreach (var child in Controls)
-        {
-            if (!child.Visible) continue;
-
-            g.TranslateTransform(child.Left, child.Top);
-
-            var childArgs = new PaintEventArgs(
-                g,
-                new Rectangle(0, 0, child.Width, child.Height)
-            );
-
-            if (child is ComboBox comboBox)
-            {
-                comboBox.PaintWithoutDropDown(childArgs);
-            }
-            else if (child is DateTimePicker dateTimePicker)
-            {
-                dateTimePicker.PaintWithoutDropDown(childArgs);
-            }
-            else if (child is TextBox textBox)
-            {
-                textBox.PaintWithoutAutoComplete(childArgs);
-            }
-            else
-            {
-                child.OnPaint(childArgs);
-            }
-
-            g.TranslateTransform(-child.Left, -child.Top);
-        }
-
-        g.Restore();
-
-        // Paint overlays on top of everything (drop-downs, autocomplete)
-        // These must not be clipped to the GroupBox client area; WinForms drop-downs render outside.
-        foreach (var child in Controls)
-        {
-            if (!child.Visible) continue;
-
-            if (child is ComboBox comboBox && comboBox.DroppedDown)
-            {
-                g.TranslateTransform(child.Left, child.Top);
-                var ddArgs = new PaintEventArgs(g, new Rectangle(0, 0, child.Width, child.Height));
-                comboBox.PaintDropDownOnly(ddArgs);
-                g.TranslateTransform(-child.Left, -child.Top);
-            }
-            else if (child is DateTimePicker dateTimePicker && dateTimePicker.HasVisibleDropDown)
-            {
-                g.TranslateTransform(child.Left, child.Top);
-                var ddArgs = new PaintEventArgs(g, new Rectangle(0, 0, child.Width, child.Height));
-                dateTimePicker.PaintDropDownOnly(ddArgs);
-                g.TranslateTransform(-child.Left, -child.Top);
-            }
-            else if (child is TextBox textBox && textBox.HasVisibleAutoComplete)
-            {
-                g.TranslateTransform(child.Left, child.Top);
-                var acArgs = new PaintEventArgs(g, new Rectangle(0, 0, child.Width, child.Height));
-                textBox.PaintAutoCompleteOnly(acArgs);
-                g.TranslateTransform(-child.Left, -child.Top);
-            }
-        }
+        // Child controls are painted by Form.PaintControlsRecursive — do not paint them here.
+        // Overlays (drop-downs, autocomplete) are handled by Form.PaintOverlaysRecursive.
     }
 
     private void DrawGroupBoxBorderAndText(Graphics g)
@@ -157,21 +85,16 @@ public class GroupBox : Control
 
         if (FlatStyle == FlatStyle.Flat)
         {
-            // Flat: single-line border, no etching
+            // Flat: rounded border; caption gap is handled by the bg-erase + text draw below
             using var pen = new Pen(borderColor);
+            g.DrawRoundRect(pen, rect, 4);
 
-            g.DrawLine(pen, rect.X, rect.Y, rect.X, rect.Bottom);
-            g.DrawLine(pen, rect.Right, rect.Y, rect.Right, rect.Bottom);
-            g.DrawLine(pen, rect.X, rect.Bottom, rect.Right, rect.Bottom);
-
-            if (gapRight <= gapLeft)
+            // Erase the top segment over the caption gap
+            if (gapRight > gapLeft)
             {
-                g.DrawLine(pen, rect.X, rect.Y, rect.Right, rect.Y);
-            }
-            else
-            {
-                g.DrawLine(pen, rect.X, rect.Y, rect.X + gapLeft - 1, rect.Y);
-                g.DrawLine(pen, rect.X + gapRight + 1, rect.Y, rect.Right, rect.Y);
+                var bg = BackColor != System.Drawing.Color.Transparent ? BackColor : (Parent?.BackColor ?? System.Drawing.Color.White);
+                using var erasePen = new Pen(bg);
+                g.DrawLine(erasePen, rect.X + gapLeft, rect.Y, rect.X + gapRight, rect.Y);
             }
         }
         else

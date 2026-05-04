@@ -249,7 +249,7 @@ public class DataGridViewRowCollection : System.Collections.ObjectModel.Collecti
         _owner.Invalidate();
     }
 
-    public int Add(DataGridViewRow row) { Add((object)row); return row.Index; }
+    public new int Add(DataGridViewRow row) { Add((object)row); return row.Index; }
     private void Add(object row) => Add((DataGridViewRow)row);
 }
 

@@ -22,7 +22,7 @@ public class ToolStripPanel : ContainerControl
     /// Whether this panel is visible even when it contains no ToolStrips.
     /// Matches WinForms default of false.
     /// </summary>
-    public bool Visible { get; set; } = false;
+    public new bool Visible { get; set; } = false;
 
     protected internal override void OnPaint(PaintEventArgs e)
     {

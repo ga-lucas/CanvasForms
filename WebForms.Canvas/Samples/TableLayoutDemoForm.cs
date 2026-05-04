@@ -78,7 +78,7 @@ public class TableLayoutDemoForm : Form
         {
             Dock = DockStyle.Fill,
             BorderStyle = BorderStyle.FixedSingle,
-            Padding = new Size(10, 10),
+            Padding = new Padding(10),
             ColumnCount = 3,
             RowCount = 3
         };
@@ -106,7 +106,7 @@ public class TableLayoutDemoForm : Form
         {
             Text = "Embedded",
             Dock = DockStyle.Fill,
-            Margin = new Size(6, 6)
+            Margin = new Padding(6)
         };
 
         var leftText = new TextBox
@@ -140,7 +140,7 @@ public class TableLayoutDemoForm : Form
             BackColor = Color.FromArgb(255, 255, 224),
             ForeColor = Color.FromArgb(60, 60, 60),
             TextAlign = ContentAlignment.MiddleCenter,
-            Margin = new Size(6, 6)
+            Margin = new Padding(6)
         };
         tlp.Controls.Add(autosizeLabel);
         tlp.SetCellPosition(autosizeLabel, new TableLayoutPanelCellPosition(1, 0));
@@ -149,7 +149,7 @@ public class TableLayoutDemoForm : Form
         {
             BackColor = Color.FromArgb(245, 245, 245),
             Dock = DockStyle.Fill,
-            Margin = new Size(6, 6)
+            Margin = new Padding(6)
         };
         _anchoredPanel = anchoredPanel;
         tlp.Controls.Add(anchoredPanel);
@@ -190,7 +190,7 @@ public class TableLayoutDemoForm : Form
         {
             Dock = DockStyle.Fill,
             Text = "This TextBox spans 2 columns (ColumnSpan=2) and is Dock=Fill",
-            Margin = new Size(6, 6)
+            Margin = new Padding(6)
         };
         tlp.Controls.Add(spanningText);
         tlp.SetCellPosition(spanningText, new TableLayoutPanelCellPosition(1, 1));
@@ -201,12 +201,12 @@ public class TableLayoutDemoForm : Form
         {
             Dock = DockStyle.Fill,
             BorderStyle = BorderStyle.FixedSingle,
-            Padding = new Size(6, 6),
+            Padding = new Padding(6),
             WrapContents = true
         };
-        var one = new Button { Text = "One", Width = 70, Height = 30, Margin = new Size(4, 4) };
-        var two = new Button { Text = "Two", Width = 70, Height = 30, Margin = new Size(4, 4) };
-        var three = new Button { Text = "Three", Width = 70, Height = 30, Margin = new Size(4, 4) };
+        var one = new Button { Text = "One", Width = 70, Height = 30, Margin = new Padding(4) };
+        var two = new Button { Text = "Two", Width = 70, Height = 30, Margin = new Padding(4) };
+        var three = new Button { Text = "Three", Width = 70, Height = 30, Margin = new Padding(4) };
 
         one.Click += (s, e) => footer.Text = "Clicked: One @ " + DateTime.Now.ToLongTimeString();
         two.Click += (s, e) => footer.Text = "Clicked: Two @ " + DateTime.Now.ToLongTimeString();

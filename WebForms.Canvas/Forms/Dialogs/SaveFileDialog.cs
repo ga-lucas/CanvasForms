@@ -50,7 +50,7 @@ public class SaveFileDialog : FileDialog
     /// Creates the file if it does not already exist.
     /// Matches WinForms <c>SaveFileDialog.OpenFile()</c>.
     /// </summary>
-    public System.IO.Stream OpenFile()
+    public new System.IO.Stream OpenFile()
     {
         if (string.IsNullOrWhiteSpace(FileName))
             throw new InvalidOperationException("No file selected.");

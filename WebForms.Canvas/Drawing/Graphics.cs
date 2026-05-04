@@ -149,6 +149,77 @@ public class Graphics : IDisposable
         DrawImage(imageUrl, rect.X, rect.Y, rect.Width, rect.Height);
     }
 
+    // ── RoundRect ─────────────────────────────────────────────────────────────
+
+    public void DrawRoundRect(Pen pen, int x, int y, int width, int height, int radius)
+        => _commands.Add(new DrawRoundRectCommand(pen, x + _translateX, y + _translateY, width, height, radius));
+
+    public void DrawRoundRect(Pen pen, Rectangle rect, int radius)
+        => DrawRoundRect(pen, rect.X, rect.Y, rect.Width, rect.Height, radius);
+
+    public void FillRoundRect(Brush brush, int x, int y, int width, int height, int radius)
+        => _commands.Add(new FillRoundRectCommand(brush, x + _translateX, y + _translateY, width, height, radius));
+
+    public void FillRoundRect(Brush brush, Rectangle rect, int radius)
+        => FillRoundRect(brush, rect.X, rect.Y, rect.Width, rect.Height, radius);
+
+    // ── Arc ───────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Draws an arc (portion of an ellipse outline).
+    /// <paramref name="startAngle"/> and <paramref name="sweepAngle"/> are in degrees, clockwise.
+    /// </summary>
+    public void DrawArc(Pen pen, int x, int y, int width, int height, float startAngle, float sweepAngle)
+        => _commands.Add(new DrawArcCommand(pen, x + _translateX, y + _translateY, width, height, startAngle, sweepAngle));
+
+    public void DrawArc(Pen pen, Rectangle rect, float startAngle, float sweepAngle)
+        => DrawArc(pen, rect.X, rect.Y, rect.Width, rect.Height, startAngle, sweepAngle);
+
+    // ── Bezier ────────────────────────────────────────────────────────────────
+
+    public void DrawBezier(Pen pen, int x1, int y1, int cx1, int cy1, int cx2, int cy2, int x2, int y2)
+        => _commands.Add(new DrawBezierCommand(pen,
+            x1 + _translateX, y1 + _translateY,
+            cx1 + _translateX, cy1 + _translateY,
+            cx2 + _translateX, cy2 + _translateY,
+            x2 + _translateX, y2 + _translateY));
+
+    public void DrawBezier(Pen pen, Point p1, Point c1, Point c2, Point p2)
+        => DrawBezier(pen, p1.X, p1.Y, c1.X, c1.Y, c2.X, c2.Y, p2.X, p2.Y);
+
+    // ── Polygon ───────────────────────────────────────────────────────────────
+
+    public void DrawPolygon(Pen pen, Point[] points)
+    {
+        var translated = Translate(points);
+        _commands.Add(new DrawPolygonCommand(pen, translated));
+    }
+
+    public void FillPolygon(Brush brush, Point[] points)
+    {
+        var translated = Translate(points);
+        _commands.Add(new DrawPolygonCommand(brush, translated));
+    }
+
+    // ── GraphicsPath ──────────────────────────────────────────────────────────
+
+    public void DrawPath(Pen pen, GraphicsPath path)
+        => _commands.Add(new DrawPathCommand(pen, path));
+
+    public void FillPath(Brush brush, GraphicsPath path)
+        => _commands.Add(new FillPathCommand(brush, path));
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private Point[] Translate(Point[] points)
+    {
+        if (_translateX == 0 && _translateY == 0) return points;
+        var result = new Point[points.Length];
+        for (int i = 0; i < points.Length; i++)
+            result[i] = new Point(points[i].X + _translateX, points[i].Y + _translateY);
+        return result;
+    }
+
     public IEnumerable<DrawingCommand> GetCommands() => _commands;
 
     public void Dispose()

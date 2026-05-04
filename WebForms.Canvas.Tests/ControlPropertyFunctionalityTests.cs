@@ -63,11 +63,11 @@ public class ControlPropertyFunctionalityTests
         control.MaximumSize = new Size(500, 300);
         Assert.Equal(new Size(500, 300), control.MaximumSize);
 
-        control.Margin = new Size(10, 10);
-        Assert.Equal(new Size(10, 10), control.Margin);
+        control.Margin = new Padding(10);
+        Assert.Equal(new Padding(10), control.Margin);
 
-        control.Padding = new Size(5, 5);
-        Assert.Equal(new Size(5, 5), control.Padding);
+        control.Padding = new Padding(5);
+        Assert.Equal(new Padding(5), control.Padding);
     }
 
     [Fact]

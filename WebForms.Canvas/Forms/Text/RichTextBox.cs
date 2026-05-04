@@ -47,7 +47,7 @@ public class RichTextBox : TextBoxBase
     /// <summary>
     /// Appends text followed by a newline
     /// </summary>
-    public void AppendText(string text)
+    public new void AppendText(string text)
     {
         Text += text;
         SelectionStart = Text.Length;
@@ -57,12 +57,12 @@ public class RichTextBox : TextBoxBase
     /// <summary>
     /// Clears the undo buffer
     /// </summary>
-    public void ClearUndo() { /* stub */ }
+    public new void ClearUndo() { /* stub */ }
 
     /// <summary>
     /// Selects a range of text
     /// </summary>
-    public void Select(int start, int length)
+    public new void Select(int start, int length)
     {
         SelectionStart = Math.Max(0, Math.Min(start, Text.Length));
         SelectionLength = Math.Max(0, Math.Min(length, Text.Length - SelectionStart));
@@ -73,7 +73,7 @@ public class RichTextBox : TextBoxBase
     /// <summary>
     /// Selects all text
     /// </summary>
-    public void SelectAll()
+    public new void SelectAll()
     {
         Select(0, Text.Length);
     }
@@ -81,7 +81,7 @@ public class RichTextBox : TextBoxBase
     /// <summary>
     /// Scrolls to the caret position
     /// </summary>
-    public void ScrollToCaret() { /* stub */ }
+    public new void ScrollToCaret() { /* stub */ }
 
     private static string StripRtf(string rtf)
     {

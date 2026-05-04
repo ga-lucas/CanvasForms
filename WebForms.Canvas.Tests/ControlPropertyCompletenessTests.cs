@@ -173,9 +173,9 @@ public class ControlPropertyCompletenessTests
         Assert.True(control.Width > 0);
         Assert.True(control.Height > 0);
 
-        // Color properties
-        Assert.NotNull(control.BackColor);
-        Assert.NotNull(control.ForeColor);
+        // Color properties — BackColor/ForeColor are value types, no null check needed
+        _ = control.BackColor;
+        _ = control.ForeColor;
 
         // Anchor and Dock
         Assert.Equal(AnchorStyles.Top | AnchorStyles.Left, control.Anchor);
@@ -185,10 +185,10 @@ public class ControlPropertyCompletenessTests
         Assert.Null(control.Parent);
         Assert.NotNull(control.Controls);
 
-        // Location and Bounds
-        Assert.NotNull(control.Location);
-        Assert.NotNull(control.Size);
-        Assert.NotNull(control.Bounds);
+        // Location and Bounds — value types, verify they are accessible
+        _ = control.Location;
+        _ = control.Size;
+        _ = control.Bounds;
     }
 
     // Helper test control

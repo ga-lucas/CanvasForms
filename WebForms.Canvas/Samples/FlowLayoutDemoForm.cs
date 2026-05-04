@@ -45,7 +45,7 @@ public class FlowLayoutDemoForm : Form
             BorderStyle = BorderStyle.FixedSingle,
             WrapContents = true,
             FlowDirection = FlowDirection.LeftToRight,
-            Padding = new Size(10, 10)
+            Padding = new Padding(10)
         };
         Controls.Add(flow);
 
@@ -57,7 +57,7 @@ public class FlowLayoutDemoForm : Form
             BackColor = Color.White,
             ForeColor = Color.FromArgb(60, 60, 60),
             TextAlign = ContentAlignment.MiddleCenter,
-            Margin = new Size(6, 6)
+            Margin = new Padding(6)
         };
         flow.Controls.Add(intro);
 
@@ -68,7 +68,7 @@ public class FlowLayoutDemoForm : Form
             Height = 160,
             BackColor = Color.Transparent,
             ForeColor = Color.FromArgb(60, 60, 60),
-            Margin = new Size(6, 6)
+            Margin = new Padding(6)
         };
 
         var txt = new TextBox
@@ -131,7 +131,7 @@ public class FlowLayoutDemoForm : Form
            Text = "WrapContents = True",
             Width = 180,
             Height = 36,
-            Margin = new Size(6, 6)
+            Margin = new Padding(6)
         };
         btnWrap.Click += (s, e) =>
         {
@@ -147,7 +147,7 @@ public class FlowLayoutDemoForm : Form
           Text = "FlowBreak = False",
             Width = 180,
             Height = 36,
-            Margin = new Size(6, 6)
+            Margin = new Padding(6)
         };
         btnBreak.Click += (s, e) =>
         {
@@ -166,7 +166,7 @@ public class FlowLayoutDemoForm : Form
             BackColor = Color.White,
             ForeColor = Color.FromArgb(60, 60, 60),
             TextAlign = ContentAlignment.MiddleCenter,
-            Margin = new Size(6, 6)
+            Margin = new Padding(6)
         };
         flow.Controls.Add(info);
     }

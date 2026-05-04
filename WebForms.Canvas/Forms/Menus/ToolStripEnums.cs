@@ -217,6 +217,7 @@ public delegate void ToolStripItemRenderEventHandler(object? sender, ToolStripIt
 /// </summary>
 public abstract class ToolStripRenderer
 {
+    #pragma warning disable CS0067
     public event ToolStripRenderEventHandler? RenderToolStripBackground;
     public event ToolStripRenderEventHandler? RenderToolStripBorder;
     public event ToolStripRenderEventHandler? RenderGrip;
@@ -234,6 +235,7 @@ public abstract class ToolStripRenderer
     public event ToolStripItemRenderEventHandler? RenderToolStripContentPanelBackground;
     public event ToolStripItemRenderEventHandler? RenderToolStripPanelBackground;
     public event ToolStripItemRenderEventHandler? RenderToolStripStatusLabelBackground;
+#pragma warning restore CS0067
     protected virtual void Initialize(ToolStrip toolStrip) { }
     protected virtual void InitializeItem(ToolStripItem item) { }
     protected virtual void InitializeContentPanel(ToolStripContentPanel contentPanel) { }
@@ -281,5 +283,7 @@ public static class ToolStripManager
     public static bool RevertMerge(ToolStrip targetToolStrip) => false;
     public static bool RevertMerge(ToolStrip targetToolStrip, ToolStrip sourceToolStrip) => false;
 
-    public static event EventHandler? RendererChanged;
-}
+    #pragma warning disable CS0067
+        public static event EventHandler? RendererChanged;
+    #pragma warning restore CS0067
+    }

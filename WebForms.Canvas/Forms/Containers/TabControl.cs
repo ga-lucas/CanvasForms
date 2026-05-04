@@ -187,8 +187,8 @@ public class TabControl : Control
         if (_tabPages.Count == 0) return;
 
         var headerBounds = GetHeaderBounds();
+        const int tabRadius = 3;
 
-        // Clip headers to header area.
         g.Save();
         g.SetClip(headerBounds);
 
@@ -201,7 +201,6 @@ public class TabControl : Control
             }
             else
             {
-                // Single row: stop once we leave visible header area.
                 if (Alignment == TabAlignment.Top || Alignment == TabAlignment.Bottom)
                 {
                     if (rect.X >= headerBounds.Right)
@@ -221,18 +220,36 @@ public class TabControl : Control
             }
 
             var selected = i == _selectedIndex;
-            var hovered = i == _hoveredIndex;
+            var hovered  = i == _hoveredIndex;
 
-            var bg = selected ? CanvasColor.White : (hovered && HotTrack ? CanvasColor.FromArgb(229, 241, 251) : CanvasColor.FromArgb(240, 240, 240));
-
-            using (var b = new SolidBrush(bg))
+            CanvasColor bgTop, bgBottom;
+            if (selected)
             {
-                g.FillRectangle(b, rect);
+                bgTop    = CanvasColor.White;
+                bgBottom = CanvasColor.FromArgb(245, 245, 245);
+            }
+            else if (hovered && HotTrack)
+            {
+                bgTop    = CanvasColor.FromArgb(235, 245, 255);
+                bgBottom = CanvasColor.FromArgb(218, 235, 252);
+            }
+            else
+            {
+                bgTop    = CanvasColor.FromArgb(248, 248, 248);
+                bgBottom = CanvasColor.FromArgb(232, 232, 232);
+            }
+
+            using (var b = new LinearGradientBrush(
+                new Point(rect.Left, rect.Top),
+                new Point(rect.Left, rect.Bottom),
+                bgTop, bgBottom))
+            {
+                g.FillRoundRect(b, rect, tabRadius);
             }
 
             using (var border = new Pen(CanvasColor.FromArgb(200, 200, 200)))
             {
-                g.DrawRectangle(border, rect);
+                g.DrawRoundRect(border, rect, tabRadius);
             }
 
             var textColor = Enabled ? ForeColor : DisabledForeColor;
@@ -365,7 +382,7 @@ public class TabControl : Control
 
         if (!e.Handled)
         {
-            if (e.KeyCode == Keys.Left)
+            if (e.KeyCode == Keys.Left || (e.KeyCode == Keys.Tab && e.Shift && e.Control))
             {
                 if (_tabPages.Count > 0)
                 {
@@ -375,7 +392,7 @@ public class TabControl : Control
                     return;
                 }
             }
-            else if (e.KeyCode == Keys.Right)
+            else if (e.KeyCode == Keys.Right || (e.KeyCode == Keys.Tab && e.Control && !e.Shift))
             {
                 if (_tabPages.Count > 0)
                 {
@@ -384,6 +401,14 @@ public class TabControl : Control
                     e.Handled = true;
                     return;
                 }
+            }
+            else if (e.KeyCode == Keys.Home)
+            {
+                if (_tabPages.Count > 0) { SetSelectedIndex(0, userInitiated: true); e.Handled = true; return; }
+            }
+            else if (e.KeyCode == Keys.End)
+            {
+                if (_tabPages.Count > 0) { SetSelectedIndex(_tabPages.Count - 1, userInitiated: true); e.Handled = true; return; }
             }
         }
 

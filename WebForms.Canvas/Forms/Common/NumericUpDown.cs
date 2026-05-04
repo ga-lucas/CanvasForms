@@ -50,6 +50,8 @@ public class NumericUpDown : UpDownBase
 
     public decimal Increment { get => _increment; set => _increment = value; }
 
+    public HorizontalAlignment TextAlign { get; set; } = HorizontalAlignment.Left;
+
     public int DecimalPlaces
     {
         get => _decimalPlaces;
@@ -70,6 +72,52 @@ public class NumericUpDown : UpDownBase
 
     public override void UpButton() => Value = Math.Min(_maximum, _value + _increment);
     public override void DownButton() => Value = Math.Max(_minimum, _value - _increment);
+
+    private string _typingBuffer = string.Empty;
+
+    protected internal override void OnKeyPress(KeyPressEventArgs e)
+    {
+        if (ReadOnly) { base.OnKeyPress(e); return; }
+
+        char c = e.KeyChar;
+        if (c == (char)Keys.Back)
+        {
+            if (_typingBuffer.Length > 0)
+                _typingBuffer = _typingBuffer[..^1];
+        }
+        else if (c == '\r' || c == '\n')
+        {
+            CommitTypingBuffer();
+            _typingBuffer = string.Empty;
+        }
+        else if (char.IsDigit(c) || (c == '-' && _typingBuffer.Length == 0 && _minimum < 0)
+                 || (c == '.' && _decimalPlaces > 0 && !_typingBuffer.Contains('.')))
+        {
+            _typingBuffer += c;
+            if (decimal.TryParse(_typingBuffer, out var parsed))
+            {
+                var clamped = Math.Max(_minimum, Math.Min(_maximum, parsed));
+                _value = clamped;
+                ValueChanged?.Invoke(this, EventArgs.Empty);
+                Invalidate();
+            }
+        }
+        e.Handled = true;
+        base.OnKeyPress(e);
+    }
+
+    protected internal override void OnLostFocus(EventArgs e)
+    {
+        CommitTypingBuffer();
+        _typingBuffer = string.Empty;
+        base.OnLostFocus(e);
+    }
+
+    private void CommitTypingBuffer()
+    {
+        if (!string.IsNullOrEmpty(_typingBuffer) && decimal.TryParse(_typingBuffer, out var parsed))
+            Value = parsed;
+    }
 
     protected override string GetValueText()
     {

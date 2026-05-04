@@ -42,7 +42,7 @@ public sealed class SqliteDataConnection
     /// </summary>
     public void EnsureSeeded()
     {
-        using var conn = CreateConnection();
+        using var conn = (SqliteConnection)CreateConnection();
         using var cmd = conn.CreateCommand();
 
         // ── Products table ──────────────────────────────────────────────────

@@ -26,7 +26,7 @@ public class ContextMenuStrip : ToolStripDropDownMenu
     public new event ToolStripDropDownClosingEventHandler? Closing;
 
     /// <summary>Raised after the menu has closed.</summary>
-    public new event EventHandler? Closed;
+    public event EventHandler? Closed;
 
     // ── Constructors ───────────────────────────────────────────────────────────
 
@@ -45,7 +45,7 @@ public class ContextMenuStrip : ToolStripDropDownMenu
     // ── Show overloads (mirrors WinForms API) ──────────────────────────────────
 
     /// <summary>Shows the menu at the given point (screen/form coordinates).</summary>
-    public void Show(Point location)
+    public new void Show(Point location)
     {
         _sourceControl = null;
         PopupLocation  = location;
@@ -53,7 +53,7 @@ public class ContextMenuStrip : ToolStripDropDownMenu
     }
 
     /// <summary>Shows the menu at screen/form coordinates.</summary>
-    public void Show(int x, int y) => Show(new Point(x, y));
+    public new void Show(int x, int y) => Show(new Point(x, y));
 
     /// <summary>Shows the menu relative to a control.</summary>
     public void Show(Control control, Point position)
@@ -64,10 +64,10 @@ public class ContextMenuStrip : ToolStripDropDownMenu
         OpenInternal();
     }
 
-    public void Show(Control control, int x, int y) => Show(control, new Point(x, y));
+    public new void Show(Control control, int x, int y) => Show(control, new Point(x, y));
 
     /// <summary>Shows the menu relative to a control in the given direction (stub — direction ignored).</summary>
-    public void Show(Control control, Point position, ToolStripDropDownDirection direction)
+    public new void Show(Control control, Point position, ToolStripDropDownDirection direction)
         => Show(control, position);
 
     // ── Open / Close ───────────────────────────────────────────────────────────
@@ -101,7 +101,7 @@ public class ContextMenuStrip : ToolStripDropDownMenu
     }
 
     /// <summary>Closes the menu with the specified reason.</summary>
-    public void Close(ToolStripDropDownCloseReason reason)
+    public new void Close(ToolStripDropDownCloseReason reason)
     {
         if (!IsVisible) return;
         var args = new ToolStripDropDownClosingEventArgs(reason);

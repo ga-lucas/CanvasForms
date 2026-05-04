@@ -419,7 +419,7 @@ public class ToolStrip : ScrollableControl
             int midY     = bounds.Y + bounds.Height / 2;
             int iconX    = bounds.X + 4;
             int iconY    = midY - iconSize / 2;
-            g.DrawImage(item.Image!.Source, iconX, iconY, iconSize, iconSize);
+            g.DrawImage(item.Image!.Source ?? string.Empty, iconX, iconY, iconSize, iconSize);
             // textBaseline='top' in JS, so offset by half the font size (12px) to center
             int textX = bounds.X + iconSize + 8;
             int textY = midY - 6;
@@ -431,7 +431,7 @@ public class ToolStrip : ScrollableControl
             int iconSize = Math.Min(bounds.Height - 6, 16);
             int iconX    = bounds.X + (bounds.Width  - iconSize) / 2;
             int iconY    = bounds.Y + (bounds.Height - iconSize) / 2;
-            g.DrawImage(item.Image!.Source, iconX, iconY, iconSize, iconSize);
+            g.DrawImage(item.Image!.Source ?? string.Empty, iconX, iconY, iconSize, iconSize);
         }
         else if (showText)
         {
@@ -454,7 +454,7 @@ public class ToolStrip : ScrollableControl
     /// <summary>
     /// Forces an immediate layout pass on the strip (stub — canvas lays out during paint).
     /// </summary>
-    public void PerformLayout() { /* layout happens in OnPaint; no-op here */ }
+    public new void PerformLayout() { /* layout happens in OnPaint; no-op here */ }
 
     // ── FindForm forwarding ────────────────────────────────────────────────────
 
@@ -490,7 +490,9 @@ public class ToolStripDropDownButton : ToolStripItem
 
     public event EventHandler? DropDownOpening;
     public event EventHandler? DropDownOpened;
+#pragma warning disable CS0067
     public event EventHandler? DropDownClosed;
+#pragma warning restore CS0067
 
     public ToolStripDropDownButton() { }
     public ToolStripDropDownButton(string text) { Text = text; }
@@ -600,7 +602,7 @@ public class ToolStripTextBox : ToolStripItem
     public bool Multiline     { get => TextBox.Multiline;     set => TextBox.Multiline     = value; }
     public bool ReadOnly      { get => TextBox.ReadOnly;      set => TextBox.ReadOnly      = value; }
     public int MaxLength      { get => TextBox.MaxLength;     set => TextBox.MaxLength     = value; }
-    public HorizontalAlignment TextAlign { get => TextBox.TextAlign; set => TextBox.TextAlign = value; }
+    public new HorizontalAlignment TextAlign { get => TextBox.TextAlign; set => TextBox.TextAlign = value; }
     public ScrollBars ScrollBars { get => TextBox.ScrollBars; set => TextBox.ScrollBars   = value; }
 
     public ToolStripTextBox() { }

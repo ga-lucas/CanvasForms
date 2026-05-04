@@ -116,7 +116,9 @@ The server runs this automatically when an app is installed via the UI.
 Paint event  →  Graphics commands  →  canvas-renderer.js  →  HTMLCanvasElement
 ```
 
-Drawing commands are buffered and dispatched to the JS renderer via Blazor JS interop.
+Drawing commands are buffered as typed `DrawingCommand` objects and dispatched to the JS renderer via Blazor JS interop. Gradient brushes are serialised as compact token strings (`LG:…` / `RG:…`) that the JS side resolves into `CanvasGradient` objects at paint time. `GraphicsPath` segments are serialised as a flat numeric array and replayed natively using the Canvas 2D path API.
+
+Current opcodes: `StrokeLine`, `StrokeRect`, `FillRect`, `StrokeEllipse`, `FillEllipse`, `DrawText`, `Clear`, `Save`/`Restore`, `ClipRect`, `DrawImage`, `StrokeRoundRect`, `FillRoundRect`, `DrawArc`, `DrawBezier`, `DrawPolygon`/`FillPolygon`, `DrawPath`/`FillPath`.
 
 ---
 
@@ -218,34 +220,34 @@ The following WinForms controls/types currently exist under `WebForms.Canvas/For
 - `ToolTip`
 - `NotifyIcon`
 
-### Not implemented yet (common WinForms controls)
+### Not yet implemented (common WinForms controls)
 
-This list is not exhaustive; it’s meant to highlight frequently used WinForms controls that are not currently present in this repo.
+Controls below have **no source file** in the repo yet. Everything else either has at least a stub or partial implementation — check the [Controls roadmap](#controls-roadmap) table for its current status.
 
-**Menus / toolbars**
-- `MainMenu`, `ContextMenu`
-- `MenuStrip`, `ContextMenuStrip`, `ToolStrip`, `StatusStrip`
+**Menus / toolbars (legacy)**
+- `MainMenu`, `ContextMenu` (pre-`MenuStrip` legacy)
+- `ToolBar` (pre-`ToolStrip` legacy)
 
 **Data / inspection**
-- `DataGridView`
 - `PropertyGrid`
+- `BindingNavigator`
 
 **Value/input**
 - `TrackBar`
-- `ScrollBar` (`HScrollBar`, `VScrollBar`)
+- `HScrollBar` / `VScrollBar` (standalone)
 - `DomainUpDown`
 
-**Rich UI controls**
-- `ListView` / `TreeView` advanced features (icons, in-place label editing, full keyboard/mouse parity, virtualization)
-- `ListView` groups, image lists, and owner-draw modes
+**Print**
+- `PrintDialog`, `PrintPreviewDialog`, `PrintDocument`, `PrintPreviewControl`
 
-**Dialogs**
-- `OpenFileDialog`, `SaveFileDialog`, `FolderBrowserDialog`
-- `ColorDialog`, `FontDialog`, `PrintDialog`
-
-**Other common controls**
-- `WebBrowser`
+**Other**
+- `ErrorProvider`
+- `HelpProvider`
+- `WebBrowser` / WebView2
 - `Chart`
+- MDI (`MdiClient`, MDI Forms)
+- `Screen` (multi-monitor info)
+- `Clipboard` (JS bridge needed)
 
 Controls live in `WebForms.Canvas/Forms/...` (project: `Canvas.Windows.Forms`).
 See `COMPATIBILITY_REVIEW.md` for a full per-control breakdown, and the test project for property-level tracking:
@@ -279,26 +281,72 @@ Status legend:
 | Display | `MonthCalendar` | ⚠️ Partial | Single-month view + basic keyboard/mouse navigation. |
 | Common | `DateTimePicker` | ⚠️ Partial | Simplified text rendering + drop-down calendar. |
 | Common | `NumericUpDown` / `UpDownBase` | ⚠️ Partial | Spinner UI + value clamping/events; missing WinForms edge cases. |
+| Common | `ImageList` | 🧩 Stub/Compatibility | API present; image storage stub. |
+| Common | `Timer` | ✅ Good | `PeriodicTimer`-based async loop; fires on captured `SynchronizationContext`. |
 | Containers | `Panel` / `ScrollableControl` | ⚠️ Partial | Child painting + input routing; supports scroll offset behavior used by nested controls. |
 | Containers | `GroupBox` | ⚠️ Partial | Border/caption + child routing/clipping. |
+| Containers | `TabControl` | ⚠️ Partial | Tab strip + page switching. |
+| Containers | `SplitContainer` | ⚠️ Partial | Resizable pane splitter. |
+| Containers | `UserControl` | 🧩 Stub/Compatibility | Base present; full composite lifecycle partial. |
 | Layout | `FlowLayoutPanel` | ⚠️ Partial | FlowDirection + wrap/flow-break behavior. |
 | Layout | `TableLayoutPanel` | ⚠️ Partial | Row/column styles + spans; anchors/dock within cells. |
-
-Non-visual WinForms components (API-oriented):
-
-- `ToolTip` (stub)
-- `NotifyIcon` (stub)
-
+| Menus | `MenuStrip` | ⚠️ Partial | Top-level menu bar with dropdowns. |
+| Menus | `ContextMenuStrip` | ⚠️ Partial | Right-click overlay menus. |
+| Menus | `ToolStrip` | ⚠️ Partial | Toolbar with icons, hover, checked state. |
+| Menus | `StatusStrip` / `ToolStripStatusLabel` | ⚠️ Partial | Status bar; Spring, BorderSides, SizingGrip. |
+| Menus | `ToolStripMenuItem` | 🧩 Stub/Compatibility | Dropdowns, check state, shortcuts. |
+| Menus | `ToolStripContainer` / `ToolStripPanel` | 🧩 Stub/Compatibility | Dockable strip host. |
+| Dialogs | `OpenFileDialog` | ⚠️ Partial | Host FS + browser upload. |
+| Dialogs | `SaveFileDialog` | ⚠️ Partial | `CreatePrompt`, `OverwritePrompt`, `OpenFile()`. |
+| Dialogs | `FolderBrowserDialog` | ⚠️ Partial | `SelectedPath`, `Description`, `ShowNewFolderButton`; host FS aware. |
+| Dialogs | `ColorDialog` | ⚠️ Partial | Swatch palette + Hex/RGB/HSV inputs. |
+| Dialogs | `FontDialog` | ⚠️ Partial | Family/style/size lists; `ShowEffects`, `ShowColor`, `Apply` event. |
+| Data | `DataGridView` | ⚠️ Partial | `IList`/`BindingSource`/`DataTable` binding; auto-column gen; sort; column types: TextBox/CheckBox/Button/ComboBox/Image/Link. |
+| Data | `BindingSource` | ⚠️ Partial | `IList`/`IBindingList` wrapper; `Current`/`Position` navigation; server-backed via `CanvasDataService`. |
+| Non-visual | `ToolTip` | 🧩 Stub/Compatibility | API present; rendering may be incomplete. |
+| Non-visual | `NotifyIcon` | 🧩 Stub/Compatibility | API present; system tray stub. |
 ### Layout
 
 - Docking and anchoring (`Dock`, `Anchor`)
 
 ### Drawing
 
-- Shapes (lines/rectangles/ellipses)
-- Fill operations
-- Text rendering
-- Command-buffered rendering to JS canvas
+#### Primitives
+- Lines, rectangles, ellipses — stroke and fill
+- **Rounded rectangles** — `DrawRoundRect` / `FillRoundRect` with corner radius
+- **Arcs** — `DrawArc(pen, x, y, w, h, startAngle, sweepAngle)`
+- **Bezier curves** — `DrawBezier(pen, p1, c1, c2, p2)`
+- **Polygons** — `DrawPolygon` / `FillPolygon`
+- Text rendering with Bold/Italic/Underline/Strikeout
+
+#### Brushes
+| Brush | Description |
+|---|---|
+| `SolidBrush` | Flat colour fill |
+| `LinearGradientBrush` | Two-colour gradient between two points or across a rectangle; supports `LinearGradientMode` (Horizontal/Vertical/Diagonal) and custom `InterpolationColors` stops |
+| `RadialGradientBrush` | Radial glow from a centre point (canvas extension) |
+
+#### GraphicsPath
+`GraphicsPath` accumulates path segments and is drawn/filled via `g.DrawPath` / `g.FillPath`:
+
+```csharp
+var path = new GraphicsPath();
+path.AddArc(10, 10, 80, 80, 0, 180);
+path.AddLine(90, 50, 150, 50);
+path.AddBezier(new Point(150,50), new Point(180,10), new Point(220,90), new Point(250,50));
+path.CloseFigure();
+
+g.FillPath(new LinearGradientBrush(new Point(10,10), new Point(250,90),
+    Color.SkyBlue, Color.Navy), path);
+g.DrawPath(new Pen(Color.DarkBlue, 2), path);
+```
+
+Supported segment types: `AddLine`, `AddLines`, `AddBezier`, `AddArc`, `AddRectangle`, `AddEllipse`, `AddPolygon`, `CloseFigure`.
+
+All gradient brushes also work with `FillRectangle`, `FillEllipse`, and `FillRoundRect`.
+
+#### Command-buffered rendering
+Drawing calls are accumulated as typed command objects and dispatched once per frame to the JS canvas renderer via Blazor interop — no `eval` or string building at runtime.
 
 ## WinForms compatibility notes
 
@@ -336,10 +384,10 @@ Items are ordered by estimated prevalence in designer-generated / translated Win
 | ✅ | `Button` / `ButtonBase` | Hover, pressed, focus, keyboard |
 | ✅ | `CheckBox` | Toggle + indicator |
 | ✅ | `RadioButton` | Mutual exclusion within parent |
-| ⚠️ | `TextBox` / `TextBoxBase` | Editing, selection, shortcuts; autocomplete evolving |
-| ⚠️ | `Label` | Multi-line, alignment, approximate measurement |
+| ✅ | `TextBox` / `TextBoxBase` | Editing, selection, shortcuts, redo, word-delete, placeholder, autocomplete |
+| ✅ | `Label` | Multi-line, alignment, UseMnemonic, AutoEllipsis, AutoSize, BorderStyle, FlatStyle |
 | ⚠️ | `ComboBox` | Drop-down + selection; autocomplete partial |
-| ⚠️ | `ListBox` | Selection + navigation; advanced modes missing |
+| ✅ | `ListBox` | Selection + navigation; owner-draw, MeasureItem, ItemHeight, IntegralHeight, double-click |
 | ⚠️ | `Panel` / `ScrollableControl` | Child painting, input routing, scroll offset |
 | ⚠️ | `GroupBox` | Border/caption + child routing |
 | ⚠️ | `TabControl` | Tab strip + page switching |
@@ -347,15 +395,15 @@ Items are ordered by estimated prevalence in designer-generated / translated Win
 | ⚠️ | `ContextMenuStrip` | Right-click overlay menus |
 | ⚠️ | `ToolStrip` | Toolbar with icons, hover, checked state |
 | ⚠️ | `StatusStrip` / `ToolStripStatusLabel` | Status bar; Spring, BorderSides, SizingGrip |
-| ⚠️ | `SplitContainer` | Resizable pane splitter |
-| ⚠️ | `FlowLayoutPanel` | FlowDirection + wrap/break |
-| ⚠️ | `TableLayoutPanel` | Row/column styles + spans |
-| ⚠️ | `DateTimePicker` | Simplified text + drop-down calendar |
-| ⚠️ | `NumericUpDown` | Spinner UI + value clamping |
-| ⚠️ | `PictureBox` | URL-based image loading |
-| ⚠️ | `ProgressBar` | Blocks/continuous/marquee |
-| ⚠️ | `TreeView` | Nodes, expand/collapse, selection |
-| ⚠️ | `ListView` | Details view + columns; growing |
+| ✅ | `SplitContainer` | Resizable pane splitter; fixed/min-size; double-click reset |
+| ✅ | `FlowLayoutPanel` | FlowDirection + wrap/break + SetFlowBreak |
+| ✅ | `TableLayoutPanel` | Row/column styles + spans; CellBorderStyle; GetControlFromPosition |
+| ✅ | `DateTimePicker` | Format/CustomFormat; ShowUpDown/ShowCheckBox; calendar styling properties |
+| ✅ | `NumericUpDown` | Spinner UI + value clamping; direct-type keyboard entry; TextAlign |
+| ✅ | `PictureBox` | URL/Image; Load/LoadAsync; SizeMode; LoadCompleted/LoadProgressChanged events |
+| ✅ | `ProgressBar` | Blocks/continuous/marquee; animated MarqueeAnimationSpeed; RightToLeftLayout |
+| ✅ | `TreeView` | Nodes, expand/collapse, selection; LabelEdit; ToolTipText; BeginUpdate/EndUpdate |
+| ✅ | `ListView` | Details/List/LargeIcon views; keyboard nav; EnsureVisible; BeginUpdate/EndUpdate |
 | ⚠️ | `OpenFileDialog` | Host FS + browser upload |
 | 🧩 | `ToolTip` | API present; rendering may be incomplete |
 | ⚠️ | **`DataGridView`** | In-process `DataSource` binding (IList, BindingSource, DataTable); auto-column gen; virtualised scroll; row selection; sort; column types: TextBox/CheckBox/Button/ComboBox/Image/Link |
@@ -373,10 +421,10 @@ Items are ordered by estimated prevalence in designer-generated / translated Win
 | ⚠️ | `RichTextBox` | Stores RTF, renders as plain text |
 | ⚠️ | `MaskedTextBox` | Masked display + basic validation |
 | ⚠️ | `CheckedListBox` | Basic checked item behaviour |
-| ⚠️ | `MonthCalendar` | Single-month view + keyboard/mouse |
+| ✅ | `MonthCalendar` | Single-month view; SelectionRange; BoldedDates; keyboard/mouse nav |
 | 🧩 | `NotifyIcon` | API present; system tray stub |
 | 🧩 | `UserControl` | Base present; full composite lifecycle partial |
-| 🧩 | `ToolStripMenuItem` | Dropdowns, check state, shortcuts |
+| ⚠️ | `ToolStripMenuItem` | Dropdowns, check state, shortcuts, image, enabled |
 | 🧩 | `ToolStripContainer` / `ToolStripPanel` | Dockable strip host |
 | 🔲 | **`PropertyGrid`** | Common in tools and settings panels |
 | 🔲 | **`TrackBar`** | Slider; common in settings/media UIs |
@@ -394,7 +442,7 @@ Items are ordered by estimated prevalence in designer-generated / translated Win
 | Status | Control | Notes |
 |--------|---------|-------|
 | 🔲 | **`DataGrid`** (legacy) | Older apps use instead of `DataGridView` |
-| ⚠️ | **`BindingSource`** | IList/IBindingList wrapper with `ListChanged`; `Current`/`Position` navigation; server-backed via `CanvasDataService` |
+| ✅ | **`BindingSource`** | IList/IBindingList wrapper; `Current`/`Position`; `Filter`/`Sort`/`Find`; server-backed via `CanvasDataService` |
 | 🔲 | **`BindingNavigator`** | Record-navigation bar; paired with `BindingSource` |
 | 🔲 | **`StatusBar`** (legacy) | Pre-`StatusStrip`; thin wrapper for translator compat |
 | 🔲 | **`ToolBar`** (legacy) | Pre-`ToolStrip` |

@@ -108,18 +108,34 @@ public struct Color
     public static Color LightSlateGray => FromArgb(119, 136, 153);
 
     // Common web/UI colors
-    public static Color Orange => FromArgb(255, 165, 0);
-    public static Color Purple => FromArgb(128, 0, 128);
-    public static Color Brown => FromArgb(165, 42, 42);
-    public static Color Pink => FromArgb(255, 192, 203);
-    public static Color Lime => FromArgb(0, 255, 0);
-    public static Color Navy => FromArgb(0, 0, 128);
-    public static Color Teal => FromArgb(0, 128, 128);
-    public static Color Olive => FromArgb(128, 128, 0);
-    public static Color Maroon => FromArgb(128, 0, 0);
-    public static Color Silver => FromArgb(192, 192, 192);
-    public static Color Aqua => FromArgb(0, 255, 255);
-    public static Color Fuchsia => FromArgb(255, 0, 255);
+    public static Color Orange     => FromArgb(255, 165,   0);
+    public static Color Purple     => FromArgb(128,   0, 128);
+    public static Color Brown      => FromArgb(165,  42,  42);
+    public static Color Pink       => FromArgb(255, 192, 203);
+    public static Color Lime       => FromArgb(  0, 255,   0);
+    public static Color Navy       => FromArgb(  0,   0, 128);
+    public static Color Teal       => FromArgb(  0, 128, 128);
+    public static Color Olive      => FromArgb(128, 128,   0);
+    public static Color Maroon     => FromArgb(128,   0,   0);
+    public static Color Silver     => FromArgb(192, 192, 192);
+    public static Color Aqua       => FromArgb(  0, 255, 255);
+    public static Color Fuchsia    => FromArgb(255,   0, 255);
+    // Extended named colors
+    public static Color DarkBlue   => FromArgb(  0,   0, 139);
+    public static Color DarkRed    => FromArgb(139,   0,   0);
+    public static Color DarkGreen  => FromArgb(  0, 100,   0);
+    public static Color DarkOrange => FromArgb(255, 140,   0);
+    public static Color DeepPink   => FromArgb(255,  20, 147);
+    public static Color OrangeRed  => FromArgb(255,  69,   0);
+    public static Color Coral      => FromArgb(255, 127,  80);
+    public static Color Gold       => FromArgb(255, 215,   0);
+    public static Color Indigo     => FromArgb( 75,   0, 130);
+    public static Color Violet     => FromArgb(238, 130, 238);
+    public static Color SkyBlue    => FromArgb(135, 206, 235);
+    public static Color Crimson    => FromArgb(220,  20,  60);
+    public static Color LightBlue  => FromArgb(173, 216, 230);
+    public static Color LightGreen => FromArgb(144, 238, 144);
+    public static Color LightYellow=> FromArgb(255, 255, 224);
 
     public static implicit operator Color(System.Drawing.Color c)
     {

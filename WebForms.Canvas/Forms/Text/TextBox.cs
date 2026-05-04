@@ -10,10 +10,11 @@ public class TextBox : TextBoxBase
     private HorizontalAlignment _textAlign = HorizontalAlignment.Left;
     private CharacterCasing _characterCasing = CharacterCasing.Normal;
     private bool _useSystemPasswordChar = false;
-    private string[] _autoCompleteCustomSource = Array.Empty<string>();
+    private AutoCompleteStringCollection _autoCompleteCustomSource = new();
     private AutoCompleteMode _autoCompleteMode = AutoCompleteMode.None;
     private AutoCompleteSource _autoCompleteSource = AutoCompleteSource.None;
     private AutoCompletePanel? _autoCompletePanel;
+    private string _placeholderText = string.Empty;
 
     public TextBox()
     {
@@ -24,6 +25,22 @@ public class TextBox : TextBoxBase
     }
 
     #region Properties
+
+    /// <summary>
+    /// Gets or sets the text that is displayed when the control has no text and does not have focus
+    /// </summary>
+    public string PlaceholderText
+    {
+        get => _placeholderText;
+        set
+        {
+            if (_placeholderText != value)
+            {
+                _placeholderText = value ?? string.Empty;
+                Invalidate();
+            }
+        }
+    }
 
     /// <summary>
     /// Gets or sets the character used for password masking
@@ -91,12 +108,12 @@ public class TextBox : TextBoxBase
     }
 
     /// <summary>
-    /// Gets or sets the auto-complete custom source (stub)
+    /// Gets or sets the auto-complete custom source
     /// </summary>
-    public string[] AutoCompleteCustomSource
+    public AutoCompleteStringCollection AutoCompleteCustomSource
     {
         get => _autoCompleteCustomSource;
-        set => _autoCompleteCustomSource = value ?? Array.Empty<string>();
+        set => _autoCompleteCustomSource = value ?? new AutoCompleteStringCollection();
     }
 
     /// <summary>
@@ -173,7 +190,7 @@ public class TextBox : TextBoxBase
     /// <summary>
     /// Draws single-line text with TextBox-specific features (alignment and auto-scroll)
     /// </summary>
-    protected override void DrawSingleLineText(Graphics g, string displayText, Rectangle textBounds, System.Drawing.Color textColor, bool hasFocus, TextMeasurementService? measureService)
+    protected override void DrawSingleLineText(Graphics g, string displayText, Rectangle textBounds, System.Drawing.Color textColor, bool showSelection, TextMeasurementService? measureService)
     {
         // Update scroll to keep caret visible
         if (measureService != null && !string.IsNullOrEmpty(displayText))
@@ -181,12 +198,24 @@ public class TextBox : TextBoxBase
             UpdateScrollPosition(displayText, measureService, textBounds.Width);
         }
 
+        // Draw placeholder when empty and unfocused
+        if (string.IsNullOrEmpty(displayText) && !string.IsNullOrEmpty(_placeholderText))
+        {
+            var hasFocus = FindForm() is Form f && f.FocusedControl == this;
+            if (!hasFocus)
+            {
+                var placeholderColor = System.Drawing.Color.FromArgb(160, 160, 160);
+                g.DrawString(_placeholderText, Font, placeholderColor, textBounds.X, textBounds.Y);
+                return;
+            }
+        }
+
         // Calculate text X position based on alignment
         var textX = CalculateTextX(textBounds, displayText, measureService);
         var textY = textBounds.Y;
 
         // Draw selection if any
-        if (_selectionLength > 0 && hasFocus && measureService != null)
+        if (_selectionLength > 0 && showSelection && measureService != null)
         {
             DrawTextWithSelection(g, displayText, textX, textY, textColor, measureService);
         }
@@ -307,7 +336,7 @@ public class TextBox : TextBoxBase
 
     private void UpdateAutoComplete()
     {
-        if (_autoCompleteMode == AutoCompleteMode.None || 
+        if (_autoCompleteMode == AutoCompleteMode.None ||
             _autoCompleteSource == AutoCompleteSource.None ||
             string.IsNullOrWhiteSpace(Text))
         {
@@ -315,16 +344,32 @@ public class TextBox : TextBoxBase
             return;
         }
 
-        // Get suggestions based on source
-        var suggestions = GetAutoCompleteSuggestions(Text);
+        var suggestions = GetAutoCompleteSuggestions(Text).ToList();
 
-        if (suggestions.Any())
+        if (_autoCompleteMode == AutoCompleteMode.Append ||
+            _autoCompleteMode == AutoCompleteMode.SuggestAppend)
         {
-            _autoCompletePanel?.Show(suggestions, Text);
+            // Inline append: show best match as selected suffix after caret
+            var best = suggestions.FirstOrDefault();
+            if (best != null && best.Length > Text.Length)
+            {
+                var typed = Text;
+                Text = best;
+                _selectionStart  = typed.Length;
+                _selectionLength = best.Length - typed.Length;
+                _caretPosition   = best.Length;
+                Invalidate();
+                // Fall through to also show the suggestion panel for SuggestAppend
+            }
         }
-        else
+
+        if (_autoCompleteMode == AutoCompleteMode.Suggest ||
+            _autoCompleteMode == AutoCompleteMode.SuggestAppend)
         {
-            _autoCompletePanel?.Hide();
+            if (suggestions.Any())
+                _autoCompletePanel?.Show(suggestions, Text);
+            else
+                _autoCompletePanel?.Hide();
         }
     }
 
@@ -338,57 +383,54 @@ public class TextBox : TextBoxBase
                 .Take(20);
         }
 
-        // Other sources would be implemented here (FileSystem, HistoryList, etc.)
+        if (_autoCompleteSource == AutoCompleteSource.ListItems)
+        {
+            // Resolved by the owning form/context; nothing available here
+            return Enumerable.Empty<string>();
+        }
+
+        // FileSystem, HistoryList, etc. require platform support — not available in browser
         return Enumerable.Empty<string>();
     }
 
     internal void AcceptAutoCompleteSuggestion(string suggestion)
     {
-        if (_autoCompleteMode == AutoCompleteMode.Suggest || 
-            _autoCompleteMode == AutoCompleteMode.SuggestAppend)
+        switch (_autoCompleteMode)
         {
-            Text = suggestion;
-            _caretPosition = suggestion.Length;
-            _selectionStart = _caretPosition;
-            _selectionLength = 0;
-            Invalidate();
+            case AutoCompleteMode.Suggest:
+            case AutoCompleteMode.SuggestAppend:
+                // Replace entire text with selected suggestion
+                Text = suggestion;
+                _caretPosition   = suggestion.Length;
+                _selectionStart  = _caretPosition;
+                _selectionLength = 0;
+                break;
+
+            case AutoCompleteMode.Append:
+                // Append only: keep what the user typed, append the rest of the match
+                if (suggestion.StartsWith(Text, StringComparison.OrdinalIgnoreCase))
+                {
+                    var typed = Text;
+                    Text = suggestion;
+                    // Select the appended portion so the user can type over it
+                    _selectionStart  = typed.Length;
+                    _selectionLength = suggestion.Length - typed.Length;
+                    _caretPosition   = suggestion.Length;
+                }
+                break;
+
+            default:
+                return;
         }
+
+        _autoCompletePanel?.Hide();
+        Invalidate();
     }
 
     protected override void OnTextChanged(EventArgs e)
     {
         base.OnTextChanged(e);
         UpdateAutoComplete();
-    }
-
-    /// <summary>
-    /// Measures the current text asynchronously to populate the cache
-    /// This ensures accurate measurements are available for rendering
-    /// </summary>
-    private async Task MeasureTextForCacheAsync()
-    {
-        var measureService = FindForm()?.TextMeasurementService;
-        if (measureService == null) return;
-
-        var displayText = GetDisplayText();
-        if (string.IsNullOrEmpty(displayText)) return;
-
-        try
-        {
-            // Measure full text
-            await measureService.MeasureTextAsync(displayText, Font.Family, (int)Font.Size);
-
-            // Also measure text before caret for accurate caret positioning
-            if (_caretPosition > 0 && _caretPosition <= displayText.Length)
-            {
-                var textBeforeCaret = displayText.Substring(0, _caretPosition);
-                await measureService.MeasureTextAsync(textBeforeCaret, Font.Family, (int)Font.Size);
-            }
-        }
-        catch
-        {
-            // Measurement failed, will use estimation fallback during render
-        }
     }
 
     #region Keyboard Input
@@ -507,6 +549,18 @@ public enum CharacterCasing
     Normal = 0,
     Upper = 1,
     Lower = 2
+}
+
+/// <summary>
+/// Provides a collection of strings for auto-complete sources
+/// </summary>
+public class AutoCompleteStringCollection : System.Collections.ObjectModel.Collection<string>
+{
+    public void AddRange(string[] values)
+    {
+        foreach (var v in values)
+            Add(v);
+    }
 }
 
 /// <summary>

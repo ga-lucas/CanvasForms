@@ -14,7 +14,7 @@ public class TableLayoutPanelLayoutTests
             RowCount = 2,
             Width = 200,
             Height = 100,
-            Padding = new Size(0, 0)
+            Padding = new Padding(0)
         };
 
         var child = new Panel { Width = 10, Height = 10 };
@@ -78,7 +78,7 @@ public class TableLayoutPanelLayoutTests
             RowCount = 1,
             Width = 200,
             Height = 50,
-            Padding = new Size(0, 0)
+            Padding = new Padding(0)
         };
 
         // Force a deterministic split.
@@ -93,7 +93,7 @@ public class TableLayoutPanelLayoutTests
         var child = new Panel
         {
             Dock = DockStyle.Fill,
-            Margin = new Size(2, 2),
+            Margin = new Padding(2),
             Width = 1,
             Height = 1
         };
@@ -118,7 +118,7 @@ public class TableLayoutPanelLayoutTests
             RowCount = 1,
             Width = 120,
             Height = 40,
-            Padding = new Size(0, 0)
+            Padding = new Padding(0)
         };
 
         tlp.ColumnStyles[0].SizeType = SizeType.Absolute;
@@ -129,7 +129,7 @@ public class TableLayoutPanelLayoutTests
         var child = new Panel
         {
             Anchor = AnchorStyles.Left | AnchorStyles.Right,
-            Margin = new Size(3, 3),
+            Margin = new Padding(3),
             Width = 10,
             Height = 10
         };

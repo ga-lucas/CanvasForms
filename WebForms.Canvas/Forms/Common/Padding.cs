@@ -84,10 +84,16 @@ public struct Padding : IEquatable<Padding>
     /// </summary>
     public int Horizontal => _left + _right;
 
+    /// <summary>Gets the combined padding for the left and right edges (alias for <see cref="Horizontal"/>).</summary>
+    public int Width => Horizontal;
+
     /// <summary>
     /// Gets the combined padding for the top and bottom edges.
     /// </summary>
     public int Vertical => _top + _bottom;
+
+    /// <summary>Gets the combined padding for the top and bottom edges (alias for <see cref="Vertical"/>).</summary>
+    public int Height => Vertical;
 
     /// <summary>
     /// Gets the padding information in the form of a Size.
@@ -97,6 +103,9 @@ public struct Padding : IEquatable<Padding>
     /// <summary>
     /// Computes the sum of two Padding values.
     /// </summary>
+    public static implicit operator Padding(Canvas.Windows.Forms.Drawing.Size size)
+        => new Padding(size.Width, size.Height, size.Width, size.Height);
+
     public static Padding Add(Padding p1, Padding p2)
     {
         return new Padding(p1.Left + p2.Left, p1.Top + p2.Top, p1.Right + p2.Right, p1.Bottom + p2.Bottom);

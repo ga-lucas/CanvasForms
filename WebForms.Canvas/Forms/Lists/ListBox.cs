@@ -10,6 +10,14 @@ public class ListBox : ListControl
     private SelectionMode _selectionMode = SelectionMode.One;
     private readonly HashSet<int> _selectedIndices = new();
     private int _mouseDownIndex = -1;
+    private int _itemHeight = -1; // -1 = use base default
+    private bool _integralHeight = true;
+
+    // Owner-draw events
+#pragma warning disable CS0067
+    public event MeasureItemEventHandler? MeasureItem;
+#pragma warning restore CS0067
+    public event DrawItemEventHandler? DrawItem;
 
     public ListBox()
     {
@@ -18,6 +26,20 @@ public class ListBox : ListControl
         BackColor = Color.White;
         ForeColor = Color.Black;
         BorderStyle = BorderStyle.Fixed3D;
+    }
+
+    /// <summary>Gets or sets the height of an item in the list (owner-draw or fixed).</summary>
+    public new int ItemHeight
+    {
+        get => _itemHeight > 0 ? _itemHeight : base.ItemHeight;
+        set { _itemHeight = Math.Max(1, value); Invalidate(); }
+    }
+
+    /// <summary>Gets or sets whether the control is resized so that it does not show partial items.</summary>
+    public bool IntegralHeight
+    {
+        get => _integralHeight;
+        set { _integralHeight = value; Invalidate(); }
     }
 
     /// <summary>
@@ -139,7 +161,7 @@ public class ListBox : ListControl
                 ItemHeight
             );
 
-            DrawItem(g, itemIndex, itemBounds);
+            PaintItem(g, itemIndex, itemBounds);
         }
 
         // Draw scrollbar if needed (uses base class method)
@@ -177,8 +199,18 @@ public class ListBox : ListControl
         }
     }
 
-    private void DrawItem(Graphics g, int index, Rectangle bounds)
+    private void PaintItem(Graphics g, int index, Rectangle bounds)
     {
+        // Owner-draw: raise DrawItem event
+        if (DrawMode != DrawMode.Normal && DrawItem != null)
+        {
+            var state = DrawItemState.Default;
+            if (_selectedIndices.Contains(index)) state |= DrawItemState.Selected;
+            if (_hoveredIndex == index) state |= DrawItemState.HotLight;
+            DrawItem.Invoke(this, new DrawItemEventArgs(g, Font, bounds, index, state) { ForeColor = ForeColor, BackColor = BackColor });
+            return;
+        }
+
         var item = Items[index];
         var isSelected = _selectedIndices.Contains(index);
         var isHovered = _hoveredIndex == index && Enabled;
@@ -248,6 +280,19 @@ public class ListBox : ListControl
         _mouseDownIndex = -1;
         HandleScrollbarMouseUp();
         base.OnMouseUp(e);
+    }
+
+    protected internal override void OnMouseDoubleClick(MouseEventArgs e)
+    {
+        var contentArea = GetContentBounds();
+        if (e.X >= contentArea.X && e.X < contentArea.Right &&
+            e.Y >= contentArea.Y && e.Y < contentArea.Bottom)
+        {
+            var itemIndex = _topIndex + ((e.Y - contentArea.Y) / ItemHeight);
+            if (itemIndex >= 0 && itemIndex < Items.Count)
+                OnDoubleClick(EventArgs.Empty);
+        }
+        base.OnMouseDoubleClick(e);
     }
 
     protected internal override void OnMouseMove(MouseEventArgs e)

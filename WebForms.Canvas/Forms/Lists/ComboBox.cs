@@ -184,6 +184,21 @@ public class ComboBox : ListControl
     public bool Sorted { get; set; } = false;
 
     /// <summary>
+    /// Gets or sets the auto-complete mode
+    /// </summary>
+    public AutoCompleteMode AutoCompleteMode { get; set; } = AutoCompleteMode.None;
+
+    /// <summary>
+    /// Gets or sets the source for auto-complete suggestions
+    /// </summary>
+    public AutoCompleteSource AutoCompleteSource { get; set; } = AutoCompleteSource.None;
+
+    /// <summary>
+    /// Gets or sets a custom auto-complete source (ListItems source is handled automatically)
+    /// </summary>
+    public AutoCompleteStringCollection AutoCompleteCustomSource { get; set; } = new AutoCompleteStringCollection();
+
+    /// <summary>
     /// Occurs when the drop-down is opened
     /// </summary>
     public event EventHandler? DropDown;

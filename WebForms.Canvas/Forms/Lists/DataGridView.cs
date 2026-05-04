@@ -37,6 +37,7 @@ public class DataGridView : ScrollableControl
 
     // ── Events ───────────────────────────────────────────────────
     public event EventHandler<DataGridViewCellEventArgs>? CellClick;
+#pragma warning disable CS0067
     public event EventHandler<DataGridViewCellEventArgs>? CellDoubleClick;
     public event EventHandler<DataGridViewCellEventArgs>? CellValueChanged;
     public event EventHandler<DataGridViewCellMouseEventArgs>? CellMouseClick;
@@ -50,6 +51,7 @@ public class DataGridView : ScrollableControl
     public event EventHandler? SelectionChanged;
     public event EventHandler<DataGridViewDataErrorEventArgs>? DataError;
     public event DataGridViewSortCompareEventHandler? SortCompare;
+#pragma warning restore CS0067
     public event EventHandler<DataGridViewColumnEventArgs>? ColumnHeaderMouseClick;
 
     // ── Properties ───────────────────────────────────────────────
@@ -603,7 +605,7 @@ public class DataGridView : ScrollableControl
     /// Refreshes the grid by re-binding the current data source.
     /// Call this when the underlying IList has changed.
     /// </summary>
-    public void Refresh() => RebindDataSource();
+    public new void Refresh() => RebindDataSource();
 }
 
 // ── Supporting event arg types ────────────────────────────────

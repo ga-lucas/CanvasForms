@@ -173,13 +173,13 @@ public class TableLayoutPanel : Panel
         }
 
         var borderWidth = GetBorderWidth();
-        var paddingX = Padding.Width;
-        var paddingY = Padding.Height;
+        var paddingX = Padding.Left;
+        var paddingY = Padding.Top;
 
         var innerLeft = borderWidth + paddingX;
         var innerTop = borderWidth + paddingY;
-        var innerWidth = System.Math.Max(0, Width - (borderWidth * 2) - (paddingX * 2));
-        var innerHeight = System.Math.Max(0, Height - (borderWidth * 2) - (paddingY * 2));
+        var innerWidth = System.Math.Max(0, Width - (borderWidth * 2) - Padding.Horizontal);
+        var innerHeight = System.Math.Max(0, Height - (borderWidth * 2) - Padding.Vertical);
 
       var colWidths = ComputeTrackSizes(isColumn: true, _columnStyles, ColumnCount, innerWidth);
         var rowHeights = ComputeTrackSizes(isColumn: false, _rowStyles, RowCount, innerHeight);
@@ -218,13 +218,13 @@ public class TableLayoutPanel : Panel
 
     private void LayoutChildInCell(Control child, int cellX, int cellY, int cellW, int cellH)
     {
-        var marginX = child.Margin.Width;
-        var marginY = child.Margin.Height;
+        var marginX = child.Margin.Left;
+        var marginY = child.Margin.Top;
 
         var innerX = cellX + marginX;
         var innerY = cellY + marginY;
-        var innerW = System.Math.Max(0, cellW - (marginX * 2));
-        var innerH = System.Math.Max(0, cellH - (marginY * 2));
+        var innerW = System.Math.Max(0, cellW - child.Margin.Horizontal);
+        var innerH = System.Math.Max(0, cellH - child.Margin.Vertical);
 
         // 1) Dock is handled first (WinForms-like precedence)
         if (child.Dock != DockStyle.None)
@@ -551,7 +551,7 @@ public class TableLayoutPanel : Panel
                     if (span < 1) span = 1;
                     if (idx < startTrack || idx >= startTrack + span) continue;
 
-                    var margin = isColumn ? child.Margin.Width * 2 : child.Margin.Height * 2;
+                    var margin = isColumn ? child.Margin.Horizontal : child.Margin.Vertical;
                     var pref = child.PreferredSize;
                   var need = (isColumn ? pref.Width : pref.Height) + margin;
 
@@ -640,13 +640,13 @@ public class TableLayoutPanel : Panel
      if (_columnCount <= 0 || _rowCount <= 0) return;
 
      var borderWidth = GetBorderWidth();
-     var paddingX = Padding.Width;
-     var paddingY = Padding.Height;
+     var paddingX = Padding.Left;
+     var paddingY = Padding.Top;
 
      var innerLeft = borderWidth + paddingX;
      var innerTop = borderWidth + paddingY;
-     var innerWidth = System.Math.Max(0, Width - (borderWidth * 2) - (paddingX * 2));
-     var innerHeight = System.Math.Max(0, Height - (borderWidth * 2) - (paddingY * 2));
+     var innerWidth = System.Math.Max(0, Width - (borderWidth * 2) - Padding.Horizontal);
+     var innerHeight = System.Math.Max(0, Height - (borderWidth * 2) - Padding.Vertical);
 
      var colWidths = ComputeTrackSizes(isColumn: true, _columnStyles, _columnCount, innerWidth);
      var rowHeights = ComputeTrackSizes(isColumn: false, _rowStyles, _rowCount, innerHeight);

@@ -63,13 +63,13 @@ public class FlowLayoutPanel : Panel
 
         var borderWidth = GetBorderWidth();
 
-        var paddingX = Padding.Width;
-        var paddingY = Padding.Height;
+        var paddingX = Padding.Left;
+        var paddingY = Padding.Top;
 
         var innerLeft = borderWidth + paddingX;
         var innerTop = borderWidth + paddingY;
-        var innerWidth = System.Math.Max(0, Width - (borderWidth * 2) - (paddingX * 2));
-        var innerHeight = System.Math.Max(0, Height - (borderWidth * 2) - (paddingY * 2));
+        var innerWidth = System.Math.Max(0, Width - (borderWidth * 2) - Padding.Horizontal);
+        var innerHeight = System.Math.Max(0, Height - (borderWidth * 2) - Padding.Vertical);
 
         switch (_flowDirection)
         {
@@ -98,13 +98,13 @@ public class FlowLayoutPanel : Panel
         {
             if (!child.Visible) continue;
 
-            var marginX = child.Margin.Width;
-            var marginY = child.Margin.Height;
+            var marginX = child.Margin.Left;
+            var marginY = child.Margin.Top;
 
             var cw = child.Width;
             var ch = child.Height;
 
-            var neededWidth = cw + (marginX * 2);
+            var neededWidth = cw + child.Margin.Horizontal;
 
             if (_wrapContents && x != x0 && x - x0 + neededWidth > width)
             {
@@ -117,7 +117,7 @@ public class FlowLayoutPanel : Panel
             child.Top = y + marginY;
 
             x += neededWidth;
-            rowHeight = System.Math.Max(rowHeight, ch + (marginY * 2));
+            rowHeight = System.Math.Max(rowHeight, ch + child.Margin.Vertical);
 
             if (GetFlowBreak(child))
             {
@@ -138,13 +138,13 @@ public class FlowLayoutPanel : Panel
         {
             if (!child.Visible) continue;
 
-            var marginX = child.Margin.Width;
-            var marginY = child.Margin.Height;
+            var marginX = child.Margin.Left;
+            var marginY = child.Margin.Top;
 
             var cw = child.Width;
             var ch = child.Height;
 
-            var neededWidth = cw + (marginX * 2);
+            var neededWidth = cw + child.Margin.Horizontal;
 
             if (_wrapContents && x != x0 + width && (x0 + width) - x + neededWidth > width)
             {
@@ -157,7 +157,7 @@ public class FlowLayoutPanel : Panel
             child.Left = x + marginX;
             child.Top = y + marginY;
 
-            rowHeight = System.Math.Max(rowHeight, ch + (marginY * 2));
+            rowHeight = System.Math.Max(rowHeight, ch + child.Margin.Vertical);
 
             if (GetFlowBreak(child))
             {
@@ -178,13 +178,13 @@ public class FlowLayoutPanel : Panel
         {
             if (!child.Visible) continue;
 
-            var marginX = child.Margin.Width;
-            var marginY = child.Margin.Height;
+            var marginX = child.Margin.Left;
+            var marginY = child.Margin.Top;
 
             var cw = child.Width;
             var ch = child.Height;
 
-            var neededHeight = ch + (marginY * 2);
+            var neededHeight = ch + child.Margin.Vertical;
 
             if (_wrapContents && y != y0 && y - y0 + neededHeight > height)
             {
@@ -197,7 +197,7 @@ public class FlowLayoutPanel : Panel
             child.Top = y + marginY;
 
             y += neededHeight;
-            colWidth = System.Math.Max(colWidth, cw + (marginX * 2));
+            colWidth = System.Math.Max(colWidth, cw + child.Margin.Horizontal);
 
             if (GetFlowBreak(child))
             {
@@ -218,13 +218,13 @@ public class FlowLayoutPanel : Panel
         {
             if (!child.Visible) continue;
 
-            var marginX = child.Margin.Width;
-            var marginY = child.Margin.Height;
+            var marginX = child.Margin.Left;
+            var marginY = child.Margin.Top;
 
             var cw = child.Width;
             var ch = child.Height;
 
-            var neededHeight = ch + (marginY * 2);
+            var neededHeight = ch + child.Margin.Vertical;
 
             if (_wrapContents && y != y0 + height && (y0 + height) - y + neededHeight > height)
             {
@@ -237,7 +237,7 @@ public class FlowLayoutPanel : Panel
             child.Left = x + marginX;
             child.Top = y + marginY;
 
-            colWidth = System.Math.Max(colWidth, cw + (marginX * 2));
+            colWidth = System.Math.Max(colWidth, cw + child.Margin.Horizontal);
 
             if (GetFlowBreak(child))
             {

@@ -292,6 +292,21 @@ public class WelcomeForm : Form
         };
         Controls.Add(btnMenuDemo);
 
+        // Row 5 — Project Status
+        var btnProjectStatus = new Button
+        {
+            Text = "Project Status",
+            Left = 40,
+            Top = 520,
+            Width = 200,
+            Height = 50
+        };
+        btnProjectStatus.Click += (s, e) =>
+        {
+            Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<ProjectStatusForm>();
+        };
+        Controls.Add(btnProjectStatus);
+
         // Links section
         var linksLabel = new Label
         {

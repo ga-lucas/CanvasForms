@@ -14,6 +14,7 @@ public class NotifyIcon : System.ComponentModel.Component
     private string _balloonTipTitle = string.Empty;
     private string _balloonTipText = string.Empty;
 
+    #pragma warning disable CS0067
     public event EventHandler? Click;
     public event MouseEventHandler? MouseClick;
     public event MouseEventHandler? MouseDoubleClick;
@@ -21,6 +22,7 @@ public class NotifyIcon : System.ComponentModel.Component
     public event EventHandler? BalloonTipClicked;
     public event EventHandler? BalloonTipClosed;
     public event EventHandler? BalloonTipShown;
+#pragma warning restore CS0067
 
     public bool Visible
     {

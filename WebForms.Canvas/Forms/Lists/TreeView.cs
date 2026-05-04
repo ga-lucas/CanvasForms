@@ -18,6 +18,7 @@ public class TreeNode
     public string Text { get => _text; set { _text = value; _treeView?.Invalidate(); } }
     public string Name { get; set; } = string.Empty;
     public object? Tag { get; set; }
+    public string ToolTipText { get; set; } = string.Empty;
     public int ImageIndex { get; set; } = -1;
     public int SelectedImageIndex { get; set; } = -1;
     public Color ForeColor { get; set; } = Color.Transparent;
@@ -122,6 +123,7 @@ public class TreeView : Control
     private int _scrollOffset = 0;
 
     public event TreeViewEventHandler? AfterSelect;
+#pragma warning disable CS0067
     public event TreeViewEventHandler? BeforeSelect;
     public event TreeViewEventHandler? AfterExpand;
     public event TreeViewEventHandler? AfterCollapse;
@@ -129,6 +131,9 @@ public class TreeView : Control
     public event TreeViewCancelEventHandler? BeforeCollapse;
     public event TreeNodeMouseClickEventHandler? NodeMouseClick;
     public event TreeNodeMouseClickEventHandler? NodeMouseDoubleClick;
+    public event NodeLabelEditEventHandler? AfterLabelEdit;
+    public event NodeLabelEditEventHandler? BeforeLabelEdit;
+#pragma warning restore CS0067
 
     public TreeView()
     {
@@ -160,8 +165,14 @@ public class TreeView : Control
     public bool FullRowSelect { get; set; } = false;
     public bool HideSelection { get; set; } = true;
     public bool CheckBoxes { get; set; } = false;
+    public bool LabelEdit { get; set; } = false;
+    public bool Scrollable { get; set; } = true;
     public int Indent_ { get; set; } = Indent;
     public BorderStyle BorderStyle { get; set; } = BorderStyle.Fixed3D;
+
+    private int _updateCount = 0;
+    public void BeginUpdate() => _updateCount++;
+    public void EndUpdate() { if (_updateCount > 0) _updateCount--; if (_updateCount == 0) Invalidate(); }
 
     protected internal override void OnPaint(PaintEventArgs e)
     {
@@ -388,3 +399,12 @@ public class TreeNodeMouseClickEventArgs : MouseEventArgs
 }
 
 public enum TreeViewAction { Unknown, ByKeyboard, ByMouse, Collapse, Expand }
+
+public delegate void NodeLabelEditEventHandler(object? sender, NodeLabelEditEventArgs e);
+public class NodeLabelEditEventArgs : EventArgs
+{
+    public TreeNode? Node { get; }
+    public string? Label { get; }
+    public bool CancelEdit { get; set; }
+    public NodeLabelEditEventArgs(TreeNode? node, string? label) { Node = node; Label = label; }
+}

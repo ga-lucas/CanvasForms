@@ -1,7 +1,10 @@
 using System.Collections.Concurrent;
-using System.Data;
 using System.Data.Common;
 using System.Windows.Forms;
+// Aliases to resolve ambiguities between System.Data and System.Windows.Forms re-exports
+using WfDataTable = System.Windows.Forms.DataTable;
+using WfDataRow   = System.Windows.Forms.DataRow;
+using DBNull      = System.DBNull;
 
 namespace Canvas.Windows.Forms.Host.Server.Data;
 
@@ -88,13 +91,13 @@ public sealed class ServerCanvasDataService : ICanvasDataService, ICanvasDataSer
 
     // ── ICanvasDataService ────────────────────────────────────────────────────
 
-    public void Fill(DataTable table, string sql, params (string name, object? value)[] parameters)
+    public void Fill(WfDataTable table, string sql, params (string name, object? value)[] parameters)
     {
         using var ctx = OpenContext();
         ctx.Fill(table, sql, parameters);
     }
 
-    public async Task FillAsync(DataTable table, string sql, params (string name, object? value)[] parameters)
+    public async Task FillAsync(WfDataTable table, string sql, params (string name, object? value)[] parameters)
     {
         await using var ctx = (ServerDbContext)OpenContext();
         await ctx.FillAsync(table, sql, parameters);
@@ -111,17 +114,17 @@ public sealed class ServerCanvasDataService : ICanvasDataService, ICanvasDataSer
     public IReadOnlyList<string> GetTableNames(string connectionName = "Default")
     {
         using var ctx = (ServerDbContext)OpenContext(connectionName);
-        var table = new DataTable();
+        var table = new WfDataTable();
         ctx.Fill(table, "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name");
-        return table.Rows.Select(r => r[0]?.ToString() ?? string.Empty).ToList();
+        return table.Rows.Cast<WfDataRow>().Select(r => r[0]?.ToString() ?? string.Empty).ToList();
     }
 
     public IReadOnlyList<CanvasColumnInfo> GetColumns(string tableName, string connectionName = "Default")
     {
         using var ctx = (ServerDbContext)OpenContext(connectionName);
-        var table = new DataTable();
+        var table = new WfDataTable();
         ctx.Fill(table, $"PRAGMA table_info(\"{tableName}\")");
-        return table.Rows.Select(r => new CanvasColumnInfo(
+        return table.Rows.Cast<WfDataRow>().Select(r => new CanvasColumnInfo(
             r["name"]?.ToString() ?? "",
             r["type"]?.ToString() ?? "",
             r["notnull"]?.ToString() == "0",
@@ -145,7 +148,7 @@ internal sealed class ServerDbContext : ICanvasDbContext, IAsyncDisposable
 
     // ── Fill ──────────────────────────────────────────────────────────────────
 
-    public void Fill(DataTable table, string sql, params (string name, object? value)[] parameters)
+    public void Fill(WfDataTable table, string sql, params (string name, object? value)[] parameters)
     {
         table.Rows.Clear();
 
@@ -167,7 +170,7 @@ internal sealed class ServerDbContext : ICanvasDbContext, IAsyncDisposable
         table.AcceptChanges();
     }
 
-    public async Task FillAsync(DataTable table, string sql, params (string name, object? value)[] parameters)
+    public async Task FillAsync(WfDataTable table, string sql, params (string name, object? value)[] parameters)
     {
         table.Rows.Clear();
 
@@ -239,7 +242,7 @@ internal sealed class ServerDbContext : ICanvasDbContext, IAsyncDisposable
         return cmd;
     }
 
-    private static void BuildColumns(DataTable table, DbDataReader reader)
+    private static void BuildColumns(WfDataTable table, DbDataReader reader)
     {
         for (int i = 0; i < reader.FieldCount; i++)
         {

@@ -164,7 +164,6 @@
         {
             // Launch welcome form by default
             LaunchWelcomeForm();
-            StateHasChanged();
         }
     }
 
@@ -180,13 +179,13 @@
         _showStartMenu = false;
         if (_desktop == null) return;
 
-        var form = new WelcomeForm
-        {
-            Left = 100 + Random.Shared.Next(100),
-            Top = 50 + Random.Shared.Next(50),
-        };
+        var form = _desktop.FormManager.ShowOrCreateForm<WelcomeForm>();
         _desktop.FormManager.MainForm ??= form;
-        Application.Run(form);
+        if (form.Left == 0 && form.Top == 0)
+        {
+            form.Left = 100 + Random.Shared.Next(100);
+            form.Top = 50 + Random.Shared.Next(50);
+        }
     }
 
     // ============ Installed Apps ============

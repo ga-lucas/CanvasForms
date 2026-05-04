@@ -116,12 +116,12 @@ public class ListView : Control
 
     private View _view = View.Details;
     private int _scrollOffset = 0;
+    private int _topIndex = 0;
     private int _hoveredIndex = -1;
     private bool _fullRowSelect = false;
     private bool _gridLines = false;
     private bool _checkBoxes = false;
     private SortOrder _sorting = SortOrder.None;
-    private int _selectedResizeCol = -1;
 
     public ListViewItemCollection Items { get; }
     public ColumnHeaderCollection Columns { get; }
@@ -157,6 +157,125 @@ public class ListView : Control
     public event EventHandler? ItemChecked;
     public event EventHandler? SelectedIndexChanged;
     public event ColumnClickEventHandler? ColumnClick;
+    public event ItemActivateEventHandler? ItemActivate;
+
+    private int _updateCount = 0;
+
+    public void BeginUpdate() => _updateCount++;
+
+    public void EndUpdate()
+    {
+        if (_updateCount > 0) _updateCount--;
+        if (_updateCount == 0) Invalidate();
+    }
+
+    public ListViewItem? FocusedItem
+    {
+        get
+        {
+            var sorted = GetSortedItems();
+            var sel = sorted.FirstOrDefault(i => i.Selected);
+            return sel;
+        }
+        set
+        {
+            if (value != null) value.Selected = true;
+        }
+    }
+
+    public void EnsureVisible(int index)
+    {
+        var sorted = GetSortedItems();
+        if (index < 0 || index >= sorted.Count) return;
+        var itemH = GetEffectiveItemHeight();
+        var bw = GetBorderWidth();
+        var headerH = (View == View.Details && Columns.Count > 0) ? 22 : 0;
+        var visibleH = Math.Max(0, Height - bw * 2 - headerH);
+        var itemTop = index * itemH;
+        var itemBottom = itemTop + itemH;
+        if (itemTop < _topIndex * itemH)
+            _topIndex = index;
+        else if (itemBottom > _topIndex * itemH + visibleH)
+            _topIndex = Math.Max(0, index - (visibleH / itemH) + 1);
+        Invalidate();
+    }
+
+    public ListViewItem? GetItemAt(int x, int y)
+    {
+        var idx = GetItemAtY(y);
+        var sorted = GetSortedItems();
+        return idx >= 0 && idx < sorted.Count ? sorted[idx] : null;
+    }
+
+    protected internal override void OnKeyDown(KeyEventArgs e)
+    {
+        if (!Enabled) { base.OnKeyDown(e); return; }
+        var sorted = GetSortedItems();
+        var cur = sorted.FindIndex(i => i.Selected);
+        if (cur < 0 && sorted.Count > 0) cur = 0;
+        var handled = false;
+        switch (e.KeyCode)
+        {
+            case Keys.Up:
+                if (cur > 0) { SelectSingle(sorted, cur - 1); EnsureVisible(cur - 1); handled = true; }
+                break;
+            case Keys.Down:
+                if (cur < sorted.Count - 1) { SelectSingle(sorted, cur + 1); EnsureVisible(cur + 1); handled = true; }
+                break;
+            case Keys.Home:
+                if (sorted.Count > 0) { SelectSingle(sorted, 0); EnsureVisible(0); handled = true; }
+                break;
+            case Keys.End:
+                if (sorted.Count > 0) { SelectSingle(sorted, sorted.Count - 1); EnsureVisible(sorted.Count - 1); handled = true; }
+                break;
+            case Keys.PageUp:
+            {
+                var itemH = GetEffectiveItemHeight();
+                var bw = GetBorderWidth();
+                var headerH = (View == View.Details && Columns.Count > 0) ? 22 : 0;
+                var perPage = Math.Max(1, (Height - bw * 2 - headerH) / itemH);
+                var next = Math.Max(0, cur - perPage);
+                SelectSingle(sorted, next); EnsureVisible(next); handled = true;
+                break;
+            }
+            case Keys.PageDown:
+            {
+                var itemH = GetEffectiveItemHeight();
+                var bw = GetBorderWidth();
+                var headerH = (View == View.Details && Columns.Count > 0) ? 22 : 0;
+                var perPage = Math.Max(1, (Height - bw * 2 - headerH) / itemH);
+                var next = Math.Min(sorted.Count - 1, cur + perPage);
+                SelectSingle(sorted, next); EnsureVisible(next); handled = true;
+                break;
+            }
+            case Keys.Enter:
+                if (cur >= 0) { ItemActivate?.Invoke(this, new ItemActivateEventArgs(sorted[cur])); handled = true; }
+                break;
+            case Keys.Space:
+                if (cur >= 0 && CheckBoxes)
+                {
+                    sorted[cur].Checked = !sorted[cur].Checked;
+                    ItemChecked?.Invoke(this, EventArgs.Empty);
+                    Invalidate(); handled = true;
+                }
+                break;
+            case Keys.A when e.Control:
+                if (MultiSelect) { foreach (var i in sorted) i.Selected = true; SelectedIndexChanged?.Invoke(this, EventArgs.Empty); Invalidate(); handled = true; }
+                break;
+        }
+        if (handled) e.Handled = true;
+        base.OnKeyDown(e);
+    }
+
+    private void SelectSingle(List<ListViewItem> sorted, int index)
+    {
+        foreach (var i in sorted) i.Selected = false;
+        sorted[index].Selected = true;
+        SelectedIndexChanged?.Invoke(this, EventArgs.Empty);
+        Invalidate();
+    }
+
+    private int GetEffectiveItemHeight() => View == View.Details ? ItemHeight : 48;
 
     protected internal override void OnPaint(PaintEventArgs e)
     {
@@ -360,7 +479,6 @@ public class ListView : Control
             var item = sorted[idx];
             if (e.Button == MouseButtons.Left)
             {
-                bool ctrl = false; // No modifier key tracking yet
                 if (!MultiSelect) foreach (var i in Items) i.Selected = false;
                 item.Selected = !item.Selected;
                 SelectedIndexChanged?.Invoke(this, EventArgs.Empty);
@@ -421,6 +539,13 @@ public class ColumnClickEventArgs : EventArgs
 {
     public int Column { get; }
     public ColumnClickEventArgs(int column) => Column = column;
+}
+
+public delegate void ItemActivateEventHandler(object? sender, ItemActivateEventArgs e);
+public class ItemActivateEventArgs : EventArgs
+{
+    public ListViewItem Item { get; }
+    public ItemActivateEventArgs(ListViewItem item) => Item = item;
 }
 
 /// <summary>

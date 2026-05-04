@@ -13,6 +13,8 @@ public class BindingSource : Component, IList, IBindingList, INotifyPropertyChan
     private string _dataMember = string.Empty;
     private object? _dataSource;
     private int _position = -1;
+    private string _filter = string.Empty;
+    private string _sort   = string.Empty;
 
     public BindingSource() { }
     public BindingSource(IContainer container) { container.Add(this); }
@@ -21,13 +23,15 @@ public class BindingSource : Component, IList, IBindingList, INotifyPropertyChan
     // ── Events ───────────────────────────────────────────────────
     public event ListChangedEventHandler? ListChanged;
     public event EventHandler? CurrentChanged;
+#pragma warning disable CS0067
     public event EventHandler? CurrentItemChanged;
     public event BindingCompleteEventHandler? BindingComplete;
+    public event PropertyChangedEventHandler? PropertyChanged;
+#pragma warning restore CS0067
     public event EventHandler? DataSourceChanged;
     public event EventHandler? DataMemberChanged;
     public event EventHandler? PositionChanged;
     public event EventHandler<AddingNewEventArgs>? AddingNew;
-    public event PropertyChangedEventHandler? PropertyChanged;
 
     // ── DataSource / DataMember ──────────────────────────────────
     public object? DataSource
@@ -124,6 +128,62 @@ public class BindingSource : Component, IList, IBindingList, INotifyPropertyChan
             OnListChanged(new ListChangedEventArgs(ListChangedType.ItemChanged, _position));
     }
 
+    // ── Filter / Sort ────────────────────────────────────────────
+    /// <summary>
+    /// Gets or sets the expression used to filter which rows are viewed.
+    /// Stub: stores the value and raises ListChanged; actual row filtering
+    /// must be implemented by the caller or a derived class.
+    /// </summary>
+    public string Filter
+    {
+        get => _filter;
+        set
+        {
+            if (_filter == value) return;
+            _filter = value ?? string.Empty;
+            OnListChanged(new ListChangedEventArgs(ListChangedType.Reset, -1));
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets the column name(s) and sort direction used to sort rows.
+    /// Stub: stores the value and raises ListChanged; actual sort ordering
+    /// must be implemented by the caller or a derived class.
+    /// </summary>
+    public string Sort
+    {
+        get => _sort;
+        set
+        {
+            if (_sort == value) return;
+            _sort = value ?? string.Empty;
+            OnListChanged(new ListChangedEventArgs(ListChangedType.Reset, -1));
+        }
+    }
+
+    /// <summary>
+    /// Searches for the index of the item whose property named
+    /// <paramref name="propertyName"/> equals <paramref name="key"/>.
+    /// Returns -1 if no match is found.
+    /// </summary>
+    public int Find(string propertyName, object key)
+    {
+        for (int i = 0; i < _inner.Count; i++)
+        {
+            var item = _inner[i];
+            if (item is null) continue;
+            var prop = System.ComponentModel.TypeDescriptor.GetProperties(item)[propertyName];
+            if (prop is null) continue;
+            var val = prop.GetValue(item);
+            if (Equals(val, key)) return i;
+        }
+        return -1;
+    }
+
+    // ── RemoveFilter / RemoveSort ────────────────────────────────
+    public void RemoveFilter() => Filter = string.Empty;
+    public void RemoveSort()   => Sort   = string.Empty;
+
     private void OnListChanged(ListChangedEventArgs e)
     {
         ListChanged?.Invoke(this, e);
@@ -156,7 +216,7 @@ public class BindingSource : Component, IList, IBindingList, INotifyPropertyChan
     bool IBindingList.AllowNew => !_inner.IsReadOnly && !_inner.IsFixedSize;
     bool IBindingList.AllowRemove => !_inner.IsReadOnly && !_inner.IsFixedSize;
     bool IBindingList.SupportsChangeNotification => true;
-    bool IBindingList.SupportsSearching => false;
+    bool IBindingList.SupportsSearching => true;
     bool IBindingList.SupportsSorting => false;
     bool IBindingList.IsSorted => false;
     PropertyDescriptor? IBindingList.SortProperty => null;
@@ -165,7 +225,7 @@ public class BindingSource : Component, IList, IBindingList, INotifyPropertyChan
     void IBindingList.RemoveIndex(PropertyDescriptor property) { }
     void IBindingList.ApplySort(PropertyDescriptor property, ListSortDirection direction) => throw new NotSupportedException();
     void IBindingList.RemoveSort() => throw new NotSupportedException();
-    int IBindingList.Find(PropertyDescriptor property, object key) => throw new NotSupportedException();
+    int IBindingList.Find(PropertyDescriptor property, object key) => Find(property.Name, key);
     object? IBindingList.AddNew()
     {
         var args = new AddingNewEventArgs();
