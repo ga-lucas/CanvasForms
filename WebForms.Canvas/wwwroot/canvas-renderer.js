@@ -1080,3 +1080,82 @@ window.setupViewportTracking = (dotNetRef) => {
         });
     }
 };
+
+// ---------------------------------------------------------------------------
+// Drag-and-drop helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Sets a sentinel value on dataTransfer so the browser allows the drag.
+ * Called from Blazor's @ondragstart handler via JSInterop when needed.
+ * @param {DragEvent} e - The native dragstart event (not accessible from Blazor directly).
+ */
+window.setDragTransferData = (canvasEl) => {
+    // No-op here — the dataTransfer is set via the document-level dragstart listener below.
+};
+
+// Ensure the browser doesn't cancel the drag when draggable canvas elements start dragging.
+document.addEventListener('dragstart', (e) => {
+    if (e.target && e.target.tagName === 'CANVAS' && e.target.draggable) {
+        try { e.dataTransfer.setData('text/plain', '__canvasforms_drag__'); } catch (_) { }
+        e.dataTransfer.effectAllowed = 'all';
+    }
+});
+
+// ── WebBrowser iframe helpers ─────────────────────────────────────────────────
+
+/**
+ * Navigates the iframe back one step in its session history.
+ * @param {string} iframeId - The id attribute of the target <iframe>.
+ */
+window.canvasWebBrowserGoBack = (iframeId) => {
+    const iframe = document.getElementById(iframeId);
+    try { iframe?.contentWindow?.history?.back(); } catch (_) { }
+};
+
+/**
+ * Navigates the iframe forward one step in its session history.
+ * @param {string} iframeId - The id attribute of the target <iframe>.
+ */
+window.canvasWebBrowserGoForward = (iframeId) => {
+    const iframe = document.getElementById(iframeId);
+    try { iframe?.contentWindow?.history?.forward(); } catch (_) { }
+};
+
+/**
+ * Stops the iframe's current load.
+ * @param {string} iframeId - The id attribute of the target <iframe>.
+ */
+window.canvasWebBrowserStop = (iframeId) => {
+    const iframe = document.getElementById(iframeId);
+    try { iframe?.contentWindow?.stop?.(); } catch (_) { }
+};
+
+/**
+ * Reloads the iframe.
+ * @param {string} iframeId - The id attribute of the target <iframe>.
+ */
+window.canvasWebBrowserRefresh = (iframeId) => {
+    const iframe = document.getElementById(iframeId);
+    try { iframe?.contentWindow?.location?.reload(); } catch (_) { }
+};
+
+/**
+ * Executes a script expression inside the iframe (same-origin only).
+ * @param {string} iframeId - The id attribute of the target <iframe>.
+ * @param {string} script   - JavaScript expression to evaluate.
+ * @returns {string|null} String result of the expression, or null on error.
+ */
+window.canvasWebBrowserExecScript = (iframeId, script) => {
+    const iframe = document.getElementById(iframeId);
+    if (!iframe) return null;
+    try {
+        const result = iframe.contentWindow?.eval(script);
+        return result !== undefined ? String(result) : null;
+    } catch (e) {
+        console.warn('canvasWebBrowserExecScript error:', e);
+        return null;
+    }
+};
+
+

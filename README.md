@@ -218,7 +218,6 @@ The following WinForms controls/types currently exist under `WebForms.Canvas/For
 
 **Non-visual / helper components (currently stubs/compat)**
 - `ToolTip`
-- `NotifyIcon`
 
 ### Not yet implemented (common WinForms controls)
 
@@ -233,9 +232,6 @@ Controls below have **no source file** in the repo yet. Everything else either h
 - `BindingNavigator`
 
 **Value/input**
-- `TrackBar`
-- `HScrollBar` / `VScrollBar` (standalone)
-- `DomainUpDown`
 
 **Print**
 - `PrintDialog`, `PrintPreviewDialog`, `PrintDocument`, `PrintPreviewControl`
@@ -304,7 +300,7 @@ Status legend:
 | Data | `DataGridView` | ⚠️ Partial | `IList`/`BindingSource`/`DataTable` binding; auto-column gen; sort; column types: TextBox/CheckBox/Button/ComboBox/Image/Link. |
 | Data | `BindingSource` | ⚠️ Partial | `IList`/`IBindingList` wrapper; `Current`/`Position` navigation; server-backed via `CanvasDataService`. |
 | Non-visual | `ToolTip` | 🧩 Stub/Compatibility | API present; rendering may be incomplete. |
-| Non-visual | `NotifyIcon` | 🧩 Stub/Compatibility | API present; system tray stub. |
+| Non-visual | `NotifyIcon` | ⚠️ Partial | Canvas system tray: icon in taskbar, ContextMenuStrip popup, balloon tips, Click/DoubleClick events. |
 ### Layout
 
 - Docking and anchoring (`Dock`, `Anchor`)
@@ -422,14 +418,14 @@ Items are ordered by estimated prevalence in designer-generated / translated Win
 | ⚠️ | `MaskedTextBox` | Masked display + basic validation |
 | ⚠️ | `CheckedListBox` | Basic checked item behaviour |
 | ✅ | `MonthCalendar` | Single-month view; SelectionRange; BoldedDates; keyboard/mouse nav |
-| 🧩 | `NotifyIcon` | API present; system tray stub |
+| ⚠️ | `NotifyIcon` | Canvas system tray in taskbar; ContextMenuStrip popup; balloon tips; Click/DoubleClick |
 | 🧩 | `UserControl` | Base present; full composite lifecycle partial |
 | ⚠️ | `ToolStripMenuItem` | Dropdowns, check state, shortcuts, image, enabled |
 | 🧩 | `ToolStripContainer` / `ToolStripPanel` | Dockable strip host |
 | 🔲 | **`PropertyGrid`** | Common in tools and settings panels |
-| 🔲 | **`TrackBar`** | Slider; common in settings/media UIs |
-| 🔲 | **`HScrollBar` / `VScrollBar`** | Standalone scrollbars used in legacy apps |
-| 🔲 | **`DomainUpDown`** | Text-based up-down; pair to `NumericUpDown` |
+| ⚠️ | **`TrackBar`** | Slider; Horizontal/Vertical; tick marks; keyboard/mouse; SetRange |
+| ⚠️ | **`HScrollBar` / `VScrollBar`** | Standalone scrollbars; SmallChange/LargeChange; Scroll/ValueChanged events |
+| ⚠️ | **`DomainUpDown`** | String-list up-down; Sorted/Wrap; SelectedItem/SelectedIndex; pair to NumericUpDown |
 | 🔲 | **`HelpProvider`** | F1 help integration |
 | 🔲 | **`ToolStripProgressBar`** | Common in status strips for background tasks |
 | 🔲 | **`ToolStripSplitButton`** | Split-action toolbar button |
@@ -452,7 +448,7 @@ Items are ordered by estimated prevalence in designer-generated / translated Win
 | 🔲 | **`PrintPreviewControl`** | Embedded (non-dialog) print preview |
 | 🔲 | **`Screen`** | Multi-monitor info; `Screen.PrimaryScreen` stub needed |
 | 🔲 | **`Clipboard`** | Cut/Copy/Paste; requires JS bridge |
-| 🔲 | **`WebBrowser` / WebView2** | Embedded web content; stub for compatibility |
+| ⚠️ | **`WebBrowser` / WebView2** | iframe overlay; Navigate, GoBack/Forward, Stop, Refresh, DocumentText, ExecuteScriptAsync, events; cross-origin DOM access blocked by browser sandbox |
 | 🔲 | **MDI (`MdiClient`, MDI Forms)** | MDI window management; enterprise apps |
 | ✅ | **`DataGridViewColumn` types** | TextBox/CheckBox/ComboBox/Button/Image/Link column variants; `DataGridViewCellStyle`; `DataGridViewRow`/`DataGridViewCell` model |
 | ✅ | **`CanvasDataService`** | Server-backed ADO.NET provider; `ICanvasDataService.Fill(DataTable, sql)`; SQLite default; ambient `CanvasDataService.Current` accessor for native and translated apps |

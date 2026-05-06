@@ -1333,32 +1333,32 @@ public abstract class Control
         ControlRemoved?.Invoke(this, e);
     }
 
-    protected virtual void OnDragDrop(DragEventArgs e)
+    protected internal virtual void OnDragDrop(DragEventArgs e)
     {
         DragDrop?.Invoke(this, e);
     }
 
-    protected virtual void OnDragEnter(DragEventArgs e)
+    protected internal virtual void OnDragEnter(DragEventArgs e)
     {
         DragEnter?.Invoke(this, e);
     }
 
-    protected virtual void OnDragLeave(EventArgs e)
+    protected internal virtual void OnDragLeave(EventArgs e)
     {
         DragLeave?.Invoke(this, e);
     }
 
-    protected virtual void OnDragOver(DragEventArgs e)
+    protected internal virtual void OnDragOver(DragEventArgs e)
     {
         DragOver?.Invoke(this, e);
     }
 
-    protected virtual void OnGiveFeedback(GiveFeedbackEventArgs e)
+    protected internal virtual void OnGiveFeedback(GiveFeedbackEventArgs e)
     {
         GiveFeedback?.Invoke(this, e);
     }
 
-    protected virtual void OnQueryContinueDrag(QueryContinueDragEventArgs e)
+    protected internal virtual void OnQueryContinueDrag(QueryContinueDragEventArgs e)
     {
         QueryContinueDrag?.Invoke(this, e);
     }
@@ -1807,20 +1807,46 @@ public abstract class Control
 
 
     /// <summary>
-    /// Initiates a drag-and-drop operation
+    /// Initiates a drag-and-drop operation.
+    /// <para>
+    /// Registers a session with <see cref="DragDropManager"/> and fires
+    /// <see cref="DragDropManager.DragStarted"/> so the renderer can set
+    /// <c>draggable=true</c> on the canvas element.  Because WebAssembly runs on a
+    /// single thread, this method returns <see cref="DragDropEffects.None"/>
+    /// immediately — it cannot block waiting for the drop.  The actual resulting
+    /// effect is delivered asynchronously through <see cref="DragDropManager.LastResult"/>
+    /// once <c>HandleDrop</c> fires in <c>FormRenderer</c>.
+    /// </para>
+    /// <para>
+    /// In standard WinForms the method blocks until the drag ends and returns the
+    /// effect.  Translated apps that use the return value must read
+    /// <see cref="DragDropManager.LastResult"/> after the drop instead.
+    /// </para>
     /// </summary>
     public DragDropEffects DoDragDrop(object data, DragDropEffects allowedEffects)
     {
-        // Stub implementation - would need browser drag-drop API integration
+        // Cancel any stale prior session before starting a new one.
+        if (DragDropManager.IsDragging)
+            DragDropManager.CancelDrag();
+
+        // BeginDrag fires DragStarted so FormRenderer can enable draggable on the canvas.
+        DragDropManager.BeginDrag(this, data, allowedEffects);
+
+        // Notify source that the drag has started.
+        OnQueryContinueDrag(new QueryContinueDragEventArgs(0, false, DragAction.Continue));
+
+        // WASM constraint: cannot block here — the UI thread must remain free so
+        // HandleDrop/HandleDragLeave can fire.  The result will be available via
+        // DragDropManager.LastResult after the drop completes.
         return DragDropEffects.None;
     }
 
     /// <summary>
-    /// Begins a drag operation
+    /// Begins a drag operation with a custom drag image (browser environment: image is ignored).
     /// </summary>
     public void DoDragDrop(object data, DragDropEffects allowedEffects, Bitmap? dragImage, Point cursorOffset, bool useDefaultDragImage)
     {
-        // Stub implementation
+        DoDragDrop(data, allowedEffects);
     }
 
     /// <summary>

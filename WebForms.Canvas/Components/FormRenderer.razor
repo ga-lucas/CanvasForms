@@ -1,9 +1,11 @@
 @using Forms = System.Windows.Forms
 @using Canvas.Windows.Forms.Drawing
+@using Canvas.Windows.Forms.Services
 @using BlazorMouseEventArgs = Microsoft.AspNetCore.Components.Web.MouseEventArgs
 @using BlazorKeyboardEventArgs = Microsoft.AspNetCore.Components.Web.KeyboardEventArgs
 @using BlazorTouchEventArgs = Microsoft.AspNetCore.Components.Web.TouchEventArgs
 @using BlazorWheelEventArgs = Microsoft.AspNetCore.Components.Web.WheelEventArgs
+@using BlazorDragEventArgs = Microsoft.AspNetCore.Components.Web.DragEventArgs
 @inject IJSRuntime JSRuntime
 @implements IDisposable
 
@@ -26,7 +28,18 @@
             @onkeydown="HandleKeyDown"
             @onkeyup="HandleKeyUp"
             @onkeypress="HandleKeyPress"
-            width="@Form.Width" 
+            @ondragstart="HandleDragStart"
+            @ondragstart:preventDefault="false"
+            @ondragend="HandleDragEnd"
+            @ondragenter="HandleDragEnter"
+            @ondragenter:preventDefault="true"
+            @ondragover="HandleDragOver"
+            @ondragover:preventDefault="true"
+            @ondragleave="HandleDragLeave"
+            @ondrop="HandleDrop"
+            @ondrop:preventDefault="true"
+            draggable="@(_canvasDraggable ? "true" : "false")"
+            width="@Form.Width"
             height="@Form.Height"
             style="position: absolute; 
                    left: @(Form.Left)px;
@@ -53,6 +66,32 @@
                     pointer-events: auto;
                     cursor: not-allowed;">
         </div>
+    }
+
+    @* ── WebBrowser iframe overlays ──────────────────────────────────────────── *@
+    @foreach (var wb in GetWebBrowsers())
+    {
+        var wbLeft   = Form.Left + BorderWidth + wb.Left;
+        var wbTop    = Form.Top  + TitleBarHeight + BorderWidth + wb.Top;
+        var wbWidth  = wb.Width;
+        var wbHeight = wb.Height;
+        var sandbox  = wb.ScriptEnabled
+            ? "allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+            : "allow-same-origin";
+
+        <iframe id="@wb.IframeId"
+                src="@(wb.Url?.ToString())"
+                srcdoc="@(wb.DocumentText)"
+                sandbox="@sandbox"
+                style="position: absolute;
+                       left: @(wbLeft)px;
+                       top: @(wbTop)px;
+                       width: @(wbWidth)px;
+                       height: @(wbHeight)px;
+                       z-index: @(Form.ZIndex + 1);
+                       border: none;
+                       display: @(wb.Visible ? "block" : "none");"
+                @onload="@(() => wb.RaiseDocumentCompleted())" />
     }
 
     @if (_showMaximizePreview)
@@ -89,12 +128,16 @@
     private const int CloseButtonSize = 20;
     private const int CloseButtonMargin = 6;
 
-    // Dragging state
+    // Dragging state (form window drag)
     private bool _isDragging = false;
     private double _dragStartX = 0;
     private double _dragStartY = 0;
-    private int _dragFormStartLeft = 0;  // Position when drag started (for delta calc)
-    private int _dragFormStartTop = 0;   // Position when drag started (for delta calc)
+    private int _dragFormStartLeft = 0;
+    private int _dragFormStartTop = 0;
+
+    // HTML5 drag-and-drop: whether the canvas element should have draggable=true
+    // Set to true when DragDropManager.DragStarted fires, cleared on dragend/drop.
+    private bool _canvasDraggable = false;
 
     // JS interop throttling for drag position updates
     private DateTime _lastDragPositionUpdate = DateTime.MinValue;
@@ -216,6 +259,16 @@
             {
                 // Non-critical; silently ignore if JS isn't ready
             }
+
+            // Subscribe to DragDropManager so we can make the canvas draggable when DoDragDrop is called
+            Forms.DragDropManager.DragStarted += OnDragSessionStarted;
+            Forms.DragDropManager.DragEnded   += OnDragSessionEnded;
+
+            // Subscribe to WebBrowserRegistry so iframe overlays are re-rendered when state changes
+            WebBrowserRegistry.Instance.SetChangeCallback(() => InvokeAsync(StateHasChanged));
+
+            // Inject JSRuntime into any WebBrowser controls already present
+            PropagateJSRuntime(Form);
 
             // Set RequestRender and propagate to all children
             var renderFunc = () =>
@@ -995,7 +1048,7 @@
             clientY < Form.Height - TitleBarHeight - (BorderWidth * 2))
         {
             var args = new Forms.MouseEventArgs(
-                Forms.MouseButtons.None,
+                GetMouseButtonsHeld(e),
                 0,
                 clientX,
                 clientY
@@ -1195,7 +1248,7 @@
             clientY < Form.Height - TitleBarHeight - (BorderWidth * 2))
         {
             var args = new Forms.MouseEventArgs(
-                Forms.MouseButtons.None,
+                Forms.MouseButtons.Left,  // touch move always implies left-button equivalent
                 0,
                 clientX,
                 clientY
@@ -1267,6 +1320,234 @@
             Form.OnKeyPress(args);
         }
     }
+
+    // ── Drag-and-drop handlers ─────────────────────────────────────────────────
+
+    private void HandleDragEnter(BlazorDragEventArgs e)
+    {
+        if (Form == null || !Forms.DragDropManager.IsDragging) return;
+
+        var (clientX, clientY) = CanvasToClient((int)e.ClientX, (int)e.ClientY);
+        var keyState = GetDragKeyState(e);
+        var target = FindDragTarget(clientX, clientY);
+        if (target == null) return;
+
+        Forms.DragDropManager.CurrentTarget = target;
+        var (cx, cy) = target == Form
+            ? (clientX, clientY)
+            : ToRelativeCoords(target, clientX, clientY);
+        var args = Forms.DragDropManager.MakeDragEventArgs(cx, cy, keyState,
+            Forms.DragDropManager.AllowedEffects);
+        target.OnDragEnter(args);
+    }
+
+    private void HandleDragOver(BlazorDragEventArgs e)
+    {
+        if (Form == null || !Forms.DragDropManager.IsDragging) return;
+
+        var (clientX, clientY) = CanvasToClient((int)e.ClientX, (int)e.ClientY);
+        var keyState = GetDragKeyState(e);
+        var newTarget = FindDragTarget(clientX, clientY);
+        var prevTarget = Forms.DragDropManager.CurrentTarget;
+
+        // Simulate leave/enter when the hovered control changes
+        if (newTarget != prevTarget)
+        {
+            if (prevTarget != null)
+                prevTarget.OnDragLeave(EventArgs.Empty);
+            Forms.DragDropManager.CurrentTarget = newTarget;
+            if (newTarget != null)
+            {
+                var (ex, ey) = newTarget == Form
+                    ? (clientX, clientY)
+                    : ToRelativeCoords(newTarget, clientX, clientY);
+                newTarget.OnDragEnter(Forms.DragDropManager.MakeDragEventArgs(
+                    ex, ey, keyState, Forms.DragDropManager.AllowedEffects));
+            }
+        }
+
+        if (newTarget != null)
+        {
+            var (cx, cy) = newTarget == Form
+                ? (clientX, clientY)
+                : ToRelativeCoords(newTarget, clientX, clientY);
+            var args = Forms.DragDropManager.MakeDragEventArgs(cx, cy, keyState,
+                Forms.DragDropManager.AllowedEffects);
+            newTarget.OnDragOver(args);
+        }
+    }
+
+    private void HandleDragLeave(BlazorDragEventArgs e)
+    {
+        if (Form == null || !Forms.DragDropManager.IsDragging) return;
+
+        var target = Forms.DragDropManager.CurrentTarget;
+        Forms.DragDropManager.CurrentTarget = null;
+        target?.OnDragLeave(EventArgs.Empty);
+    }
+
+    private void HandleDrop(BlazorDragEventArgs e)
+    {
+        _canvasDraggable = false;
+        if (Form == null || !Forms.DragDropManager.IsDragging) return;
+
+        var (clientX, clientY) = CanvasToClient((int)e.ClientX, (int)e.ClientY);
+        var keyState = GetDragKeyState(e);
+        var target = Forms.DragDropManager.CurrentTarget ?? FindDragTarget(clientX, clientY);
+
+        Forms.DragDropEffects resultEffect = Forms.DragDropEffects.None;
+        if (target != null && target.AllowDrop)
+        {
+            var (cx, cy) = target == Form
+                ? (clientX, clientY)
+                : ToRelativeCoords(target, clientX, clientY);
+            var args = Forms.DragDropManager.MakeDragEventArgs(cx, cy, keyState,
+                Forms.DragDropManager.AllowedEffects);
+            target.OnDragDrop(args);
+            resultEffect = args.Effect;
+        }
+
+        Forms.DragDropManager.EndDrag(resultEffect);
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Converts canvas-relative ClientX/Y (page coordinates) to form client coordinates.
+    /// </summary>
+    private (int x, int y) CanvasToClient(int pageX, int pageY)
+    {
+        // The canvas is inside `.desktop-area` which is already offset downward
+        // by TaskbarHeight from the page top.  Form.Left/Top are relative to that
+        // desktop-area, so the full page→client conversion is:
+        //   clientX = pageX - Form.Left - BorderWidth
+        //   clientY = pageY - TaskbarHeight - Form.Top - TitleBarHeight - BorderWidth
+        var x = pageX - Form!.Left - BorderWidth;
+        var y = pageY - TaskbarHeight - Form!.Top - TitleBarHeight - BorderWidth;
+        return (x, y);
+    }
+
+    /// <summary>
+    /// Finds the deepest AllowDrop-enabled control at the given client coordinates,
+    /// falling back to the Form itself if it has AllowDrop set.
+    /// </summary>
+    private Forms.Control? FindDragTarget(int clientX, int clientY)
+    {
+        if (Form == null) return null;
+        // Walk the child tree looking for the deepest control with AllowDrop
+        var hit = FindDragTargetIn(Form, clientX, clientY);
+        return hit ?? (Form.AllowDrop ? Form : null);
+    }
+
+    private Forms.Control? FindDragTargetIn(Forms.Control parent, int x, int y)
+    {
+        // Convert to this control's client space
+        var (cx, cy) = (x, y);
+        for (var i = parent.Controls.Count - 1; i >= 0; i--)
+        {
+            var child = parent.Controls[i];
+            if (!child.Visible || !child.Enabled) continue;
+            if (x >= child.Left && x < child.Left + child.Width &&
+                y >= child.Top  && y < child.Top  + child.Height)
+            {
+                var rel_x = x - child.Left;
+                var rel_y = y - child.Top;
+                var deeper = FindDragTargetIn(child, rel_x, rel_y);
+                if (deeper != null) return deeper;
+                if (child.AllowDrop) return child;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>Converts form-client coordinates to coordinates relative to a child control.</summary>
+    private (int x, int y) ToRelativeCoords(Forms.Control target, int clientX, int clientY)
+    {
+        var x = clientX;
+        var y = clientY;
+        var c = target;
+        while (c != null && c != Form)
+        {
+            x -= c.Left;
+            y -= c.Top;
+            c = c.Parent;
+        }
+        return (x, y);
+    }
+
+    private static int GetDragKeyState(BlazorDragEventArgs e)
+    {
+        // Mirror the WinForms keyState encoding used in MouseEventArgs:
+        // 1=LButton, 2=RButton, 4=Shift, 8=Ctrl, 16=MButton, 32=Alt
+        int ks = 0;
+        // Drag events don't carry button state directly; encode modifier keys only
+        // (the left mouse button is implicitly held during a drag)
+        ks |= 1; // left button is held
+        return ks;
+    }
+
+    /// <summary>
+    /// Called when <see cref="Forms.DragDropManager.DragStarted"/> fires (a control called DoDragDrop).
+    /// Sets <c>_canvasDraggable = true</c> synchronously so the Blazor re-render writes
+    /// <c>draggable="true"</c> onto the canvas element before the browser's next frame,
+    /// allowing the HTML5 dragstart event to fire on the next mouse-drag gesture.
+    /// </summary>
+    private void OnDragSessionStarted(object? sender, EventArgs e)
+    {
+        _canvasDraggable = true;
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Called when <see cref="Forms.DragDropManager.DragEnded"/> fires.
+    /// Clears the draggable attribute.
+    /// </summary>
+    private void OnDragSessionEnded(object? sender, EventArgs e)
+    {
+        _canvasDraggable = false;
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Handles the browser's HTML5 <c>dragstart</c> event on this canvas.
+    /// The user has begun dragging a canvas that has <c>draggable=true</c>.
+    /// If a DragDropManager session is already registered (DoDragDrop was called
+    /// on MouseDown), this just lets the drag proceed.  Otherwise we look for a
+    /// control at the mouse position and initiate a session for it.
+    /// </summary>
+    private void HandleDragStart(BlazorDragEventArgs e)
+    {
+        if (Form == null) return;
+        // Session already registered by DoDragDrop — nothing to do here.
+        if (Forms.DragDropManager.IsDragging) return;
+
+        // Attempt to find a drag-capable control at the drag origin.
+        var (clientX, clientY) = CanvasToClient((int)e.ClientX, (int)e.ClientY);
+        var source = FindDragSource(clientX, clientY);
+        if (source != null)
+        {
+            // Initiate the WinForms drag pipeline from the source control.
+            // DoDragDrop will call BeginDrag which fires DragStarted and sets _canvasDraggable.
+            source.DoDragDrop(source, Forms.DragDropEffects.All);
+        }
+    }
+
+    /// <summary>
+    /// Handles the browser's HTML5 <c>dragend</c> event — fires on the drag source when
+    /// the drag ends (whether or not a drop occurred).  Cancels any open session.
+    /// </summary>
+    private void HandleDragEnd(BlazorDragEventArgs e)
+    {
+        _canvasDraggable = false;
+        if (Forms.DragDropManager.IsDragging)
+            Forms.DragDropManager.CancelDrag();
+    }
+
+    /// <summary>
+    /// Finds the deepest control at the given client coordinates that has DragDrop event subscribers,
+    /// meaning it intends to be a drag source.  Falls back to any control at the position.
+    /// </summary>
+    private Forms.Control? FindDragSource(int clientX, int clientY)
+        => FindDragTargetIn(Form!, clientX, clientY) ?? Form;
 
     private void CloseForm()
     {
@@ -1341,6 +1622,19 @@
             2 => Forms.MouseButtons.Right,
             _ => Forms.MouseButtons.None
         };
+    }
+
+    /// <summary>
+    /// Converts the Blazor MouseEventArgs.Buttons bitmask (which buttons are currently held)
+    /// to the WinForms MouseButtons flags. This is the correct value to use in MouseMove events.
+    /// </summary>
+    private static Forms.MouseButtons GetMouseButtonsHeld(BlazorMouseEventArgs e)
+    {
+        var result = Forms.MouseButtons.None;
+        if ((e.Buttons & 1) != 0) result |= Forms.MouseButtons.Left;
+        if ((e.Buttons & 2) != 0) result |= Forms.MouseButtons.Right;
+        if ((e.Buttons & 4) != 0) result |= Forms.MouseButtons.Middle;
+        return result;
     }
 
     private Forms.Keys ParseKeyCode(string code)
@@ -1479,6 +1773,9 @@
 
     public void Dispose()
     {
+        Forms.DragDropManager.DragStarted -= OnDragSessionStarted;
+        Forms.DragDropManager.DragEnded   -= OnDragSessionEnded;
+
         // Clean up offscreen buffer to free memory
         if (_initialized)
         {
@@ -1493,6 +1790,43 @@
         }
 
         _dotNetRef?.Dispose();
+    }
+
+    // ── WebBrowser iframe helpers ─────────────────────────────────────────────
+
+    /// <summary>
+    /// Collects all <see cref="Forms.WebBrowser"/> controls that belong to this form.
+    /// </summary>
+    private IEnumerable<Forms.WebBrowser> GetWebBrowsers()
+    {
+        if (Form is null) yield break;
+        foreach (var wb in CollectWebBrowsers(Form))
+            yield return wb;
+    }
+
+    private static IEnumerable<Forms.WebBrowser> CollectWebBrowsers(Forms.Control parent)
+    {
+        foreach (Forms.Control child in parent.Controls)
+        {
+            if (child is Forms.WebBrowser wb)
+                yield return wb;
+            foreach (var nested in CollectWebBrowsers(child))
+                yield return nested;
+        }
+    }
+
+    /// <summary>
+    /// Injects the Blazor <see cref="IJSRuntime"/> into all <see cref="Forms.WebBrowser"/>
+    /// controls so they can call JS navigation helpers.
+    /// </summary>
+    private void PropagateJSRuntime(Forms.Control parent)
+    {
+        foreach (Forms.Control child in parent.Controls)
+        {
+            if (child is Forms.WebBrowser wb)
+                wb.JSRuntime = JSRuntime;
+            PropagateJSRuntime(child);
+        }
     }
 
     // ── Context-menu suppression helper ───────────────────────────────────────

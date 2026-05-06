@@ -90,7 +90,7 @@ public class ProjectStatusForm : Form
     [
         // ── Tier 1 ──────────────────────────────────────────────────────────────
         new("Tier 1", "Windowing",  "Form",                           "⚠️ Partial",      "Chrome, move/resize, min/max/close, start position, key preview."),
-        new("Tier 1", "Core",       "Control",                        "⚠️ Partial",      "Full property/event surface; layout, focus, tab navigation."),
+        new("Tier 1", "Core",       "Control",                        "⚠️ Partial",      "Full property/event surface; layout, focus, tab nav; drag-drop (DragEnter/Over/Leave/Drop) wired via HTML5."),
         new("Tier 1", "Buttons",    "Button / ButtonBase",            "✅ Good",          "Hover/pressed/focus + click via mouse/keyboard."),
         new("Tier 1", "Buttons",    "CheckBox",                       "✅ Good",          "Toggle behavior + indicator rendering."),
         new("Tier 1", "Buttons",    "RadioButton",                    "✅ Good",          "Mutual exclusivity within parent."),
@@ -137,14 +137,14 @@ public class ProjectStatusForm : Form
         new("Tier 2", "Data",       "BindingSource",                  "✅ Good",          "IList/IBindingList wrapper; Filter/Sort/Find; server-backed via CanvasDataService."),
         new("Tier 2", "Data",       "DataGridViewColumn types",       "✅ Good",          "TextBox/CheckBox/ComboBox/Button/Image/Link column variants."),
         new("Tier 2", "Data",       "CanvasDataService",              "✅ Good",          "Server-backed ADO.NET; SQLite default; ambient Current accessor."),
-        new("Tier 2", "Non-visual", "NotifyIcon",                     "🧩 Stub",         "API present; system tray stub."),
+        new("Tier 2", "Non-visual", "NotifyIcon",                     "⚠️ Partial",      "Canvas system tray in taskbar; ContextMenuStrip popup; balloon tips; Click/DoubleClick."),
 
         // ── Tier 3 (not yet started) ─────────────────────────────────────────────
         new("Tier 3", "Menus",      "MainMenu / ContextMenu",         "🔲 Not started",  "Legacy pre-MenuStrip menus."),
         new("Tier 3", "Menus",      "ToolBar",                        "🔲 Not started",  "Legacy pre-ToolStrip toolbar."),
-        new("Tier 3", "Input",      "TrackBar",                       "🔲 Not started",  ""),
-        new("Tier 3", "Input",      "HScrollBar / VScrollBar",        "🔲 Not started",  "Standalone scroll bars."),
-        new("Tier 3", "Input",      "DomainUpDown",                   "🔲 Not started",  ""),
+        new("Tier 2", "Input",      "TrackBar",                       "⚠️ Partial",      "Horizontal/Vertical; ticks; keyboard/mouse; SetRange."),
+        new("Tier 2", "Input",      "HScrollBar / VScrollBar",        "⚠️ Partial",      "Standalone scroll bars; SmallChange/LargeChange; Scroll/ValueChanged."),
+        new("Tier 2", "Input",      "DomainUpDown",                   "⚠️ Partial",      "String-list up-down; Sorted/Wrap; SelectedItem/SelectedIndex."),
         new("Tier 3", "Data",       "PropertyGrid",                   "🔲 Not started",  ""),
         new("Tier 3", "Data",       "BindingNavigator",               "🔲 Not started",  ""),
         new("Tier 3", "Data",       "DataGrid (legacy)",              "🔲 Not started",  ""),
@@ -155,7 +155,7 @@ public class ProjectStatusForm : Form
         new("Tier 3", "Legacy",     "StatusBar",                      "🔲 Not started",  "Pre-StatusStrip."),
         new("Tier 3", "Other",      "ErrorProvider",                  "🔲 Not started",  ""),
         new("Tier 3", "Other",      "HelpProvider",                   "🔲 Not started",  ""),
-        new("Tier 3", "Other",      "WebBrowser / WebView2",          "🔲 Not started",  ""),
+        new("Tier 3", "Other",      "WebBrowser / WebView2",          "⚠️ Partial",      "iframe overlay; Navigate/GoBack/Forward/Stop/Refresh/DocumentText/ExecuteScriptAsync; cross-origin DOM blocked by browser sandbox."),
         new("Tier 3", "Other",      "Chart",                          "🔲 Not started",  ""),
         new("Tier 3", "Other",      "MDI (MdiClient, MDI Forms)",     "🔲 Not started",  ""),
         new("Tier 3", "Other",      "Screen (multi-monitor)",         "🔲 Not started",  ""),

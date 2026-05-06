@@ -1,0 +1,291 @@
+@using System.Windows.Forms
+@using Canvas.Windows.Forms.Services
+@implements IDisposable
+
+<div class="system-tray" style="display: flex; align-items: center; height: 100%; gap: 2px; padding: 0 4px; border-left: 1px solid #b0b0b0; position: relative;">
+
+	@* ── Tray icons ─────────────────────────────────────────────────────────── *@
+	@foreach (var icon in _registry.Icons)
+	{
+		var capturedIcon = icon;
+		<div class="tray-icon"
+			 title="@icon.Text"
+			 style="width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; 
+					border-radius: 3px; cursor: pointer; position: relative;
+					background: @(_hoveredIcon == capturedIcon ? "rgba(0,0,0,0.1)" : "transparent");
+					transition: background 0.15s ease;"
+			 @onclick="() => OnTrayIconClick(capturedIcon)"
+			 @oncontextmenu="(e) => OnTrayIconRightClick(capturedIcon)"
+			 @oncontextmenu:preventDefault="true"
+			 @onmouseenter="() => _hoveredIcon = capturedIcon"
+			 @onmouseleave="() => _hoveredIcon = null">
+
+			@if (!string.IsNullOrEmpty(icon.Icon?.ResourcePath))
+			{
+				<img src="@icon.Icon.ResourcePath" alt="@icon.Text"
+					 style="width: 16px; height: 16px; object-fit: contain;" />
+			}
+			else
+			{
+				@* Default fallback icon *@
+				<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+					<rect width="16" height="16" rx="2" fill="#0078d4"/>
+					<text x="8" y="12" font-size="10" text-anchor="middle" fill="white" font-family="Segoe UI">@(GetIconInitial(icon))</text>
+				</svg>
+			}
+		</div>
+	}
+
+	@* ── Clock ──────────────────────────────────────────────────────────────── *@
+	<div class="tray-clock"
+		 style="font-size: 11px; color: #000; padding: 0 6px; white-space: nowrap; cursor: default; line-height: 1.2;">
+		<div>@_timeString</div>
+		<div style="font-size: 10px; color: #444;">@_dateString</div>
+	</div>
+
+	@* ── Context menu popup ──────────────────────────────────────────────────── *@
+	@if (_contextMenuVisible && _contextMenuIcon?.ContextMenuStrip != null)
+	{
+		var strip = _contextMenuIcon.ContextMenuStrip;
+		<div class="tray-context-backdrop"
+			 style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 99998;"
+			 @onclick="CloseContextMenu"
+			 @oncontextmenu="CloseContextMenu"
+			 @oncontextmenu:preventDefault="true">
+		</div>
+		<div class="tray-context-menu"
+			 style="position: fixed; bottom: @(_contextMenuY)px; right: @(_contextMenuRight)px;
+					background: #ffffff; border: 1px solid #b0b0b0; border-radius: 4px;
+					box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 99999;
+					min-width: 160px; padding: 4px 0; font-size: 13px; font-family: Segoe UI, sans-serif;">
+
+			@foreach (var item in strip.Items.OfType<ToolStripItem>())
+			{
+				var capturedItem = item;
+				if (item is ToolStripSeparator)
+				{
+					<div style="height: 1px; background: #e0e0e0; margin: 3px 8px;"></div>
+				}
+				else
+				{
+					<div class="tray-menu-item"
+						 style="padding: 6px 16px; cursor: @(item.Enabled ? "pointer" : "default");
+								color: @(item.Enabled ? "#000" : "#a0a0a0");
+								background: @(_hoveredMenuItem == capturedItem ? "#e3f2fd" : "transparent");
+								transition: background 0.1s ease;"
+						 @onmouseenter="() => _hoveredMenuItem = capturedItem"
+						 @onmouseleave="() => _hoveredMenuItem = null"
+						 @onclick="() => OnMenuItemClick(capturedItem)">
+						@item.Text
+					</div>
+				}
+			}
+		</div>
+	}
+
+	@* ── Balloon tip toast ───────────────────────────────────────────────────── *@
+	@if (_balloonIcon != null && _balloonInfo != null)
+	{
+		var balloon = _balloonInfo;
+		var balloonIcon = _balloonIcon;
+		<div class="tray-balloon"
+			 style="position: fixed; bottom: 48px; right: 16px; z-index: 99999;
+					background: #fff; border: 1px solid #b0b0b0; border-radius: 6px;
+					box-shadow: 0 4px 16px rgba(0,0,0,0.18); padding: 12px 16px;
+					min-width: 200px; max-width: 320px; font-family: Segoe UI, sans-serif;
+					animation: tray-balloon-in 0.2s ease;"
+			 @onclick="() => OnBalloonClick(balloonIcon)">
+
+			<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+				@BalloonIconSvg(balloon.Icon)
+				@if (!string.IsNullOrEmpty(balloon.Title))
+				{
+					<strong style="font-size: 13px;">@balloon.Title</strong>
+				}
+			</div>
+			@if (!string.IsNullOrEmpty(balloon.Text))
+			{
+				<div style="font-size: 12px; color: #333;">@balloon.Text</div>
+			}
+			<button @onclick:stopPropagation="true"
+					@onclick="() => DismissBalloon(balloonIcon)"
+					style="position: absolute; top: 4px; right: 6px; border: none; background: none;
+						   cursor: pointer; font-size: 14px; color: #666; line-height: 1;">✕</button>
+		</div>
+	}
+</div>
+
+<style>
+	@@keyframes tray-balloon-in {
+		from { opacity: 0; transform: translateY(12px); }
+		to   { opacity: 1; transform: translateY(0); }
+	}
+</style>
+
+@code {
+	[Parameter] public NotifyIconRegistry Registry { get; set; } = null!;
+
+	private NotifyIconRegistry _registry = null!;
+
+	private NotifyIcon? _hoveredIcon;
+	private ToolStripItem? _hoveredMenuItem;
+
+	// Context menu state
+	private bool _contextMenuVisible = false;
+	private NotifyIcon? _contextMenuIcon;
+	private int _contextMenuY     = 36;   // px from bottom
+	private int _contextMenuRight = 4;    // px from right
+
+	// Balloon state
+	private NotifyIcon?    _balloonIcon;
+	private BalloonTipInfo? _balloonInfo;
+	private CancellationTokenSource? _balloonCts;
+
+	// Clock
+	private string _timeString = "";
+	private string _dateString = "";
+	private System.Threading.Timer? _clockTimer;
+
+	protected override void OnInitialized()
+	{
+		_registry = Registry ?? NotifyIconRegistry.Instance;
+		_registry.SetChangeCallback(() => InvokeAsync(HandleRegistryChanged));
+
+		UpdateClock();
+		_clockTimer = new System.Threading.Timer(_ => InvokeAsync(TickClock), null, 0, 5000);
+	}
+
+	private async Task HandleRegistryChanged()
+	{
+		// Check for any new balloon tips
+		foreach (var icon in _registry.Icons)
+		{
+			if (icon.ActiveBalloon != null && icon.ActiveBalloon != _balloonInfo)
+			{
+				await ShowBalloon(icon, icon.ActiveBalloon);
+			}
+		}
+		StateHasChanged();
+	}
+
+	// ── Clock ─────────────────────────────────────────────────────────────────
+
+	private void UpdateClock()
+	{
+		var now = DateTime.Now;
+		_timeString = now.ToString("HH:mm");
+		_dateString = now.ToString("MM/dd/yyyy");
+	}
+
+	private void TickClock()
+	{
+		UpdateClock();
+		StateHasChanged();
+	}
+
+	// ── Tray icon interactions ────────────────────────────────────────────────
+
+	private void OnTrayIconClick(NotifyIcon icon)
+	{
+		CloseContextMenu();
+		var e = new System.Windows.Forms.MouseEventArgs(MouseButtons.Left, 1, 0, 0, 0);
+		icon.RaiseClick(e);
+	}
+
+	private void OnTrayIconRightClick(NotifyIcon icon)
+	{
+		if (icon.ContextMenuStrip != null)
+		{
+			_contextMenuIcon    = icon;
+			_contextMenuVisible = true;
+			StateHasChanged();
+		}
+	}
+
+	private void CloseContextMenu()
+	{
+		_contextMenuVisible = false;
+		_contextMenuIcon    = null;
+		StateHasChanged();
+	}
+
+	private void OnMenuItemClick(ToolStripItem item)
+	{
+		if (!item.Enabled) return;
+		CloseContextMenu();
+		item.PerformClick();
+	}
+
+	// ── Balloon tip ───────────────────────────────────────────────────────────
+
+	private async Task ShowBalloon(NotifyIcon icon, BalloonTipInfo info)
+	{
+		_balloonCts?.Cancel();
+		_balloonCts?.Dispose();
+
+		_balloonIcon = icon;
+		_balloonInfo = info;
+		StateHasChanged();
+
+		_balloonCts = new CancellationTokenSource();
+		var token   = _balloonCts.Token;
+
+		try
+		{
+			await Task.Delay(info.TimeoutMs, token);
+			DismissBalloon(icon);
+		}
+		catch (TaskCanceledException) { }
+	}
+
+	private void DismissBalloon(NotifyIcon icon)
+	{
+		_balloonCts?.Cancel();
+		icon.ClearBalloon();
+		_balloonIcon = null;
+		_balloonInfo = null;
+		StateHasChanged();
+	}
+
+	private void OnBalloonClick(NotifyIcon icon)
+	{
+		icon.RaiseBalloonTipClicked();
+		DismissBalloon(icon);
+	}
+
+	// ── Helpers ───────────────────────────────────────────────────────────────
+
+	private static string GetIconInitial(NotifyIcon icon)
+	{
+		if (!string.IsNullOrEmpty(icon.Text)) return icon.Text[0].ToString().ToUpper();
+		return "A";
+	}
+
+	private static RenderFragment BalloonIconSvg(BalloonTipIcon tipIcon) => builder =>
+	{
+		string color = tipIcon switch
+		{
+			BalloonTipIcon.Info    => "#0078d4",
+			BalloonTipIcon.Warning => "#ffa500",
+			BalloonTipIcon.Error   => "#d32f2f",
+			_                      => "#0078d4"
+		};
+		string symbol = tipIcon switch
+		{
+			BalloonTipIcon.Warning => "!",
+			BalloonTipIcon.Error   => "✕",
+			_                      => "i"
+		};
+		builder.OpenElement(0, "div");
+		builder.AddAttribute(1, "style", $"width:18px;height:18px;border-radius:50%;background:{color};color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;flex-shrink:0;");
+		builder.AddContent(2, symbol);
+		builder.CloseElement();
+	};
+
+	public void Dispose()
+	{
+		_balloonCts?.Cancel();
+		_balloonCts?.Dispose();
+		_clockTimer?.Dispose();
+	}
+}

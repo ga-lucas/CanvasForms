@@ -4,26 +4,11 @@ namespace Canvas.Windows.Forms.Samples;
 
 public class WelcomeForm : Form
 {
-    // UI Controls
-    private Label? _titleLabel;
-    private Label? _infoLabel;
-    private Button? _btnDockingDemo;
-    private Button? _btnInteractive;
-    private Button? _btnDrawingSample;
-    private Button? _btnFlowLayoutDemo;
-    private Button? _btnTableLayoutDemo;
-    private Button? _btnSplitContainerDemo;
-    private Button? _btnTabControlDemo;
-
-    private Button? _btnDialogDemo;
-    private Button? _btnDataGridDemo;
-    private Button? _btnServerDataDemo;
-
     public WelcomeForm()
     {
         Text = "Welcome - Windows Forms Canvas Clone";
         Width = 700;
-        Height = 760;
+        Height = 660;
         BackColor = Color.White;
         AllowResize = true;
         AllowMove = true;
@@ -31,334 +16,125 @@ public class WelcomeForm : Form
         MinimumHeight = 400;
 
         InitializeControls();
-
-        // Force layout after initialization
         PerformLayout();
     }
 
+    private static void Launch<T>() where T : Form, new()
+        => CanvasApplication.FormManager?.ShowOrCreateForm<T>();
+
     private void InitializeControls()
     {
-        // Title Label
-        _titleLabel = new Label
+        const int lx  = 40;          // left x of button grid
+        const int col2 = 250;         // col 2 x
+        const int col3 = 460;         // col 3 x
+        const int bw  = 200;          // button width
+        const int bh  = 50;           // button height
+        const int rh  = 60;           // row height (button + gap)
+
+        // ── Header ────────────────────────────────────────────────────────
+        Controls.Add(new Label
         {
-            Text = "Windows Forms Canvas Clone",
-            Left = 10,
-            Top = 10,
-            Width = 680,
-            Height = 35,
+            Text      = "Windows Forms Canvas Clone",
+            Left      = 10, Top = 10, Width = 680, Height = 35,
             ForeColor = Color.FromArgb(26, 115, 232),
             BackColor = Color.FromArgb(240, 248, 255),
             TextAlign = ContentAlignment.TopCenter
-        };
-        Controls.Add(_titleLabel);
+        });
 
-        // Info Label (no newlines, simpler text)
-        _infoLabel = new Label
+        Controls.Add(new Label
         {
-            Text = "HTML canvas-based Windows Forms implementation with full window management.",
-            Left = 20,
-            Top = 55,
-            Width = 660,
-            Height = 25,
-            ForeColor = Color.FromArgb(60, 60, 60),
-            BackColor = Color.FromArgb(255, 255, 224),
-            TextAlign = ContentAlignment.TopLeft
-        };
-        Controls.Add(_infoLabel);
-
-        // Features label
-        var featuresLabel = new Label
-        {
-            Text = "Features: Docking & Anchoring, Taskbar, Min/Max/Close, Drag & Resize",
-            Left = 20,
-            Top = 90,
-            Width = 660,
-            Height = 25,
+            Text      = "HTML canvas-based Windows Forms implementation with full window management.",
+            Left      = 20, Top = 52, Width = 660, Height = 22,
             ForeColor = Color.FromArgb(60, 60, 60),
             BackColor = Color.FromArgb(255, 255, 224)
-        };
-        Controls.Add(featuresLabel);
+        });
 
-        // Demo Buttons Section Label
-        var demosLabel = new Label
+        Controls.Add(new Label
         {
-            Text = "Click to open demo forms:",
-            Left = 20,
-            Top = 130,
-            Width = 660,
-            Height = 25,
+            Text      = "Features: Docking & Anchoring, Taskbar, Min/Max/Close, Drag & Resize",
+            Left      = 20, Top = 81, Width = 660, Height = 22,
+            ForeColor = Color.FromArgb(60, 60, 60),
+            BackColor = Color.FromArgb(255, 255, 224)
+        });
+
+        Controls.Add(new Label
+        {
+            Text      = "Click to open demo forms:",
+            Left      = 20, Top = 112, Width = 660, Height = 20,
             ForeColor = Color.FromArgb(60, 60, 60),
             BackColor = Color.White
+        });
+
+        // ── Project Status — full-width, bold ────────────────────────────
+        var btnStatus = new Button
+        {
+            Text   = "📊  Project Status",
+            Left   = lx, Top = 138, Width = 620, Height = 44,
+            Font   = new Font("Arial", 12),
+            ForeColor = Color.FromArgb(0, 51, 153),
+            BackColor = Color.FromArgb(232, 240, 255)
         };
-        Controls.Add(demosLabel);
+        btnStatus.Click += (s, e) => Launch<ProjectStatusForm>();
+        Controls.Add(btnStatus);
+
+        // ── Demo button grid (3 columns, 6 rows) ─────────────────────────
+        int y = 192;   // first row top
+
+        Button Btn(string text, int x, int top)
+        {
+            var b = new Button { Text = text, Left = x, Top = top, Width = bw, Height = bh };
+            Controls.Add(b);
+            return b;
+        }
 
         // Row 1
-        var btnInputControls = new Button
-        {
-            Text = "Input Controls",
-            Left = 40,
-            Top = 170,
-            Width = 200,
-            Height = 50
-        };
-        btnInputControls.Click += (s, e) =>
-        {
-           Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<DemoInputControlsForm>();
-        };
-        Controls.Add(btnInputControls);
-
-        var btnSelectionControls = new Button
-        {
-            Text = "Selection Controls",
-            Left = 250,
-            Top = 170,
-            Width = 200,
-            Height = 50
-        };
-        btnSelectionControls.Click += (s, e) =>
-        {
-          Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<DemoSelectionControlsForm>();
-        };
-        Controls.Add(btnSelectionControls);
-
-        var btnCollectionControls = new Button
-        {
-            Text = "TreeView & ListView",
-            Left = 460,
-            Top = 170,
-            Width = 200,
-            Height = 50
-        };
-        btnCollectionControls.Click += (s, e) =>
-        {
-           Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<DemoCollectionControlsForm>();
-        };
-        Controls.Add(btnCollectionControls);
+        Btn("Input Controls",      lx,   y).Click += (s, e) => Launch<DemoInputControlsForm>();
+        Btn("Selection Controls",  col2, y).Click += (s, e) => Launch<DemoSelectionControlsForm>();
+        Btn("TreeView & ListView", col3, y).Click += (s, e) => Launch<DemoCollectionControlsForm>();
+        y += rh;
 
         // Row 2
-        _btnDockingDemo = new Button
-        {
-            Text = "Docking & Anchoring",
-            Left = 40,
-            Top = 240,
-            Width = 200,
-            Height = 50
-        };
-        _btnDockingDemo.Click += (s, e) =>
-        {
-           Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<DockingDemoForm>();
-        };
-        Controls.Add(_btnDockingDemo);
-
-        _btnFlowLayoutDemo = new Button
-        {
-            Text = "FlowLayoutPanel",
-            Left = 250,
-            Top = 240,
-            Width = 200,
-            Height = 50
-        };
-        _btnFlowLayoutDemo.Click += (s, e) =>
-        {
-            Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<FlowLayoutDemoForm>();
-        };
-        Controls.Add(_btnFlowLayoutDemo);
-
-        _btnTableLayoutDemo = new Button
-        {
-            Text = "TableLayoutPanel",
-            Left = 460,
-            Top = 240,
-            Width = 200,
-            Height = 50
-        };
-        _btnTableLayoutDemo.Click += (s, e) =>
-        {
-            Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<TableLayoutDemoForm>();
-        };
-        Controls.Add(_btnTableLayoutDemo);
+        Btn("Docking & Anchoring", lx,   y).Click += (s, e) => Launch<DockingDemoForm>();
+        Btn("FlowLayoutPanel",     col2, y).Click += (s, e) => Launch<FlowLayoutDemoForm>();
+        Btn("TableLayoutPanel",    col3, y).Click += (s, e) => Launch<TableLayoutDemoForm>();
+        y += rh;
 
         // Row 3
-        _btnInteractive = new Button
-        {
-            Text = "Interactive Form",
-            Left = 250,
-            Top = 310,
-            Width = 200,
-            Height = 50
-        };
-        _btnInteractive.Click += (s, e) =>
-        {
-           Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<InteractiveForm>();
-        };
-        Controls.Add(_btnInteractive);
+        Btn("SplitContainer",      lx,   y).Click += (s, e) => Launch<SplitContainerDemoForm>();
+        Btn("Interactive Form",    col2, y).Click += (s, e) => Launch<InteractiveForm>();
+        Btn("Drawing Sample",      col3, y).Click += (s, e) => Launch<SampleDrawingForm>();
+        y += rh;
 
-        _btnDrawingSample = new Button
-        {
-            Text = "Drawing Sample",
-            Left = 460,
-            Top = 310,
-            Width = 200,
-            Height = 50
-        };
-        _btnDrawingSample.Click += (s, e) =>
-        {
-         Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<SampleDrawingForm>();
-        };
-        Controls.Add(_btnDrawingSample);
+        // Row 4
+        Btn("TabControl",          lx,   y).Click += (s, e) => Launch<TabControlDemoForm>();
+        Btn("Dialog Demos",        col2, y).Click += (s, e) => Launch<DialogDemoForm>();
+        Btn("Menus & ToolStrip",   col3, y).Click += (s, e) => Launch<MenuDemoForm>();
+        y += rh;
 
-        _btnSplitContainerDemo = new Button
-        {
-            Text = "SplitContainer",
-            Left = 40,
-            Top = 310,
-            Width = 200,
-            Height = 50
-        };
-        _btnSplitContainerDemo.Click += (s, e) =>
-        {
-            Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<SplitContainerDemoForm>();
-        };
-        Controls.Add(_btnSplitContainerDemo);
+        // Row 5
+        Btn("DataGridView",        lx,   y).Click += (s, e) => Launch<DataGridDemoForm>();
+        Btn("Server Data (ADO.NET)", col2, y).Click += (s, e) => Launch<ServerDataDemoForm>();
+        Btn("Sliders & Spinners",  col3, y).Click += (s, e) => Launch<DemoSliderSpinnerForm>();
+        y += rh;
 
-        _btnTabControlDemo = new Button
-        {
-            Text = "TabControl",
-            Left = 40,
-            Top = 380,
-            Width = 200,
-            Height = 50
-        };
-        _btnTabControlDemo.Click += (s, e) =>
-        {
-            Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<TabControlDemoForm>();
-        };
-        Controls.Add(_btnTabControlDemo);
+        // Row 6
+        Btn("WebBrowser & NotifyIcon", lx, y).Click += (s, e) => Launch<DemoWebNotifyForm>();
+        y += rh;
 
-        _btnDialogDemo = new Button
+        // ── Links ────────────────────────────────────────────────────────
+        Controls.Add(new Label
         {
-            Text = "Dialog Demos",
-            Left = 250,
-            Top = 380,
-            Width = 200,
-            Height = 50
-        };
-        _btnDialogDemo.Click += (s, e) =>
-        {
-            Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<DialogDemoForm>();
-        };
-        Controls.Add(_btnDialogDemo);
-
-        _btnDataGridDemo = new Button
-        {
-            Text = "DataGridView",
-            Left = 40,
-            Top = 450,
-            Width = 200,
-            Height = 50
-        };
-        _btnDataGridDemo.Click += (s, e) =>
-        {
-            Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<DataGridDemoForm>();
-        };
-        Controls.Add(_btnDataGridDemo);
-
-        _btnServerDataDemo = new Button
-        {
-            Text = "Server Data (ADO.NET)",
-            Left = 250,
-            Top = 450,
-            Width = 200,
-            Height = 50
-        };
-        _btnServerDataDemo.Click += (s, e) =>
-        {
-            Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<ServerDataDemoForm>();
-        };
-        Controls.Add(_btnServerDataDemo);
-
-        // Row 4 col 3 — Menus & ToolStrip demo
-        var btnMenuDemo = new Button
-        {
-            Text = "Menus & ToolStrip",
-            Left = 460,
-            Top = 380,
-            Width = 200,
-            Height = 50
-        };
-        btnMenuDemo.Click += (s, e) =>
-        {
-            Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<MenuDemoForm>();
-        };
-        Controls.Add(btnMenuDemo);
-
-        // Row 5 — Project Status
-        var btnProjectStatus = new Button
-        {
-            Text = "Project Status",
-            Left = 40,
-            Top = 520,
-            Width = 200,
-            Height = 50
-        };
-        btnProjectStatus.Click += (s, e) =>
-        {
-            Canvas.Windows.Forms.CanvasApplication.FormManager?.ShowOrCreateForm<ProjectStatusForm>();
-        };
-        Controls.Add(btnProjectStatus);
-
-        // Links section
-        var linksLabel = new Label
-        {
-            Text = "Links:",
-            Left = 20,
-            Top = 590,
-            Width = 660,
-            Height = 25,
+            Text      = "Links:",
+            Left      = 20, Top = y + 4, Width = 660, Height = 20,
             ForeColor = Color.FromArgb(60, 60, 60),
             BackColor = Color.White
-        };
-        Controls.Add(linksLabel);
+        });
+        y += 28;
 
-        // GitHub link
-        var githubLink = new LinkLabel
-        {
-            Text = "View on GitHub",
-            LinkUrl = "https://github.com/ga-lucas/CanvasForms",
-            Left = 40,
-            Top = 620,
-            Width = 150,
-            Height = 20
-        };
-        githubLink.LinkClicked += (s, e) =>
-        {
-            // Optional: show a message when link is clicked
-            // The URL will be opened automatically
-        };
-        Controls.Add(githubLink);
-
-        // Documentation link
-        var docsLink = new LinkLabel
-        {
-            Text = "Documentation",
-            LinkUrl = "https://docs.microsoft.com/en-us/dotnet/desktop/winforms/",
-            Left = 200,
-            Top = 620,
-            Width = 150,
-            Height = 20
-        };
-        Controls.Add(docsLink);
-
-        // Example link
-        var exampleLink = new LinkLabel
-        {
-            Text = "WinForms Examples",
-            LinkUrl = "https://github.com/dotnet/winforms",
-            Left = 360,
-            Top = 620,
-            Width = 150,
-            Height = 20
-        };
-        Controls.Add(exampleLink);
+        Controls.Add(new LinkLabel { Text = "View on GitHub",    LinkUrl = "https://github.com/ga-lucas/CanvasForms",                          Left = 40,  Top = y, Width = 160, Height = 20 });
+        Controls.Add(new LinkLabel { Text = "Documentation",     LinkUrl = "https://docs.microsoft.com/en-us/dotnet/desktop/winforms/",        Left = 210, Top = y, Width = 150, Height = 20 });
+        Controls.Add(new LinkLabel { Text = "WinForms Examples", LinkUrl = "https://github.com/dotnet/winforms",                               Left = 370, Top = y, Width = 150, Height = 20 });
     }
 }
+
+

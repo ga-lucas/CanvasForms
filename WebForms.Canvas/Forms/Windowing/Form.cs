@@ -216,6 +216,20 @@ public class Form : ContainerControl
     private CloseReason _closeReason = CloseReason.None;
 
     /// <summary>
+    /// Activates the form and gives it focus, bringing it to the front of the z-order.
+    /// Matches WinForms <c>Form.Activate()</c>.
+    /// </summary>
+    public void Activate()
+    {
+        if (!Visible) Visible = true;
+        BringToFront();
+        // Focus the form's first focusable child, or the form itself
+        var first = GetNextControl(null, true);
+        if (first != null)
+            FocusedControl = first;
+    }
+
+    /// <summary>
     /// Closes the form. Can be cancelled by handling the FormClosing event.
     /// </summary>
     public void Close()

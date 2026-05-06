@@ -1,6 +1,7 @@
 @using System.Windows.Forms
 @using Canvas.Windows.Forms.Components
 @using Canvas.Windows.Forms
+@using Canvas.Windows.Forms.Services
 @inject IJSRuntime JSRuntime
 @implements IDisposable
 
@@ -10,6 +11,7 @@
     <div class="taskbar" style="position: absolute; top: 0; left: 0; right: 0; height: @(TaskbarHeight)px; background: linear-gradient(180deg, #f0f0f0 0%, #d0d0d0 100%); border-bottom: 1px solid #a0a0a0; z-index: 10000; display: flex; align-items: center; padding: 0 8px; padding-left: @(TaskbarLeftPadding)px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 
         <!-- Window buttons -->
+        <div style="display: flex; align-items: center; flex: 1; overflow: hidden; gap: 0;">
         @foreach (var form in _formManager.OpenForms.OrderBy(f => f.CreatedAt))
         {
             var isActive = form == _formManager.ActiveForm;
@@ -40,6 +42,10 @@
                 @form.Text
             </div>
         }
+        </div>
+
+        <!-- System tray (right side) -->
+        <SystemTray Registry="@_trayRegistry" />
     </div>
 
     <!-- Desktop area (below taskbar) -->
@@ -67,6 +73,7 @@
     public int TaskbarLeftPadding { get; set; } = 8;
 
     private FormManager _formManager = null!;
+    private NotifyIconRegistry _trayRegistry = NotifyIconRegistry.Instance;
     private int _viewportWidth = 1920;
     private int _viewportHeight = 1080;
     private DotNetObjectReference<Desktop>? _dotNetRef;

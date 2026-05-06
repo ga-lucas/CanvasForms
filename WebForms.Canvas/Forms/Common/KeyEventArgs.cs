@@ -6,6 +6,7 @@ public enum Keys
     Back = 8,
     Tab = 9,
     Enter = 13,
+    Return = 13,   // WinForms alias for Enter
     Shift = 16,
     Control = 17,
     Alt = 18,
