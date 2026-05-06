@@ -264,7 +264,22 @@ public class TabControl : Control
             }
             else
             {
-                g.DrawString(text, Font, tb, rect.X + 8, rect.Y + 5);
+                int textOffsetX = 8;
+                if (ImageList != null)
+                {
+                    var page = _tabPages[i];
+                    string? iconUrl = !string.IsNullOrEmpty(page.ImageKey)
+                        ? ImageList.GetUrl(page.ImageKey)
+                        : ImageList.GetUrl(page.ImageIndex);
+                    if (iconUrl != null)
+                    {
+                        var sz = ImageList.ImageSize;
+                        int iconY = rect.Y + (rect.Height - sz.Height) / 2;
+                        g.DrawImage(iconUrl, rect.X + textOffsetX, iconY, sz.Width, sz.Height);
+                        textOffsetX += sz.Width + 3;
+                    }
+                }
+                g.DrawString(text, Font, tb, rect.X + textOffsetX, rect.Y + 5);
             }
         }
 
@@ -1081,6 +1096,8 @@ public class TabPage : Panel
         Text = text;
     }
 
+    public int ImageIndex { get; set; } = -1;
+    public string ImageKey { get; set; } = string.Empty;
     public bool UseVisualStyleBackColor { get; set; } = true;
 }
 

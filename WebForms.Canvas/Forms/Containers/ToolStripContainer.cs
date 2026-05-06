@@ -2,27 +2,109 @@ namespace System.Windows.Forms;
 
 // ── ToolStripPanel ────────────────────────────────────────────────────────────
 // A docking band that holds ToolStrips along one edge of a ToolStripContainer.
-// Currently a structural stub — real ToolStrip hosting is implemented with menus/toolbars.
+// Children (ToolStrips) are stacked in a row matching the panel Orientation;
+// the panel auto-resizes to the tallest/widest child and becomes visible
+// automatically when the first child is added (matching WinForms behaviour).
 
 public class ToolStripPanel : ContainerControl
 {
+    // Gap between stacked ToolStrips on the same band.
+    private const int Strip_Gap = 1;
+
     public ToolStripPanel()
     {
         IsMouseRoutingContainer = true;
         TabStop = false;
         BackColor = System.Drawing.Color.FromArgb(240, 240, 240);
+        // Hidden until a ToolStrip is docked — matches WinForms default.
+        base.Visible = false;
     }
+
+    // ── Properties ────────────────────────────────────────────────────────────
 
     /// <summary>
     /// Orientation of the docking band (Horizontal for Top/Bottom, Vertical for Left/Right).
     /// </summary>
     public Orientation Orientation { get; set; } = Orientation.Horizontal;
 
+    // ── Auto-visibility ───────────────────────────────────────────────────────
+
     /// <summary>
-    /// Whether this panel is visible even when it contains no ToolStrips.
-    /// Matches WinForms default of false.
+    /// Becomes visible when the first child is added; hidden when the last is removed.
+    /// The property can still be set explicitly to override this behaviour.
     /// </summary>
-    public new bool Visible { get; set; } = false;
+    public new bool Visible
+    {
+        get => base.Visible;
+        set => base.Visible = value;
+    }
+
+    protected override void OnControlAdded(ControlEventArgs e)
+    {
+        base.OnControlAdded(e);
+        if (Controls.Count > 0)
+            base.Visible = true;
+        PerformLayout();
+        Parent?.PerformLayout();
+    }
+
+    protected override void OnControlRemoved(ControlEventArgs e)
+    {
+        base.OnControlRemoved(e);
+        if (Controls.Count == 0)
+            base.Visible = false;
+        PerformLayout();
+        Parent?.PerformLayout();
+    }
+
+    // ── Layout ────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Positions children in a row (horizontal band) or column (vertical band).
+    /// Resizes the panel to the minimum bounding size for all visible children.
+    /// </summary>
+    public override void PerformLayout()
+    {
+        base.PerformLayout();
+
+        var visible = Controls.Where(c => c.Visible).ToList();
+        if (visible.Count == 0) return;
+
+        if (Orientation == Orientation.Horizontal)
+        {
+            // Stack left-to-right; panel height = tallest child.
+            int x = 0;
+            int maxH = 0;
+            foreach (var c in visible)
+            {
+                c.Left = x;
+                c.Top  = 0;
+                // ToolStrip children that fill width will respect Width set by LayoutBands;
+                // others keep their own width.
+                x  += c.Width + Strip_Gap;
+                maxH = Math.Max(maxH, c.Height);
+            }
+            if (maxH > 0 && Height != maxH)
+                Height = maxH;
+        }
+        else
+        {
+            // Stack top-to-bottom; panel width = widest child.
+            int y = 0;
+            int maxW = 0;
+            foreach (var c in visible)
+            {
+                c.Left = 0;
+                c.Top  = y;
+                y  += c.Height + Strip_Gap;
+                maxW = Math.Max(maxW, c.Width);
+            }
+            if (maxW > 0 && Width != maxW)
+                Width = maxW;
+        }
+    }
+
+    // ── Painting ──────────────────────────────────────────────────────────────
 
     protected internal override void OnPaint(PaintEventArgs e)
     {
@@ -68,8 +150,8 @@ public class ToolStripContainer : ContainerControl
     private readonly ToolStripPanel       _right;
     private readonly ToolStripContentPanel _content;
 
-    // Typical ToolStrip heights/widths matching WinForms defaults.
-    private const int BandThickness = 25;
+    // Minimum band size — used only when a panel is visible but has no measurable children yet.
+    private const int MinBandThickness = 24;
 
     public ToolStripContainer()
     {
@@ -115,46 +197,56 @@ public class ToolStripContainer : ContainerControl
     {
         if (Width <= 0 || Height <= 0) return;
 
-        // Measure each band: visible bands use BandThickness, hidden ones collapse to 0.
-        int topH    = _top.Visible    ? Math.Max(BandThickness, _top.Height)    : 0;
-        int bottomH = _bottom.Visible ? Math.Max(BandThickness, _bottom.Height) : 0;
-        int leftW   = _left.Visible   ? Math.Max(BandThickness, _left.Width)    : 0;
-        int rightW  = _right.Visible  ? Math.Max(BandThickness, _right.Width)   : 0;
+        // ── Pass 1: give horizontal bands their full container width so child
+        //   ToolStrips can stretch, then measure their natural height from children.
+        if (_top.Visible)
+        {
+            _top.Left  = 0; _top.Top = 0; _top.Width = Width;
+            _top.PerformLayout();
+        }
+        if (_bottom.Visible)
+        {
+            _bottom.Left = 0; _bottom.Width = Width;
+            _bottom.PerformLayout();
+        }
 
-        // Top band — full width.
-        _top.Left   = 0;
-        _top.Top    = 0;
-        _top.Width  = Width;
-        _top.Height = topH;
+        // Height from children; fall back to minimum if panel has no children yet.
+        int topH    = _top.Visible    ? Math.Max(MinBandThickness, _top.Height)    : 0;
+        int bottomH = _bottom.Visible ? Math.Max(MinBandThickness, _bottom.Height) : 0;
 
-        // Bottom band — full width.
-        _bottom.Left   = 0;
-        _bottom.Top    = Height - bottomH;
-        _bottom.Width  = Width;
-        _bottom.Height = bottomH;
+        int innerH = Math.Max(0, Height - topH - bottomH);
 
-        // Left band — between top and bottom.
-        _left.Left   = 0;
-        _left.Top    = topH;
-        _left.Width  = leftW;
-        _left.Height = Math.Max(0, Height - topH - bottomH);
+        // ── Pass 2: give vertical bands their full inner height, measure width.
+        if (_left.Visible)
+        {
+            _left.Left = 0; _left.Top = topH; _left.Height = innerH;
+            _left.PerformLayout();
+        }
+        if (_right.Visible)
+        {
+            _right.Top = topH; _right.Height = innerH;
+            _right.PerformLayout();
+        }
 
-        // Right band.
-        _right.Left   = Width - rightW;
-        _right.Top    = topH;
-        _right.Width  = rightW;
-        _right.Height = Math.Max(0, Height - topH - bottomH);
+        int leftW  = _left.Visible  ? Math.Max(MinBandThickness, _left.Width)  : 0;
+        int rightW = _right.Visible ? Math.Max(MinBandThickness, _right.Width) : 0;
 
-        // Content panel fills the remaining centre area.
+        // ── Pass 3: commit final positions now that all sizes are known.
+        _top.Left = 0; _top.Top = 0; _top.Width = Width; _top.Height = topH;
+
+        _bottom.Left = 0; _bottom.Top = Height - bottomH;
+        _bottom.Width = Width; _bottom.Height = bottomH;
+
+        _left.Left = 0; _left.Top = topH; _left.Width = leftW; _left.Height = innerH;
+
+        _right.Left = Width - rightW; _right.Top = topH;
+        _right.Width = rightW; _right.Height = innerH;
+
         _content.Left   = leftW;
         _content.Top    = topH;
         _content.Width  = Math.Max(0, Width  - leftW - rightW);
-        _content.Height = Math.Max(0, Height - topH  - bottomH);
+        _content.Height = Math.Max(0, innerH);
 
-        _top.PerformLayout();
-        _bottom.PerformLayout();
-        _left.PerformLayout();
-        _right.PerformLayout();
         _content.PerformLayout();
     }
 

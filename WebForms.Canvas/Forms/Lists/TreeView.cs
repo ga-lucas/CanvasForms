@@ -170,6 +170,13 @@ public class TreeView : Control
     public int Indent_ { get; set; } = Indent;
     public BorderStyle BorderStyle { get; set; } = BorderStyle.Fixed3D;
 
+    private ImageList? _imageList;
+    public ImageList? ImageList
+    {
+        get => _imageList;
+        set { _imageList = value; Invalidate(); }
+    }
+
     private int _updateCount = 0;
     public void BeginUpdate() => _updateCount++;
     public void EndUpdate() { if (_updateCount > 0) _updateCount--; if (_updateCount == 0) Invalidate(); }
@@ -253,11 +260,28 @@ public class TreeView : Control
                 textX += 17;
             }
 
+            // Icon from ImageList
+            int iconW = 0;
+            if (_imageList != null)
+            {
+                var imgSize = _imageList.ImageSize;
+                int imgIdx = node == _selectedNode && node.SelectedImageIndex >= 0
+                    ? node.SelectedImageIndex
+                    : node.ImageIndex;
+                string? url = _imageList.GetUrl(imgIdx);
+                if (url != null)
+                {
+                    int iconY = y + (ItemHeight - imgSize.Height) / 2;
+                    g.DrawImage(url, textX, iconY, imgSize.Width, imgSize.Height);
+                    iconW = imgSize.Width + 2;
+                }
+            }
+
             // Node text
             var textColor = !node.ForeColor.Equals(Color.Transparent) ? node.ForeColor :
                             (isSelected && Focused ? Color.White : ForeColor);
             using var textBrush = new SolidBrush(textColor);
-            g.DrawString(node.Text, "Arial", 12, textBrush, textX, y + 3);
+            g.DrawString(node.Text, "Arial", 12, textBrush, textX + iconW, y + 3);
         }
 
         y += ItemHeight;

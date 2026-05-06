@@ -63,11 +63,34 @@ public class BindingSource : Component, IList, IBindingList, INotifyPropertyChan
     private void RebindInner()
     {
         if (_dataSource == null) { _inner = new List<object?>(); return; }
-        if (_dataSource is IList list) { _inner = list; return; }
+
+        // DataTable — bind through DefaultView (IBindingList)
+        if (_dataSource is DataTable dt)
+        {
+            var view = string.IsNullOrEmpty(_dataMember)
+                ? dt.DefaultView
+                : (dt.DataSet?.Tables[_dataMember]?.DefaultView ?? dt.DefaultView);
+            _inner = view;
+            return;
+        }
+
+        // DataSet — resolve named table
+        if (_dataSource is DataSet ds)
+        {
+            var table = string.IsNullOrEmpty(_dataMember)
+                ? ds.Tables[0]
+                : ds.Tables[_dataMember];
+            _inner = (IList?)table?.DefaultView ?? new List<object?>();
+            return;
+        }
+
+        if (_dataSource is IList list)      { _inner = list; return; }
+        if (_dataSource is IListSource src) { _inner = src.GetList(); return; }
         if (_dataSource is IEnumerable<object> seq) { _inner = seq.ToList(); return; }
         // Wrap scalar
         _inner = new List<object?> { _dataSource };
     }
+
 
     // ── Current item / position ──────────────────────────────────
     public int Position

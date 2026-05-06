@@ -13,6 +13,12 @@ html, body {
     overflow: hidden;
 }
 
+/* ErrorProvider badge blink animation */
+@keyframes ep-blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0; }
+}
+
 h1:focus {
     outline: none;
 }

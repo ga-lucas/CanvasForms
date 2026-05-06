@@ -21,6 +21,7 @@ public class ListViewItem
     public bool Checked { get; set; } = false;
     public bool Selected { get; set; } = false;
     public int ImageIndex { get; set; } = -1;
+    public string ImageKey { get; set; } = string.Empty;
     public Color ForeColor { get; set; } = Color.Transparent;
     public Color BackColor { get; set; } = Color.Transparent;
 
@@ -122,6 +123,20 @@ public class ListView : Control
     private bool _gridLines = false;
     private bool _checkBoxes = false;
     private SortOrder _sorting = SortOrder.None;
+    private ImageList? _smallImageList;
+    private ImageList? _largeImageList;
+
+    public ImageList? SmallImageList
+    {
+        get => _smallImageList;
+        set { _smallImageList = value; Invalidate(); }
+    }
+
+    public ImageList? LargeImageList
+    {
+        get => _largeImageList;
+        set { _largeImageList = value; Invalidate(); }
+    }
 
     public ListViewItemCollection Items { get; }
     public ColumnHeaderCollection Columns { get; }
@@ -353,6 +368,19 @@ public class ListView : Control
 
             int ix = 2;
 
+            // Icon from SmallImageList
+            if (_smallImageList != null)
+            {
+                var imgSize = _smallImageList.ImageSize;
+                int iconY = y + (ItemHeight - imgSize.Height) / 2;
+                string? url = !string.IsNullOrEmpty(item.ImageKey)
+                    ? _smallImageList.GetUrl(item.ImageKey)
+                    : _smallImageList.GetUrl(item.ImageIndex);
+                if (url != null)
+                    g.DrawImage(url, clientX + ix, iconY, imgSize.Width, imgSize.Height);
+                ix += imgSize.Width + 2;
+            }
+
             // Checkbox
             if (_checkBoxes)
             {
@@ -413,8 +441,20 @@ public class ListView : Control
                 using var selBrush = new SolidBrush(Color.FromArgb(0, 120, 215));
                 g.FillRectangle(selBrush, x, y, colW - 2, ItemHeight);
             }
+            int listIx = 2;
+            if (_smallImageList != null)
+            {
+                var imgSize = _smallImageList.ImageSize;
+                int iconY = y + (ItemHeight - imgSize.Height) / 2;
+                string? url = !string.IsNullOrEmpty(item.ImageKey)
+                    ? _smallImageList.GetUrl(item.ImageKey)
+                    : _smallImageList.GetUrl(item.ImageIndex);
+                if (url != null)
+                    g.DrawImage(url, x + listIx, iconY, imgSize.Width, imgSize.Height);
+                listIx += imgSize.Width + 2;
+            }
             using var textBrush = new SolidBrush(isSelected && Focused ? System.Drawing.Color.White : ForeColor);
-            g.DrawString(item.Text, "Arial", 12, textBrush, x + 2, y + 3);
+            g.DrawString(item.Text, "Arial", 12, textBrush, x + listIx, y + 3);
             y += ItemHeight;
             if (y + ItemHeight > clientY + clientH) { y = clientY; col++; }
         }
@@ -433,9 +473,23 @@ public class ListView : Control
                 using var selBrush = new SolidBrush(Color.FromArgb(0, 120, 215));
                 g.FillRectangle(selBrush, x, y, cellW - 2, cellH - 2);
             }
-            // Icon placeholder
-            using var iconBrush = new SolidBrush(Color.FromArgb(200, 200, 200));
-            g.FillRectangle(iconBrush, x + (cellW - iconSize) / 2, y + 2, iconSize, iconSize);
+            var iconList = _largeImageList ?? _smallImageList;
+            string? iconUrl = null;
+            if (iconList != null)
+            {
+                iconUrl = !string.IsNullOrEmpty(item.ImageKey)
+                    ? iconList.GetUrl(item.ImageKey)
+                    : iconList.GetUrl(item.ImageIndex);
+            }
+            if (iconUrl != null)
+            {
+                g.DrawImage(iconUrl, x + (cellW - iconSize) / 2, y + 2, iconSize, iconSize);
+            }
+            else
+            {
+                using var iconBrush = new SolidBrush(Color.FromArgb(200, 200, 200));
+                g.FillRectangle(iconBrush, x + (cellW - iconSize) / 2, y + 2, iconSize, iconSize);
+            }
             using var textBrush = new SolidBrush(isSelected && Focused ? Color.White : ForeColor);
             var tw = item.Text.Length * 6;
             g.DrawString(item.Text, "Arial", 10, textBrush, x + (cellW - tw) / 2, y + iconSize + 4);

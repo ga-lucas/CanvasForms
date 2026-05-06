@@ -262,7 +262,7 @@ Status legend:
 | Text | `LinkLabel` | ⚠️ Partial | Click/visited + optional browser navigation via `LinkUrl`. |
 | Text | `TextBox` / `TextBoxBase` | ⚠️ Partial | Basic editing, selection, shortcuts; autocomplete support is evolving. |
 | Text | `MaskedTextBox` | ⚠️ Partial | Masked display + basic validation. |
-| Text | `RichTextBox` | 🧩 Stub/Compatibility | Stores RTF, renders as plain text. |
+| Text | `RichTextBox` | ⚠️ Partial | RTF parsed into styled runs; bold/italic/underline/colour/font-size per run; SelectionFont/Color/Bold/Italic/Underline; Find(); LoadFile/SaveFile; HTML clipboard. |
 | Buttons | `Button` / `ButtonBase` | ✅ Good | Hover/pressed/focus states + click via mouse/keyboard. |
 | Buttons | `CheckBox` | ✅ Good | Toggle behavior + indicator rendering. |
 | Buttons | `RadioButton` | ✅ Good | Mutual exclusivity within parent. |
@@ -277,7 +277,7 @@ Status legend:
 | Display | `MonthCalendar` | ⚠️ Partial | Single-month view + basic keyboard/mouse navigation. |
 | Common | `DateTimePicker` | ⚠️ Partial | Simplified text rendering + drop-down calendar. |
 | Common | `NumericUpDown` / `UpDownBase` | ⚠️ Partial | Spinner UI + value clamping/events; missing WinForms edge cases. |
-| Common | `ImageList` | 🧩 Stub/Compatibility | API present; image storage stub. |
+| Common | `ImageList` | ⚠️ Partial | URL/key storage; ImageSize; wired into ListView, TreeView, TabControl. |
 | Common | `Timer` | ✅ Good | `PeriodicTimer`-based async loop; fires on captured `SynchronizationContext`. |
 | Containers | `Panel` / `ScrollableControl` | ⚠️ Partial | Child painting + input routing; supports scroll offset behavior used by nested controls. |
 | Containers | `GroupBox` | ⚠️ Partial | Border/caption + child routing/clipping. |
@@ -291,14 +291,15 @@ Status legend:
 | Menus | `ToolStrip` | ⚠️ Partial | Toolbar with icons, hover, checked state. |
 | Menus | `StatusStrip` / `ToolStripStatusLabel` | ⚠️ Partial | Status bar; Spring, BorderSides, SizingGrip. |
 | Menus | `ToolStripMenuItem` | 🧩 Stub/Compatibility | Dropdowns, check state, shortcuts. |
-| Menus | `ToolStripContainer` / `ToolStripPanel` | 🧩 Stub/Compatibility | Dockable strip host. |
+| Menus | `ToolStripContainer` / `ToolStripPanel` | ⚠️ Partial | Auto-show/hide bands; row layout of child ToolStrips; content panel fills remainder. |
 | Dialogs | `OpenFileDialog` | ⚠️ Partial | Host FS + browser upload. |
 | Dialogs | `SaveFileDialog` | ⚠️ Partial | `CreatePrompt`, `OverwritePrompt`, `OpenFile()`. |
 | Dialogs | `FolderBrowserDialog` | ⚠️ Partial | `SelectedPath`, `Description`, `ShowNewFolderButton`; host FS aware. |
 | Dialogs | `ColorDialog` | ⚠️ Partial | Swatch palette + Hex/RGB/HSV inputs. |
 | Dialogs | `FontDialog` | ⚠️ Partial | Family/style/size lists; `ShowEffects`, `ShowColor`, `Apply` event. |
 | Data | `DataGridView` | ⚠️ Partial | `IList`/`BindingSource`/`DataTable` binding; auto-column gen; sort; column types: TextBox/CheckBox/Button/ComboBox/Image/Link. |
-| Data | `BindingSource` | ⚠️ Partial | `IList`/`IBindingList` wrapper; `Current`/`Position` navigation; server-backed via `CanvasDataService`. |
+| Data | `DataTable` | ⚠️ Partial | DataView/DefaultView; DataRowView; typed RowChanged/ColumnChanged events; Select(filter, sort); DataSet/DataRelation; IListSource; BindingSource wired. |
+| Data | `BindingSource` | ⚠️ Partial | `IList`/`IBindingList`/`DataTable`/`DataSet` wrapper; `Current`/`Position` navigation; server-backed via `CanvasDataService`. |
 | Non-visual | `ToolTip` | 🧩 Stub/Compatibility | API present; rendering may be incomplete. |
 | Non-visual | `NotifyIcon` | ⚠️ Partial | Canvas system tray: icon in taskbar, ContextMenuStrip popup, balloon tips, Click/DoubleClick events. |
 ### Layout
@@ -401,10 +402,10 @@ Items are ordered by estimated prevalence in designer-generated / translated Win
 | ✅ | `TreeView` | Nodes, expand/collapse, selection; LabelEdit; ToolTipText; BeginUpdate/EndUpdate |
 | ✅ | `ListView` | Details/List/LargeIcon views; keyboard nav; EnsureVisible; BeginUpdate/EndUpdate |
 | ⚠️ | `OpenFileDialog` | Host FS + browser upload |
-| 🧩 | `ToolTip` | API present; rendering may be incomplete |
+| ⚠️ | `ToolTip` | InitialDelay/AutoPopDelay hover timer; balloon + icon title; canvas overlay div |
 | ⚠️ | **`DataGridView`** | In-process `DataSource` binding (IList, BindingSource, DataTable); auto-column gen; virtualised scroll; row selection; sort; column types: TextBox/CheckBox/Button/ComboBox/Image/Link |
 | ✅ | `Timer` | `PeriodicTimer`-based async loop; `Interval`, `Enabled`, `Start()`, `Stop()`, `Tick`, `Tag`, `IContainer` ctor; fires on captured `SynchronizationContext` |
-| 🔲 | **`ErrorProvider`** | Standard form validation; common in data-entry forms |
+| ⚠️ | **`ErrorProvider`** | SetError/GetError/Clear; red badge overlays; hover title tooltip; BlinkRate/BlinkStyle; ContainerControl |
 | ⚠️ | `SaveFileDialog` | Inherits full FileDialog UI; `CreatePrompt`, `OverwritePrompt`, `OpenFile()` |
 | ⚠️ | `FolderBrowserDialog` | `SelectedPath`, `Description`, `RootFolder`, `ShowNewFolderButton`, `InitialDirectory`; host FS aware |
 | ⚠️ | `ColorDialog` | Swatch palette + Hex/RGB/HSV inputs; `Color`, `AllowFullOpen`, `CustomColors`, `FullOpen` |
@@ -414,14 +415,14 @@ Items are ordered by estimated prevalence in designer-generated / translated Win
 
 | Status | Control | Notes |
 |--------|---------|-------|
-| ⚠️ | `RichTextBox` | Stores RTF, renders as plain text |
+| ⚠️ | `RichTextBox` | RTF parsed into styled runs; bold/italic/underline/colour/font-size; SelectionFont/Color; Find(); LoadFile/SaveFile; HTML clipboard |
 | ⚠️ | `MaskedTextBox` | Masked display + basic validation |
 | ⚠️ | `CheckedListBox` | Basic checked item behaviour |
 | ✅ | `MonthCalendar` | Single-month view; SelectionRange; BoldedDates; keyboard/mouse nav |
 | ⚠️ | `NotifyIcon` | Canvas system tray in taskbar; ContextMenuStrip popup; balloon tips; Click/DoubleClick |
 | 🧩 | `UserControl` | Base present; full composite lifecycle partial |
 | ⚠️ | `ToolStripMenuItem` | Dropdowns, check state, shortcuts, image, enabled |
-| 🧩 | `ToolStripContainer` / `ToolStripPanel` | Dockable strip host |
+| ⚠️ | `ToolStripContainer` / `ToolStripPanel` | Auto-show/hide bands; row layout |
 | 🔲 | **`PropertyGrid`** | Common in tools and settings panels |
 | ⚠️ | **`TrackBar`** | Slider; Horizontal/Vertical; tick marks; keyboard/mouse; SetRange |
 | ⚠️ | **`HScrollBar` / `VScrollBar`** | Standalone scrollbars; SmallChange/LargeChange; Scroll/ValueChanged events |

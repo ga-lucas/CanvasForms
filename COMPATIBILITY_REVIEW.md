@@ -18,7 +18,7 @@
 | Text | `LinkLabel` | Partial | Click/visited + optional browser nav; multi-link partial |
 | Text | `TextBox / TextBoxBase` | Partial | Editing, selection, redo, placeholder, autocomplete done; IME absent |
 | Text | `MaskedTextBox` | Partial | Mask display + validation; provider/culture hooks thin |
-| Text | `RichTextBox` | Stub | Stores RTF; renders as plain text |
+| Text | `RichTextBox` | Partial | RTF parsed into styled runs; bold/italic/underline/colour/font-size rendered per-run; SelectionFont/Color/Bold/Italic/Underline; Find(); LoadFile/SaveFile; HTML clipboard round-trip |
 | Buttons | `Button / ButtonBase` | Good | Hover/pressed/focus/keyboard; gradient + flat rendering; Image on face; FlatAppearance |
 | Buttons | `CheckBox` | Good | Toggle, ThreeState, CheckAlign, Appearance |
 | Buttons | `RadioButton` | Good | Mutual exclusion within parent |
@@ -36,7 +36,7 @@
 | Common | `DomainUpDown` | Partial | Items, Sorted, Wrap, SelectedIndex/SelectedItem |
 | Common | `TrackBar` | Partial | H/V; ticks; keyboard/mouse; SetRange |
 | Common | `HScrollBar / VScrollBar` | Partial | SmallChange/LargeChange; Scroll/ValueChanged |
-| Common | `ImageList` | Stub | API present; image storage stub |
+| Common | `ImageList` | Partial | URL/key storage; ImageSize; wired into ListView, TreeView, TabControl |
 | Common | `Timer` | Good | PeriodicTimer-based; Interval; fires on SynchronizationContext |
 | Containers | `Panel / ScrollableControl` | Partial | Child painting + input routing; scroll offset |
 | Containers | `GroupBox` | Partial | Border/caption + child routing/clipping |
@@ -49,7 +49,7 @@
 | Menus | `ToolStrip` | Partial | Toolbar with icons, hover, checked state |
 | Menus | `StatusStrip / ToolStripStatusLabel` | Partial | Status bar; Spring; BorderSides; SizingGrip |
 | Menus | `ToolStripMenuItem` | Partial | Dropdowns, check state, shortcuts, image, enabled |
-| Menus | `ToolStripContainer / ToolStripPanel` | Stub | Dockable strip host |
+| Menus | `ToolStripContainer / ToolStripPanel` | Partial | Auto-show/hide bands; row layout of child ToolStrips; 3-pass size-from-content layout |
 | Dialogs | `OpenFileDialog` | Partial | Host FS + browser upload |
 | Dialogs | `SaveFileDialog` | Partial | CreatePrompt, OverwritePrompt, OpenFile() |
 | Dialogs | `FolderBrowserDialog` | Partial | SelectedPath, Description, ShowNewFolderButton |
@@ -57,9 +57,10 @@
 | Dialogs | `FontDialog` | Partial | Family/style/size; ShowEffects; ShowColor; Apply event |
 | Data | `DataGridView` | Partial | IList/BindingSource/DataTable binding; auto-col gen; sort; col types |
 | Data | `BindingSource` | Partial | IList/IBindingList; Filter/Sort/Find; server-backed |
-| Data | `DataTable` | Stub | Lightweight in-process stub; not full ADO.NET |
+| Data | `DataTable` | Partial | DataView/DefaultView; DataRowView (ICustomTypeDescriptor); typed RowChanged/RowDeleted/ColumnChanged events; Select(filter, sort); DataSet/DataTableCollection/DataRelation; IListSource; BindingSource wired |
 | Non-visual | `NotifyIcon` | Partial | Canvas system tray; ContextMenuStrip popup; balloon tips |
-| Non-visual | `ToolTip` | Stub | API present; browser title-attr fallback |
+| Non-visual | `ToolTip` | Partial | InitialDelay/AutoPopDelay hover timer; balloon + icon title; overlay div in FormRenderer |
+| Non-visual | `ErrorProvider` | Partial | SetError/GetError/Clear; red badge overlays positioned right of each control; hover title shows message |
 | Non-visual | `Clipboard` | Good | SetText/GetText/Async; `navigator.clipboard` bridge; local-cache fallback |
 | Graphics | `Graphics` / drawing primitives | Good | Lines, rects, ellipses, arcs, beziers, polygons, round-rects, gradients, paths, dash styles |
 
@@ -157,7 +158,7 @@
 - Keyboard activation (Space/Enter)
 - **Image** property rendered on button face; position controlled by `ImageAlign` and `TextImageRelation`
 - **FlatAppearance** — `MouseOverBackColor`, `MouseDownBackColor`, `BorderColor`, `BorderSize`, `CheckedBackColor` all honoured in Flat/Popup rendering
-- ImageIndex, ImageKey, ImageList stubs (accepted; not yet composited via ImageList)
+- ImageIndex, ImageKey, ImageList stubs (accepted; rendered via ImageList when set; TextImageRelation layout TBD)
 
 ---
 
@@ -228,7 +229,7 @@
 - LabelEdit, BeforeLabelEdit, AfterLabelEdit
 - CheckBoxes, NodeChecked
 - BeginUpdate(), EndUpdate()
-- ImageList, ImageIndex, SelectedImageIndex
+- ImageList, ImageIndex, SelectedImageIndex (icons rendered via DrawImage)
 - Keyboard navigation (arrows, +/-, *, Home, End)
 
 ---
@@ -243,7 +244,7 @@
 - MultiSelect, CheckBoxes, FullRowSelect, GridLines
 - ColumnClick, ItemActivate, SelectedIndexChanged, ItemChecked
 - Sorting, ListViewItemSorter
-- SmallImageList, LargeImageList
+- SmallImageList, LargeImageList (icons rendered in Details, List, and LargeIcon views via DrawImage)
 - BeginUpdate(), EndUpdate(), EnsureVisible()
 - Keyboard navigation
 
@@ -385,6 +386,58 @@
 ### Partial
 - Non-text formats (`SetDataObject`, `GetDataObject`, `IDataObject`) — not implemented; canvas layer is text-only
 - `clipboard-read` requires browser permission prompt on non-localhost origins
+
+---
+
+## ToolTip
+
+### Partial — canvas overlay approach
+
+#### Implemented
+- `SetToolTip(control, text)` / `GetToolTip(control)` / `RemoveAll()` — associate text with controls
+- `MouseEnter` on a registered control starts the `InitialDelay` timer; the tooltip appears automatically
+- `MouseLeave` / `MouseDown` cancel the pending timer and hide the tooltip
+- `AutoPopDelay` — tooltip is auto-hidden after this many ms once it appears
+- `ReshowDelay` property present (used when re-entering a control before AutoPopDelay expires — accepted, not yet differentiated from InitialDelay)
+- `Show(text, control)` / `Show(text, control, duration)` / `Show(text, control, point)` / `Show(text, control, point, duration)` — manual show with optional position and duration
+- `Hide(control)` — manual hide
+- `Active` — when `false`, tooltips are suppressed
+- `IsBalloon` — renders with rounded 8px border instead of 3px
+- `ToolTipTitle` + `ToolTipIcon` (None / Info / Warning / Error) — renders bold title row with colour-coded badge above the tip text
+- Rendered as an absolutely-positioned `<div>` overlay in `FormRenderer.razor` (pointer-events: none), z-index 99999
+- `ToolTipRegistry` (static) — change-event bus so the renderer re-renders on show/hide transitions
+- `Dispose()` unregisters all hooks and cancels pending timers
+
+#### Not implemented
+- `ShowAlways` (currently no distinction between focused/unfocused forms)
+- System-level OS tooltip for controls outside the canvas (e.g. `NotifyIcon` text uses its own tooltip)
+- Per-control `AutoPopDelay` override (global setting only)
+
+---
+
+## ErrorProvider
+
+### Partial — canvas overlay approach
+
+#### Implemented
+- `SetError(control, message)` — sets or clears the error for a control; empty/null clears
+- `GetError(control)` — returns the current error string for a control
+- `Clear()` — clears all errors managed by this provider
+- `HasError(control)` — convenience predicate
+- `BlinkRate` (int, ms) — accepted; no actual blinking in canvas
+- `BlinkStyle` (`AlwaysBlink`, `BlinkIfDifferentError`, `NeverBlink`) — accepted
+- `ContainerControl` — property accepted
+- `Icon` — property accepted (custom icon path stored; canvas renders standard red badge)
+- `DataSource` / `DataMember` — properties accepted (auto-wiring not yet implemented)
+- `BindValidation(control, handler)` — convenience hook that wires `control.Validating`
+- `Dispose()` — clears all errors from the registry
+- **`ErrorProviderRegistry`** (static) — change-event bus; holds all active `ErrorProviderEntry` records (form-relative X/Y, message, DOM id)
+- **Rendering** — `FormRenderer` iterates `ErrorProviderRegistry.Entries` and renders a red `!` circle badge (16 × 16 px, z-index 99998) positioned to the right of each affected control; browser-native `title` attribute provides the hover message
+
+#### Not implemented
+- Auto-validation wired from `DataSource` / `DataMember` (stub — must call `SetError` manually)
+- Actual icon blinking (CSS animation could be added later)
+- `IExtenderProvider` compile-time property extension (designer-only concept; not applicable)
 
 ---
 

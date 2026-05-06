@@ -94,6 +94,84 @@
                 @onload="@(() => wb.RaiseDocumentCompleted())" />
     }
 
+    @* ── ToolTip overlay ──────────────────────────────────────────────────────── *@
+    @if (Forms.ToolTipRegistry.IsVisible)
+    {
+        var ttX   = Form.Left + BorderWidth + Forms.ToolTipRegistry.X;
+        var ttY   = Form.Top  + TitleBarHeight + BorderWidth + Forms.ToolTipRegistry.Y;
+        var ttIcon = Forms.ToolTipRegistry.Icon;
+        var ttTitle = Forms.ToolTipRegistry.Title;
+        var ttText  = Forms.ToolTipRegistry.Text;
+        var ttBalloon = Forms.ToolTipRegistry.IsBalloon;
+        var ttBorderRadius = ttBalloon ? "8px" : "3px";
+        var ttIconBadge = ttIcon switch {
+            Forms.ToolTipIcon.Info    => "ℹ",
+            Forms.ToolTipIcon.Warning => "⚠",
+            Forms.ToolTipIcon.Error   => "✖",
+            _                         => string.Empty
+        };
+        var ttIconColor = ttIcon switch {
+            Forms.ToolTipIcon.Info    => "#3498db",
+            Forms.ToolTipIcon.Warning => "#f39c12",
+            Forms.ToolTipIcon.Error   => "#e74c3c",
+            _                         => "transparent"
+        };
+        <div style="position: absolute;
+                    left: @(ttX)px;
+                    top: @(ttY)px;
+                    max-width: 320px;
+                    background: #ffffe1;
+                    color: #000;
+                    border: 1px solid #767676;
+                    border-radius: @ttBorderRadius;
+                    padding: @(ttBalloon ? "8px 12px" : "4px 8px");
+                    font: 11px 'Segoe UI', sans-serif;
+                    box-shadow: 2px 2px 6px rgba(0,0,0,0.25);
+                    z-index: 99999;
+                    pointer-events: none;
+                    white-space: pre-wrap;
+                    word-break: break-word;">
+            @if (!string.IsNullOrEmpty(ttTitle))
+            {
+                <div style="display:flex; align-items:center; gap:4px; font-weight:bold; margin-bottom:3px;">
+                    @if (!string.IsNullOrEmpty(ttIconBadge))
+                    {
+                        <span style="color:@ttIconColor; font-size:14px;">@ttIconBadge</span>
+                    }
+                    <span>@ttTitle</span>
+                </div>
+            }
+            @ttText
+        </div>
+    }
+
+    @* ── ErrorProvider icon overlays ─────────────────────────────────────────── *@
+    @foreach (var ep in Forms.ErrorProviderRegistry.Entries)
+    {
+        var (epRelX, epRelY) = ep.ComputePosition();
+        var epX = Form.Left + BorderWidth + epRelX;
+        var epY = Form.Top  + TitleBarHeight + BorderWidth + epRelY;
+        var epAnim = ep.Blink ? "ep-blink 1s step-start infinite" : "none";
+        <div title="@ep.Message"
+             style="position: absolute;
+                    left: @(epX)px;
+                    top: @(epY)px;
+                    width: 16px;
+                    height: 16px;
+                    border-radius: 50%;
+                    background: #d32f2f;
+                    color: #fff;
+                    font: bold 11px 'Segoe UI', sans-serif;
+                    line-height: 16px;
+                    text-align: center;
+                    cursor: default;
+                    z-index: 99998;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+                    user-select: none;
+                    animation: @epAnim;"
+             id="@ep.Id">!</div>
+    }
+
     @if (_showMaximizePreview)
     {
         <div style="position: fixed;
@@ -269,6 +347,12 @@
 
             // Subscribe to WebBrowserRegistry so iframe overlays are re-rendered when state changes
             WebBrowserRegistry.Instance.SetChangeCallback(() => InvokeAsync(StateHasChanged));
+
+            // Subscribe to ToolTipRegistry so the tooltip overlay re-renders when it shows/hides
+            Forms.ToolTipRegistry.Changed += (_, _) => InvokeAsync(StateHasChanged);
+
+            // Subscribe to ErrorProviderRegistry so error-icon overlays re-render when errors change
+            Forms.ErrorProviderRegistry.Changed += (_, _) => InvokeAsync(StateHasChanged);
 
             // Inject JSRuntime into any WebBrowser controls already present
             PropagateJSRuntime(Form);
