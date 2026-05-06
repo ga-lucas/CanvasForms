@@ -15,10 +15,21 @@ public abstract class ButtonBase : Control, IButtonControl
     public ContentAlignment TextAlign { get; set; } = ContentAlignment.MiddleCenter;
     public ContentAlignment ImageAlign { get; set; } = ContentAlignment.MiddleCenter;
     public Image? Image { get; set; }
+    public int ImageIndex { get; set; } = -1;
+    public string? ImageKey { get; set; }
+    public ImageList? ImageList { get; set; }
     public TextImageRelation TextImageRelation { get; set; } = TextImageRelation.Overlay;
     public bool UseMnemonic { get; set; } = true;
     public bool UseVisualStyleBackColor { get; set; } = true;
     public bool AutoEllipsis { get; set; } = false;
+
+    private FlatAppearance? _flatAppearance;
+    /// <summary>
+    /// Provides appearance settings used when <see cref="FlatStyle"/> is
+    /// <see cref="FlatStyle.Flat"/> or <see cref="FlatStyle.Popup"/>.
+    /// Matches WinForms <c>Button.FlatAppearance</c>.
+    /// </summary>
+    public FlatAppearance FlatAppearance => _flatAppearance ??= new FlatAppearance();
 
     protected ButtonBase()
     {
@@ -153,6 +164,29 @@ public abstract class ButtonBase : Control, IButtonControl
         int b = Math.Max(0, (int)(color.B * (1 - amount)));
         return Color.FromArgb(color.A, r, g, b);
     }
+}
+
+/// <summary>
+/// Provides properties used when a <see cref="ButtonBase"/> has
+/// <see cref="FlatStyle.Flat"/> or <see cref="FlatStyle.Popup"/> style.
+/// Matches WinForms <c>System.Windows.Forms.FlatButtonAppearance</c>.
+/// </summary>
+public class FlatAppearance
+{
+    /// <summary>Border colour in Flat/Popup style. Default: <see cref="Color.Empty"/> (use system colour).</summary>
+    public Color BorderColor { get; set; } = Color.Empty;
+
+    /// <summary>Border width in pixels. Default: 1.</summary>
+    public int BorderSize { get; set; } = 1;
+
+    /// <summary>Background colour when the mouse is over the button. Default: <see cref="Color.Empty"/>.</summary>
+    public Color MouseOverBackColor { get; set; } = Color.Empty;
+
+    /// <summary>Background colour when the button is pressed. Default: <see cref="Color.Empty"/>.</summary>
+    public Color MouseDownBackColor { get; set; } = Color.Empty;
+
+    /// <summary>Background colour when the button is checked (ToggleButton). Default: <see cref="Color.Empty"/>.</summary>
+    public Color CheckedBackColor { get; set; } = Color.Empty;
 }
 
 /// <summary>

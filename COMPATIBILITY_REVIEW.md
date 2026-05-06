@@ -19,7 +19,7 @@
 | Text | `TextBox / TextBoxBase` | Partial | Editing, selection, redo, placeholder, autocomplete done; IME absent |
 | Text | `MaskedTextBox` | Partial | Mask display + validation; provider/culture hooks thin |
 | Text | `RichTextBox` | Stub | Stores RTF; renders as plain text |
-| Buttons | `Button / ButtonBase` | Good | Hover/pressed/focus/keyboard; gradient rendering |
+| Buttons | `Button / ButtonBase` | Good | Hover/pressed/focus/keyboard; gradient + flat rendering; Image on face; FlatAppearance |
 | Buttons | `CheckBox` | Good | Toggle, ThreeState, CheckAlign, Appearance |
 | Buttons | `RadioButton` | Good | Mutual exclusion within parent |
 | Lists | `ListBox` | Good | SelectionMode, owner-draw, ItemHeight, IntegralHeight, double-click |
@@ -60,6 +60,7 @@
 | Data | `DataTable` | Stub | Lightweight in-process stub; not full ADO.NET |
 | Non-visual | `NotifyIcon` | Partial | Canvas system tray; ContextMenuStrip popup; balloon tips |
 | Non-visual | `ToolTip` | Stub | API present; browser title-attr fallback |
+| Non-visual | `Clipboard` | Good | SetText/GetText/Async; `navigator.clipboard` bridge; local-cache fallback |
 | Graphics | `Graphics` / drawing primitives | Good | Lines, rects, ellipses, arcs, beziers, polygons, round-rects, gradients, paths, dash styles |
 
 ---
@@ -147,17 +148,16 @@
 ## Button / ButtonBase
 
 ### Good
-- Text, Enabled, Visible, FlatStyle
+- Text, Enabled, Visible, FlatStyle (Standard, Flat, Popup, System)
 - Click event, PerformClick()
 - Visual states: Normal, Hover, Pressed, Focused, Disabled
-- Gradient fill (LinearGradientBrush) + text centering via TextMeasurementService
+- Gradient fill (Standard/System) or flat solid fill (Flat/Popup) + text centering via TextMeasurementService
 - DialogResult
-- TextAlign, ImageAlign
+- TextAlign, ImageAlign, TextImageRelation (all layout modes)
 - Keyboard activation (Space/Enter)
-
-### Partial
-- Image property accepted; not rendered onto button face
-- FlatAppearance (MouseOverBackColor, BorderColor accepted; rendering simplified)
+- **Image** property rendered on button face; position controlled by `ImageAlign` and `TextImageRelation`
+- **FlatAppearance** — `MouseOverBackColor`, `MouseDownBackColor`, `BorderColor`, `BorderSize`, `CheckedBackColor` all honoured in Flat/Popup rendering
+- ImageIndex, ImageKey, ImageList stubs (accepted; not yet composited via ImageList)
 
 ---
 
@@ -168,7 +168,7 @@
 - PasswordChar, UseSystemPasswordChar
 - SelectionStart, SelectionLength, SelectedText
 - Select(), SelectAll(), Clear(), AppendText()
-- Copy(), Cut(), Paste(), Undo(), Redo()
+- Copy(), Cut(), Paste(), Undo(), Redo() — **Copy/Cut write to real browser clipboard via `navigator.clipboard`; Paste refreshes from real clipboard before inserting**
 - TextAlign (Left/Center/Right), CharacterCasing
 - Lines (multiline split/join)
 - ScrollBars (visual only)
@@ -369,11 +369,30 @@
 
 ---
 
+## Clipboard
+
+### Good
+- `Clipboard.SetText(string)` / `SetText(string, TextDataFormat)` — writes to local cache **and** the real browser clipboard via `navigator.clipboard.writeText`
+- `Clipboard.GetText()` / `GetText(TextDataFormat)` — synchronous read from local cache
+- `Clipboard.GetTextAsync()` — async read from real browser clipboard; falls back to cache if `clipboard-read` permission is denied
+- `Clipboard.SetTextAsync(string)` — awaitable write to real clipboard
+- `Clipboard.ContainsText()` — checks local cache
+- `Clipboard.Clear()` — clears local cache and real clipboard
+- `TextBoxBase` Ctrl+C / Ctrl+X write via `Clipboard.SetText` (real clipboard)
+- `TextBoxBase` Ctrl+V triggers async clipboard refresh then pastes
+- `TextDataFormat` enum (Text, UnicodeText, Rtf, Html, CommaSeparatedValue) — only plain text transported
+
+### Partial
+- Non-text formats (`SetDataObject`, `GetDataObject`, `IDataObject`) — not implemented; canvas layer is text-only
+- `clipboard-read` requires browser permission prompt on non-localhost origins
+
+---
+
 ## SplitContainer
 
 ### Good
 - Panel1, Panel2, SplitterDistance, SplitterWidth
-- Orientation, FixedPanel, Panel1MinSize, Panel2MinSize
+
 - IsSplitterFixed, SplitterMoved, SplitterMoving
 - Double-click to reset splitter
 
@@ -510,7 +529,7 @@ These gaps are architectural — they require OS integration unavailable in a br
 - No P/Invoke or native handles (`Handle`, `HWND`, `WndProc`)
 - No IME for CJK / complex-script input
 - No actual system tray — canvas tray is a visual simulation inside the page
-- No clipboard API without JS bridge (basic Ctrl+C/V wired via `navigator.clipboard`)
+- Clipboard JS bridge implemented: `Clipboard.SetText`/`GetText`/`SetTextAsync`/`GetTextAsync` use `navigator.clipboard` with local-cache fallback; `clipboard-read` permission required for cross-app paste (auto-granted on localhost)
 - No multi-monitor (`Screen` class is a stub)
 - No MDI (Multiple Document Interface)
 - No `PrintDocument` / print preview (no printer access from WASM)

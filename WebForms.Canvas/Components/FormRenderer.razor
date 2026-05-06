@@ -236,6 +236,9 @@
             // Initialize text measurement service
             Form.TextMeasurementService = new TextMeasurementService(JSRuntime);
 
+            // Register the JS runtime for the Clipboard bridge so Copy/Paste reach the real browser clipboard.
+            Forms.Clipboard._jsRuntime = JSRuntime;
+
             // Setup keyboard handling for the canvas - use try/catch in case JS isn't loaded yet
             try
             {

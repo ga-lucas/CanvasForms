@@ -570,11 +570,7 @@ public abstract class TextBoxBase : Control
     public void Copy()
     {
         if (_selectionLength > 0)
-        {
-            // In a real implementation, this would use the system clipboard
-            // For now, we'll just store it in a static field
-            ClipboardText = SelectedText;
-        }
+            Clipboard.SetText(SelectedText);
     }
 
     /// <summary>
@@ -590,15 +586,29 @@ public abstract class TextBoxBase : Control
     }
 
     /// <summary>
-    /// Pastes from clipboard
+    /// Pastes from clipboard.  Prefers the real browser clipboard when available;
+    /// falls back to the local cache.
     /// </summary>
     public void Paste()
     {
         if (_readOnly) return;
 
-        if (!string.IsNullOrEmpty(ClipboardText))
+        // Start an async refresh so subsequent pastes pick up external clipboard changes,
+        // then use whatever is already in the local cache for the immediate paste.
+        _ = PasteAsync();
+    }
+
+    private async Task PasteAsync()
+    {
+        if (_readOnly) return;
+        // Refresh cache from real clipboard first (no-op if JS not ready / permission denied)
+        await Clipboard.RefreshFromJsAsync();
+        var text = Clipboard.GetText();
+        if (!string.IsNullOrEmpty(text))
         {
-            SelectedText = ClipboardText;
+            SaveUndoState();
+            SelectedText = text;
+            RequestRender?.Invoke();
         }
     }
 
@@ -1052,13 +1062,6 @@ public abstract class TextBoxBase : Control
     /// Occurs when ReadOnly property changes
     /// </summary>
     public event EventHandler? ReadOnlyChanged;
-
-    #endregion
-
-    #region Static Clipboard (Simple Implementation)
-
-    // Simple static clipboard - in a real implementation this would use the system clipboard
-    private static string ClipboardText { get; set; } = string.Empty;
 
     #endregion
 

@@ -450,8 +450,13 @@ window.renderClientAreaCommands = async (canvas, offsetX, offsetY, commands) => 
                         break;
                     }
                     case Op.DrawImage: {
-                        // [op, imageUrl, x, y, w, h]
-                        await drawImageAsync(ctx, cmd[1], cmd[2], cmd[3], cmd[4], cmd[5]);
+                        // [op, imageUrl, dstX, dstY, dstW, dstH]  OR
+                        // [op, imageUrl, dstX, dstY, dstW, dstH, srcX, srcY, srcW, srcH]
+                        if (cmd.length >= 10) {
+                            await drawImageAsync(ctx, cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], cmd[6], cmd[7], cmd[8], cmd[9]);
+                        } else {
+                            await drawImageAsync(ctx, cmd[1], cmd[2], cmd[3], cmd[4], cmd[5]);
+                        }
                         break;
                     }
                     // ── RoundRect ─────────────────────────────────────────────
@@ -570,7 +575,7 @@ window.renderClientAreaCommands = async (canvas, offsetX, offsetY, commands) => 
 };
 
 // Async image loading with error handling and caching
-window.drawImageAsync = async function(ctx, imageUrl, x, y, width, height) {
+window.drawImageAsync = async function(ctx, imageUrl, x, y, width, height, srcX, srcY, srcW, srcH) {
     if (!imageUrl || imageUrl.trim() === '') {
         console.warn('drawImageAsync: Empty image URL');
         return;
@@ -642,7 +647,11 @@ window.drawImageAsync = async function(ctx, imageUrl, x, y, width, height) {
 
         // Draw the loaded image from cache (fast!)
         if (img.complete && img.naturalWidth > 0) {
-            ctx.drawImage(img, x, y, width, height);
+            if (srcX !== undefined && srcY !== undefined && srcW !== undefined && srcH !== undefined) {
+                ctx.drawImage(img, srcX, srcY, srcW, srcH, x, y, width, height);
+            } else {
+                ctx.drawImage(img, x, y, width, height);
+            }
         } else {
             // Image in cache but not loaded properly - draw placeholder
             ctx.save();
@@ -1158,4 +1167,109 @@ window.canvasWebBrowserExecScript = (iframeId, script) => {
     }
 };
 
+// ── Clipboard bridge ──────────────────────────────────────────────────────────
+//
+// Exposes browser navigator.clipboard to Blazor/C# via JS interop.
+// Writing never requires a permission prompt on modern browsers.
+// Reading requires the 'clipboard-read' permission (auto-granted on localhost).
 
+/**
+ * Write text to the system clipboard.
+ * @param {string} text
+ * @returns {Promise<boolean>} true on success, false if the API is unavailable or denied.
+ */
+window.clipboardWriteText = async function (text) {
+    try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(text);
+            return true;
+        }
+        // Fallback: execCommand (deprecated but still works in some browsers)
+        const el = document.createElement('textarea');
+        el.value = text;
+        el.style.position = 'fixed';
+        el.style.opacity = '0';
+        document.body.appendChild(el);
+        el.focus();
+        el.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(el);
+        return ok;
+    } catch (e) {
+        console.warn('clipboardWriteText failed:', e);
+        return false;
+    }
+};
+
+/**
+ * Read text from the system clipboard.
+ * @returns {Promise<string|null>} clipboard text, or null if unavailable / denied.
+ */
+window.clipboardReadText = async function () {
+    try {
+        if (navigator.clipboard && navigator.clipboard.readText) {
+            return await navigator.clipboard.readText();
+        }
+        return null;
+    } catch (e) {
+        // Permission denied or API not available — caller will use local cache
+        console.warn('clipboardReadText failed (will use local cache):', e);
+        return null;
+    }
+};
+
+/**
+ * Write HTML (and a plain-text fallback) to the system clipboard using ClipboardItem.
+ * Falls back to plain-text only when ClipboardItem is unavailable (e.g. Firefox).
+ * @param {string} html      The HTML string to put on the clipboard.
+ * @param {string} plainText Plain-text fallback (clipboard readers that don't understand HTML).
+ * @returns {Promise<boolean>} true on success.
+ */
+window.clipboardWriteHtml = async function (html, plainText) {
+    try {
+        if (navigator.clipboard && typeof ClipboardItem !== 'undefined') {
+            const htmlBlob  = new Blob([html],      { type: 'text/html' });
+            const textBlob  = new Blob([plainText], { type: 'text/plain' });
+            await navigator.clipboard.write([
+                new ClipboardItem({ 'text/html': htmlBlob, 'text/plain': textBlob })
+            ]);
+            return true;
+        }
+        // Fallback: plain text only
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(plainText);
+            return true;
+        }
+        return false;
+    } catch (e) {
+        console.warn('clipboardWriteHtml failed:', e);
+        // Last-resort: plain text
+        try { await navigator.clipboard.writeText(plainText); } catch (_) {}
+        return false;
+    }
+};
+
+/**
+ * Read HTML from the system clipboard.
+ * Returns the raw HTML string, or null if:
+ *  - the clipboard contains no text/html item,
+ *  - clipboard-read permission is denied, or
+ *  - the browser doesn't support clipboard.read() (Firefox).
+ * @returns {Promise<string|null>}
+ */
+window.clipboardReadHtml = async function () {
+    try {
+        if (!navigator.clipboard || !navigator.clipboard.read) return null;
+        const items = await navigator.clipboard.read();
+        for (const item of items) {
+            if (item.types.includes('text/html')) {
+                const blob = await item.getType('text/html');
+                return await blob.text();
+            }
+        }
+        return null; // No HTML on clipboard
+    } catch (e) {
+        console.warn('clipboardReadHtml failed:', e);
+        return null;
+    }
+};

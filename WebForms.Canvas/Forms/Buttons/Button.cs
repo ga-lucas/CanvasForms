@@ -23,67 +23,83 @@ public class Button : ButtonBase
         var bounds = new Rectangle(0, 0, Width, Height);
         var state = GetButtonState();
 
-        // Determine button state colors
-        Color colorTop;
-        Color colorBottom;
-        Color borderColor;
+        bool isFlat   = FlatStyle == FlatStyle.Flat;
+        bool isPopup  = FlatStyle == FlatStyle.Popup;
+        bool useFlatPath = isFlat || isPopup;
 
-        switch (state)
+        // ── Background & border ───────────────────────────────────────────────
+        if (useFlatPath)
         {
-            case ButtonState.Disabled:
-                colorTop    = Color.FromArgb(240, 240, 240);
-                colorBottom = Color.FromArgb(240, 240, 240);
-                borderColor = Color.FromArgb(173, 173, 173);
-                break;
-
-            case ButtonState.Pushed:
-                colorTop    = DarkenColor(BackColor, 0.18f);
-                colorBottom = DarkenColor(BackColor, 0.08f);
-                borderColor = Color.FromArgb(0, 84, 153);
-                break;
-
-            case ButtonState.Hot:
-                colorTop    = LightenColor(BackColor, 0.22f);
-                colorBottom = LightenColor(BackColor, 0.08f);
-                borderColor = Color.FromArgb(0, 120, 215);
-                break;
-
-            default: // Normal or Focused
-                colorTop    = LightenColor(BackColor, 0.10f);
-                colorBottom = DarkenColor(BackColor, 0.05f);
-                borderColor = Color.FromArgb(173, 173, 173);
-                break;
+            _PaintFlatBackground(g, bounds, state, isFlat);
+        }
+        else
+        {
+            _PaintStandardBackground(g, bounds, state);
         }
 
-        // Draw rounded gradient background
-        var topLeft    = new Point(bounds.Left, bounds.Top);
-        var bottomLeft = new Point(bounds.Left, bounds.Bottom);
-        using var bgBrush = new LinearGradientBrush(topLeft, bottomLeft, colorTop, colorBottom);
-        g.FillRoundRect(bgBrush, bounds, CornerRadius);
+        // ── Image ─────────────────────────────────────────────────────────────
+        Rectangle textRect  = bounds;
+        Rectangle imageRect = Rectangle.Empty;
 
-        // Draw rounded border
-        using var borderPen = new Pen(borderColor);
-        g.DrawRoundRect(borderPen, bounds, CornerRadius);
+        if (Image != null)
+        {
+            imageRect = _CalcImageRect(bounds);
 
-        // Draw text (centered)
+            if (TextImageRelation == TextImageRelation.ImageBeforeText)
+            {
+                int imgRight = imageRect.Right + 2;
+                textRect = new Rectangle(imgRight, bounds.Y, bounds.Right - imgRight, bounds.Height);
+            }
+            else if (TextImageRelation == TextImageRelation.TextBeforeImage)
+            {
+                // measure text width to know how wide the text area is
+                var ms = FindForm()?.TextMeasurementService;
+                int fontSize = Font != null ? (int)Font.Size : 12;
+                string fontFamily = Font?.Family ?? "Arial";
+                int tw = ms?.MeasureTextEstimate(Text, fontFamily, fontSize) ?? (Text.Length * 7);
+                textRect = new Rectangle(bounds.X + 2, bounds.Y, tw + 4, bounds.Height);
+                int imgLeft = textRect.Right + 2;
+                imageRect = new Rectangle(imgLeft, imageRect.Y, imageRect.Width, imageRect.Height);
+            }
+            else if (TextImageRelation == TextImageRelation.ImageAboveText)
+            {
+                int imgBottom = imageRect.Bottom + 2;
+                textRect = new Rectangle(bounds.X, imgBottom, bounds.Width, bounds.Bottom - imgBottom);
+            }
+            else if (TextImageRelation == TextImageRelation.TextAboveImage)
+            {
+                var ms = FindForm()?.TextMeasurementService;
+                int fontSize = Font != null ? (int)Font.Size : 12;
+                string fontFamily = Font?.Family ?? "Arial";
+                int th = ms?.GetFontHeightEstimate(fontFamily, fontSize) ?? 14;
+                textRect = new Rectangle(bounds.X, bounds.Y + 2, bounds.Width, th + 2);
+                imageRect = new Rectangle(imageRect.X, textRect.Bottom + 2, imageRect.Width, imageRect.Height);
+            }
+
+            if (!imageRect.IsEmpty)
+                g.DrawImage(Image, imageRect.X, imageRect.Y, imageRect.Width, imageRect.Height);
+        }
+
+        // ── Text ─────────────────────────────────────────────────────────────
         if (!string.IsNullOrEmpty(Text))
         {
-            var textColor = Enabled ? ForeColor : System.Drawing.Color.FromArgb(109, 109, 109);
+            var textColor = Enabled
+                ? (Color)ForeColor
+                : (Color)Color.FromArgb(109, 109, 109);
 
             var measureService = FindForm()?.TextMeasurementService;
-            var fontSize = Font != null ? (int)Font.Size : 12;
-            var fontFamily = Font?.Family ?? "Arial";
-            var textWidth = measureService?.MeasureTextEstimate(Text, fontFamily, fontSize)
-                            ?? (Text.Length * 7);
-            var textHeight = measureService?.GetFontHeightEstimate(fontFamily, fontSize) ?? 14;
-            var textX = (Width - textWidth) / 2;
-            var textY = (Height - textHeight) / 2;
+            int fontSize   = Font != null ? (int)Font.Size : 12;
+            string family  = Font?.Family ?? "Arial";
+            int textWidth  = measureService?.MeasureTextEstimate(Text, family, fontSize) ?? (Text.Length * 7);
+            int textHeight = measureService?.GetFontHeightEstimate(family, fontSize) ?? 14;
+            int textX = textRect.X + (textRect.Width  - textWidth)  / 2;
+            int textY = textRect.Y + (textRect.Height - textHeight) / 2;
 
             using var textBrush = new SolidBrush(textColor);
-            g.DrawString(Text, fontFamily, fontSize, textBrush, textX, textY);
+            g.DrawString(Text, family, fontSize, textBrush, textX, textY);
         }
 
-        // Draw rounded focus rectangle if focused
+        // ── Focus rectangle ───────────────────────────────────────────────────
         if (Focused && Enabled)
         {
             var focusRect = new Rectangle(3, 3, Width - 6, Height - 6);
@@ -92,5 +108,111 @@ public class Button : ButtonBase
         }
 
         base.OnPaint(e);
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private void _PaintStandardBackground(Graphics g, Rectangle bounds, ButtonState state)
+    {
+        Color colorTop, colorBottom, borderColor;
+        switch (state)
+        {
+            case ButtonState.Disabled:
+                colorTop    = Color.FromArgb(240, 240, 240);
+                colorBottom = Color.FromArgb(240, 240, 240);
+                borderColor = Color.FromArgb(173, 173, 173);
+                break;
+            case ButtonState.Pushed:
+                colorTop    = DarkenColor(BackColor, 0.18f);
+                colorBottom = DarkenColor(BackColor, 0.08f);
+                borderColor = Color.FromArgb(0, 84, 153);
+                break;
+            case ButtonState.Hot:
+                colorTop    = LightenColor(BackColor, 0.22f);
+                colorBottom = LightenColor(BackColor, 0.08f);
+                borderColor = Color.FromArgb(0, 120, 215);
+                break;
+            default:
+                colorTop    = LightenColor(BackColor, 0.10f);
+                colorBottom = DarkenColor(BackColor, 0.05f);
+                borderColor = Color.FromArgb(173, 173, 173);
+                break;
+        }
+
+        var topLeft    = new Point(bounds.Left, bounds.Top);
+        var bottomLeft = new Point(bounds.Left, bounds.Bottom);
+        using var bgBrush = new LinearGradientBrush(topLeft, bottomLeft, colorTop, colorBottom);
+        g.FillRoundRect(bgBrush, bounds, CornerRadius);
+
+        using var borderPen = new Pen(borderColor);
+        g.DrawRoundRect(borderPen, bounds, CornerRadius);
+    }
+
+    private void _PaintFlatBackground(Graphics g, Rectangle bounds, ButtonState state, bool isFlat)
+    {
+        var fa = FlatAppearance;
+
+        // Resolve background fill
+        Color fillColor;
+        if (state == ButtonState.Pushed && !fa.MouseDownBackColor.IsEmpty)
+            fillColor = fa.MouseDownBackColor;
+        else if (state == ButtonState.Hot && !fa.MouseOverBackColor.IsEmpty)
+            fillColor = fa.MouseOverBackColor;
+        else if (state == ButtonState.Hot && !isFlat)
+            // Popup: show border + slight highlight on hover
+            fillColor = LightenColor(BackColor, 0.12f);
+        else if (state == ButtonState.Disabled)
+            fillColor = Color.FromArgb(240, 240, 240);
+        else if (state == ButtonState.Hot)
+            fillColor = LightenColor(BackColor, 0.12f);
+        else if (state == ButtonState.Pushed)
+            fillColor = DarkenColor(BackColor, 0.12f);
+        else
+            fillColor = BackColor;
+
+        using var bgBrush = new SolidBrush(fillColor);
+        g.FillRoundRect(bgBrush, bounds, 2);
+
+        // Resolve border
+        bool drawBorder = isFlat
+            || state == ButtonState.Hot || state == ButtonState.Pushed || Focused;
+
+        if (drawBorder && fa.BorderSize > 0)
+        {
+            Color bc = !fa.BorderColor.IsEmpty
+                ? fa.BorderColor
+                : (state == ButtonState.Disabled ? Color.FromArgb(173, 173, 173) : Color.FromArgb(100, 100, 100));
+
+            using var borderPen = new Pen(bc, fa.BorderSize);
+            g.DrawRoundRect(borderPen, bounds, 2);
+        }
+    }
+
+    /// <summary>
+    /// Calculates the image destination rectangle inside the button bounds,
+    /// honouring <see cref="ButtonBase.ImageAlign"/>.
+    /// </summary>
+    private Rectangle _CalcImageRect(Rectangle bounds)
+    {
+        int imgW = Image!.Width  > 0 ? Image.Width  : 16;
+        int imgH = Image!.Height > 0 ? Image.Height : 16;
+
+        int x, y;
+        switch (ImageAlign)
+        {
+            case ContentAlignment.TopLeft:    x = 4;                          y = 4;                          break;
+            case ContentAlignment.TopCenter:  x = (bounds.Width - imgW) / 2;  y = 4;                          break;
+            case ContentAlignment.TopRight:   x = bounds.Width - imgW - 4;    y = 4;                          break;
+            case ContentAlignment.MiddleLeft: x = 4;                          y = (bounds.Height - imgH) / 2;  break;
+            case ContentAlignment.MiddleRight:x = bounds.Width - imgW - 4;    y = (bounds.Height - imgH) / 2;  break;
+            case ContentAlignment.BottomLeft: x = 4;                          y = bounds.Height - imgH - 4;    break;
+            case ContentAlignment.BottomCenter:x= (bounds.Width - imgW) / 2;  y = bounds.Height - imgH - 4;   break;
+            case ContentAlignment.BottomRight:x = bounds.Width - imgW - 4;    y = bounds.Height - imgH - 4;    break;
+            default: // MiddleCenter / Overlay
+                x = (bounds.Width  - imgW) / 2;
+                y = (bounds.Height - imgH) / 2;
+                break;
+        }
+        return new Rectangle(bounds.X + x, bounds.Y + y, imgW, imgH);
     }
 }

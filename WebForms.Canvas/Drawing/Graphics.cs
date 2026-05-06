@@ -209,6 +209,38 @@ public class Graphics : IDisposable
     public void FillPath(Brush brush, GraphicsPath path)
         => _commands.Add(new FillPathCommand(brush, path));
 
+    // ── Images ────────────────────────────────────────────────────────────────
+
+    /// <summary>Draws an image at (x, y) using its natural size (or 1×1 if unknown).</summary>
+    public void DrawImage(Image image, int x, int y)
+    {
+        if (image?.Source == null) return;
+        int w = image.Width > 0 ? image.Width : 1;
+        int h = image.Height > 0 ? image.Height : 1;
+        _commands.Add(new DrawImageCommand(image.Source, x + _translateX, y + _translateY, w, h));
+    }
+
+    /// <summary>Draws an image scaled into the destination rectangle.</summary>
+    public void DrawImage(Image image, int x, int y, int width, int height)
+    {
+        if (image?.Source == null) return;
+        _commands.Add(new DrawImageCommand(image.Source, x + _translateX, y + _translateY, width, height));
+    }
+
+    /// <summary>Draws a portion of an image (srcRect) scaled into the destination rectangle.</summary>
+    public void DrawImage(Image image, Rectangle dstRect, Rectangle srcRect)
+    {
+        if (image?.Source == null) return;
+        _commands.Add(new DrawImageCommand(
+            image.Source,
+            dstRect.X + _translateX, dstRect.Y + _translateY, dstRect.Width, dstRect.Height,
+            srcRect));
+    }
+
+    /// <summary>Draws an image into the destination rectangle.</summary>
+    public void DrawImage(Image image, Rectangle dstRect)
+        => DrawImage(image, dstRect.X, dstRect.Y, dstRect.Width, dstRect.Height);
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private Point[] Translate(Point[] points)

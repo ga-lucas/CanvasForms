@@ -387,14 +387,17 @@ public class DrawImageCommand : DrawingCommand
     public int Y { get; }
     public int Width { get; }
     public int Height { get; }
+    /// <summary>Optional source-crop rectangle (null = draw full image).</summary>
+    public Rectangle? SrcRect { get; }
 
-    public DrawImageCommand(string imageUrl, int x, int y, int width, int height)
+    public DrawImageCommand(string imageUrl, int x, int y, int width, int height, Rectangle? srcRect = null)
     {
         ImageUrl = imageUrl;
         X = x;
         Y = y;
         Width = width;
         Height = height;
+        SrcRect = srcRect;
     }
 
     public override string ToJavaScript()
@@ -406,7 +409,11 @@ public class DrawImageCommand : DrawingCommand
     }
 
     public override object[] ToCommand()
-        => new object[] { CanvasCommandOp.DrawImage, ImageUrl, X, Y, Width, Height };
+    {
+        if (SrcRect is { } s)
+            return new object[] { CanvasCommandOp.DrawImage, ImageUrl, X, Y, Width, Height, s.X, s.Y, s.Width, s.Height };
+        return new object[] { CanvasCommandOp.DrawImage, ImageUrl, X, Y, Width, Height };
+    }
 }
 
 // ── RoundRect ─────────────────────────────────────────────────────────────────
