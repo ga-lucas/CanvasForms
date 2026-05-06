@@ -71,6 +71,9 @@ public class ToolTip : System.ComponentModel.Component
     // Cancellation token source for the current pending show/hide timer.
     private CancellationTokenSource? _cts;
 
+    // Timestamp of the last time a tooltip was hidden (used to select ReshowDelay vs InitialDelay).
+    private DateTime _lastHideTime = DateTime.MinValue;
+
     // ── Public properties (match WinForms ToolTip) ────────────────────────────
     public bool        Active        { get => _active;       set => _active       = value; }
     public int         AutoPopDelay  { get => _autoPopDelay; set => _autoPopDelay = value; }
@@ -165,10 +168,21 @@ public class ToolTip : System.ComponentModel.Component
         if (!_active || sender is not Control c) return;
         if (!_toolTips.TryGetValue(c, out var tip)) return;
 
+        // ShowAlways = false (default): suppress tooltip when the parent form is not active.
+        if (!_showAlways)
+        {
+            var rootForm = GetRootForm(c);
+            if (rootForm != null && Canvas.Windows.Forms.CanvasApplication.FormManager?.ActiveForm != rootForm)
+                return;
+        }
+
         _cts?.Cancel();
         _cts = new CancellationTokenSource();
         var token = _cts.Token;
-        var delay = _initialDelay;
+
+        // Use ReshowDelay if a tooltip was recently dismissed; otherwise use the full InitialDelay.
+        var elapsed = (DateTime.UtcNow - _lastHideTime).TotalMilliseconds;
+        var delay    = (elapsed < _autoPopDelay) ? _reshowDelay : _initialDelay;
         var duration = _autoPopDelay;
 
         // Compute position below the control (form-relative)
@@ -179,10 +193,12 @@ public class ToolTip : System.ComponentModel.Component
         {
             await Task.Delay(delay, token);
             if (token.IsCancellationRequested) return;
+            _lastHideTime = DateTime.MinValue;   // reset — tooltip is now visible
             ToolTipRegistry.Show(tip, _title, _icon, _isBalloon, x, y);
 
             await Task.Delay(duration, token);
             if (token.IsCancellationRequested) return;
+            _lastHideTime = DateTime.UtcNow;
             ToolTipRegistry.Hide();
         }, token);
     }
@@ -194,7 +210,11 @@ public class ToolTip : System.ComponentModel.Component
     {
         _cts?.Cancel();
         _cts = null;
-        ToolTipRegistry.Hide();
+        if (ToolTipRegistry.IsVisible)
+        {
+            _lastHideTime = DateTime.UtcNow;
+            ToolTipRegistry.Hide();
+        }
     }
 
     private void ShowImmediate(string text, Control control, int duration)
@@ -216,6 +236,18 @@ public class ToolTip : System.ComponentModel.Component
             if (token.IsCancellationRequested) return;
             ToolTipRegistry.Hide();
         }, token);
+    }
+
+    // Walk the parent chain to find the root Form that owns this control.
+    private static Form? GetRootForm(Control c)
+    {
+        Control? p = c.Parent;
+        while (p != null)
+        {
+            if (p is Form f) return f;
+            p = p.Parent;
+        }
+        return c as Form;
     }
 
     // Walk the parent chain to compute the form-relative X/Y of a control.

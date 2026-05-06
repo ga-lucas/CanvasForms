@@ -1273,3 +1273,15 @@ window.clipboardReadHtml = async function () {
         return null;
     }
 };
+
+// Returns live browser screen / viewport dimensions for System.Windows.Forms.Screen.
+window.getScreenInfo = function () {
+    return {
+        screenWidth:  window.screen.width,
+        screenHeight: window.screen.height,
+        workingWidth:  window.innerWidth,
+        workingHeight: window.innerHeight,
+        devicePixelRatio: window.devicePixelRatio || 1,
+        colorDepth: window.screen.colorDepth || 32
+    };
+};

@@ -242,7 +242,6 @@ Controls below have **no source file** in the repo yet. Everything else either h
 - `WebBrowser` / WebView2
 - `Chart`
 - MDI (`MdiClient`, MDI Forms)
-- `Screen` (multi-monitor info)
 - `Clipboard` (JS bridge needed)
 
 Controls live in `WebForms.Canvas/Forms/...` (project: `Canvas.Windows.Forms`).
@@ -297,7 +296,7 @@ Status legend:
 | Dialogs | `FolderBrowserDialog` | ⚠️ Partial | `SelectedPath`, `Description`, `ShowNewFolderButton`; host FS aware. |
 | Dialogs | `ColorDialog` | ⚠️ Partial | Swatch palette + Hex/RGB/HSV inputs. |
 | Dialogs | `FontDialog` | ⚠️ Partial | Family/style/size lists; `ShowEffects`, `ShowColor`, `Apply` event. |
-| Data | `DataGridView` | ⚠️ Partial | `IList`/`BindingSource`/`DataTable` binding; auto-column gen; sort; column types: TextBox/CheckBox/Button/ComboBox/Image/Link. |
+| Data | `DataGridView` | ⚠️ Partial | `IList`/`BindingSource`/`DataTable` binding; auto-column gen; sort; frozen columns; clipboard copy (Ctrl+C); multi-column sort (Ctrl+click header). |
 | Data | `DataTable` | ⚠️ Partial | DataView/DefaultView; DataRowView; typed RowChanged/ColumnChanged events; Select(filter, sort); DataSet/DataRelation; IListSource; BindingSource wired. |
 | Data | `BindingSource` | ⚠️ Partial | `IList`/`IBindingList`/`DataTable`/`DataSet` wrapper; `Current`/`Position` navigation; server-backed via `CanvasDataService`. |
 | Non-visual | `ToolTip` | 🧩 Stub/Compatibility | API present; rendering may be incomplete. |
@@ -403,7 +402,7 @@ Items are ordered by estimated prevalence in designer-generated / translated Win
 | ✅ | `ListView` | Details/List/LargeIcon views; keyboard nav; EnsureVisible; BeginUpdate/EndUpdate |
 | ⚠️ | `OpenFileDialog` | Host FS + browser upload |
 | ⚠️ | `ToolTip` | InitialDelay/AutoPopDelay hover timer; balloon + icon title; canvas overlay div |
-| ⚠️ | **`DataGridView`** | In-process `DataSource` binding (IList, BindingSource, DataTable); auto-column gen; virtualised scroll; row selection; sort; column types: TextBox/CheckBox/Button/ComboBox/Image/Link |
+| ⚠️ | **`DataGridView`** | In-process `DataSource` binding (IList, BindingSource, DataTable); auto-column gen; virtualised scroll; row selection; single/multi-column sort (Ctrl+click header, ▲1 ▲2 indicators); frozen columns (pin columns to left, unaffected by horizontal scroll); Ctrl+C clipboard export (tab-separated, respects `ClipboardCopyMode`); column types: TextBox/CheckBox/Button/ComboBox/Image/Link |
 | ✅ | `Timer` | `PeriodicTimer`-based async loop; `Interval`, `Enabled`, `Start()`, `Stop()`, `Tick`, `Tag`, `IContainer` ctor; fires on captured `SynchronizationContext` |
 | ⚠️ | **`ErrorProvider`** | SetError/GetError/Clear; red badge overlays; hover title tooltip; BlinkRate/BlinkStyle; ContainerControl |
 | ⚠️ | `SaveFileDialog` | Inherits full FileDialog UI; `CreatePrompt`, `OverwritePrompt`, `OpenFile()` |
@@ -447,7 +446,7 @@ Items are ordered by estimated prevalence in designer-generated / translated Win
 | 🔲 | **`ContextMenu`** (legacy) | Pre-`ContextMenuStrip` |
 | 🔲 | **`Splitter`** (legacy) | Pre-`SplitContainer` |
 | 🔲 | **`PrintPreviewControl`** | Embedded (non-dialog) print preview |
-| 🔲 | **`Screen`** | Multi-monitor info; `Screen.PrimaryScreen` stub needed |
+| ⚠️ | **`Screen`** | `PrimaryScreen`/`AllScreens`; `Bounds` from `window.screen`; `WorkingArea` from `window.innerWidth/Height`; `FromControl`/`FromPoint`/`GetWorkingArea`/`GetBounds`; JS interop via `getScreenInfo`; 1920×1080 fallback; no multi-monitor |
 | 🔲 | **`Clipboard`** | Cut/Copy/Paste; requires JS bridge |
 | ⚠️ | **`WebBrowser` / WebView2** | iframe overlay; Navigate, GoBack/Forward, Stop, Refresh, DocumentText, ExecuteScriptAsync, events; cross-origin DOM access blocked by browser sandbox |
 | 🔲 | **MDI (`MdiClient`, MDI Forms)** | MDI window management; enterprise apps |

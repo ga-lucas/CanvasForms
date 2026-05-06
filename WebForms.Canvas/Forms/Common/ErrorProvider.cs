@@ -18,13 +18,26 @@ public sealed class ErrorProviderEntry
     public string Id { get; }
     /// <summary>Whether the icon should blink (driven by <see cref="ErrorProvider.BlinkStyle"/>).</summary>
     public bool Blink { get; internal set; }
+    /// <summary>
+    /// Full animation period in milliseconds (= <c>BlinkRate * 2</c>).
+    /// Only meaningful when <see cref="Blink"/> is <c>true</c>.
+    /// </summary>
+    public int BlinkPeriodMs { get; internal set; }
+    /// <summary>
+    /// CSS iteration count string: <c>"infinite"</c> for AlwaysBlink,
+    /// or a finite number string (e.g. <c>"5"</c>) for BlinkIfDifferentError.
+    /// </summary>
+    public string BlinkIterations { get; internal set; } = "infinite";
 
-    internal ErrorProviderEntry(Control control, string message, string id, bool blink)
+    internal ErrorProviderEntry(Control control, string message, string id, bool blink,
+                                 int blinkPeriodMs, string blinkIterations)
     {
-        Control = control;
-        Message = message;
-        Id      = id;
-        Blink   = blink;
+        Control         = control;
+        Message         = message;
+        Id              = id;
+        Blink           = blink;
+        BlinkPeriodMs   = blinkPeriodMs;
+        BlinkIterations = blinkIterations;
     }
 
     /// <summary>
@@ -63,7 +76,8 @@ public static class ErrorProviderRegistry
     /// <summary>Raised when entries are added, changed, or removed.</summary>
     public static event EventHandler? Changed;
 
-    internal static void Set(Control control, string message, bool blink = false)
+    internal static void Set(Control control, string message, bool blink = false,
+                              int blinkPeriodMs = 500, string blinkIterations = "infinite")
     {
         var id = $"ep_{control.GetHashCode():x8}";
 
@@ -76,12 +90,14 @@ public static class ErrorProviderRegistry
         {
             if (_entries.TryGetValue(control, out var existing))
             {
-                existing.Message = message;
-                existing.Blink   = blink;
+                existing.Message        = message;
+                existing.Blink          = blink;
+                existing.BlinkPeriodMs  = blinkPeriodMs;
+                existing.BlinkIterations = blinkIterations;
             }
             else
             {
-                _entries[control] = new ErrorProviderEntry(control, message, id, blink);
+                _entries[control] = new ErrorProviderEntry(control, message, id, blink, blinkPeriodMs, blinkIterations);
             }
             Changed?.Invoke(null, EventArgs.Empty);
         }
@@ -154,12 +170,26 @@ public class ErrorProvider : System.ComponentModel.Component
     {
         if (control == null) return;
 
-        var msg   = value ?? string.Empty;
-        var blink = _blinkStyle != ErrorBlinkStyle.NeverBlink
-                    && !(_blinkStyle == ErrorBlinkStyle.BlinkIfDifferentError
-                         && _errors.TryGetValue(control, out var prev) && prev == msg);
+        var msg = value ?? string.Empty;
+
+        // Determine whether this call should trigger a blink.
+        bool isDifferentError = _errors.TryGetValue(control, out var prev) && prev != msg && !string.IsNullOrEmpty(msg);
+        bool blink = _blinkStyle switch
+        {
+            ErrorBlinkStyle.AlwaysBlink          => !string.IsNullOrEmpty(msg),
+            ErrorBlinkStyle.BlinkIfDifferentError => isDifferentError,
+            _                                    => false   // NeverBlink
+        };
+
+        // BlinkRate is the half-period (ms per visible/invisible phase), so the full CSS period = BlinkRate * 2.
+        // Minimum 100ms to avoid seizure-risk and degenerate values.
+        int periodMs = Math.Max(100, _blinkRate) * 2;
+
+        // AlwaysBlink keeps blinking forever; BlinkIfDifferentError blinks 5 times then stops.
+        string iterations = _blinkStyle == ErrorBlinkStyle.AlwaysBlink ? "infinite" : "5";
+
         _errors[control] = msg;
-        ErrorProviderRegistry.Set(control, msg, blink);
+        ErrorProviderRegistry.Set(control, msg, blink, periodMs, iterations);
     }
 
     /// <summary>Returns the current error description for <paramref name="control"/>.</summary>

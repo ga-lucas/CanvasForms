@@ -1,4 +1,4 @@
-﻿# Canvas.Windows.Forms - Compatibility Review
+# Canvas.Windows.Forms - Compatibility Review
 
 > **Last updated:** reflects codebase state after the `additional_controls` branch implementation pass.
 > Status legend: Good / Partial / Stub / Not started
@@ -55,13 +55,14 @@
 | Dialogs | `FolderBrowserDialog` | Partial | SelectedPath, Description, ShowNewFolderButton |
 | Dialogs | `ColorDialog` | Partial | Swatch palette + Hex/RGB/HSV inputs |
 | Dialogs | `FontDialog` | Partial | Family/style/size; ShowEffects; ShowColor; Apply event |
-| Data | `DataGridView` | Partial | IList/BindingSource/DataTable binding; auto-col gen; sort; col types |
+| Data | `DataGridView` | Partial | IList/BindingSource/DataTable binding; auto-col gen; sort; col types; frozen columns; clipboard copy (Ctrl+C); multi-column sort (Ctrl+click header) |
 | Data | `BindingSource` | Partial | IList/IBindingList; Filter/Sort/Find; server-backed |
 | Data | `DataTable` | Partial | DataView/DefaultView; DataRowView (ICustomTypeDescriptor); typed RowChanged/RowDeleted/ColumnChanged events; Select(filter, sort); DataSet/DataTableCollection/DataRelation; IListSource; BindingSource wired |
 | Non-visual | `NotifyIcon` | Partial | Canvas system tray; ContextMenuStrip popup; balloon tips |
 | Non-visual | `ToolTip` | Partial | InitialDelay/AutoPopDelay hover timer; balloon + icon title; overlay div in FormRenderer |
 | Non-visual | `ErrorProvider` | Partial | SetError/GetError/Clear; red badge overlays positioned right of each control; hover title shows message |
 | Non-visual | `Clipboard` | Good | SetText/GetText/Async; `navigator.clipboard` bridge; local-cache fallback |
+| Non-visual | `Screen` | Partial | PrimaryScreen/AllScreens; Bounds/WorkingArea from `window.screen`/`window.inner*` via JS; FromControl/FromPoint/FromRectangle; GetWorkingArea/GetBounds overloads; 1920×1080 fallback before first render |
 | Graphics | `Graphics` / drawing primitives | Good | Lines, rects, ellipses, arcs, beziers, polygons, round-rects, gradients, paths, dash styles |
 
 ---
@@ -262,6 +263,9 @@
 - Row selection (single/multi), SelectedRows, CurrentRow
 - CellClick, CellDoubleClick, SelectionChanged, RowEnter, CellValueChanged
 - Sort(), SortCompare
+- Multi-column sort: AddSort(col, dir) + Ctrl+click column header appends secondary criteria; sort indicators show ▲1 ▲2 …
+- Frozen columns: DataGridViewColumn.Frozen = true pins columns to the left, unaffected by horizontal scroll; separator line drawn
+- Copy to clipboard: Ctrl+C / GetClipboardContent() exports tab-separated text honouring ClipboardCopyMode and current selection
 - Virtualised row scroll
 - AllowUserToAddRows, AllowUserToDeleteRows, ReadOnly
 - DefaultCellStyle, column/row-level style overrides
@@ -272,10 +276,8 @@
 - CellValidating, RowValidating: events present, no built-in UI feedback
 
 #### Not implemented
-- Frozen columns/rows
+- Frozen rows
 - ComboBox column in-cell dropdown UI
-- Copy to clipboard
-- Multi-column sort
 
 ---
 
@@ -433,10 +435,10 @@
 - `Dispose()` — clears all errors from the registry
 - **`ErrorProviderRegistry`** (static) — change-event bus; holds all active `ErrorProviderEntry` records (form-relative X/Y, message, DOM id)
 - **Rendering** — `FormRenderer` iterates `ErrorProviderRegistry.Entries` and renders a red `!` circle badge (16 × 16 px, z-index 99998) positioned to the right of each affected control; browser-native `title` attribute provides the hover message
+- **Blinking** — `BlinkRate` drives animation period (`BlinkRate × 2` ms per CSS cycle); `AlwaysBlink` → `infinite` iterations; `BlinkIfDifferentError` → 5 iterations; `NeverBlink` → no animation; CSS keyframe uses abrupt step-start toggle matching WinForms behaviour
 
 #### Not implemented
 - Auto-validation wired from `DataSource` / `DataMember` (stub — must call `SetError` manually)
-- Actual icon blinking (CSS animation could be added later)
 - `IExtenderProvider` compile-time property extension (designer-only concept; not applicable)
 
 ---
@@ -550,6 +552,27 @@ Apps that don't use the return value are unaffected.
 
 ---
 
+
+---
+
+## Screen
+
+### Partial — single virtual browser screen
+
+#### Implemented
+- `Screen.PrimaryScreen` — returns the one virtual browser screen
+- `Screen.AllScreens` — single-element array containing `PrimaryScreen`
+- `Bounds` — `System.Drawing.Rectangle(0, 0, window.screen.width, window.screen.height)`
+- `WorkingArea` — `System.Drawing.Rectangle(0, 0, window.innerWidth, window.innerHeight)` (viewport after browser chrome)
+- `BitsPerPixel` — from `window.screen.colorDepth`
+- `Primary` — always `true`; `DeviceName` — always `\\\\.\\DISPLAY1`
+- `Screen.FromControl(control)` / `FromPoint(pt)` / `FromRectangle(rect)` — all return `PrimaryScreen`
+- `Screen.GetWorkingArea(point/rect/control)` — returns `PrimaryScreen.WorkingArea`
+- `Screen.GetBounds(point/rect/control)` — returns `PrimaryScreen.Bounds`
+- JS interop via `window.getScreenInfo` called by `FormRenderer` on first render; 1920x1080 fallback before first render
+
+#### Not implemented
+- Multi-monitor support (browser exposes only one screen)
 ## WebBrowser / WebView2
 
 **Status: ⚠️ Partial**
@@ -583,7 +606,7 @@ These gaps are architectural — they require OS integration unavailable in a br
 - No IME for CJK / complex-script input
 - No actual system tray — canvas tray is a visual simulation inside the page
 - Clipboard JS bridge implemented: `Clipboard.SetText`/`GetText`/`SetTextAsync`/`GetTextAsync` use `navigator.clipboard` with local-cache fallback; `clipboard-read` permission required for cross-app paste (auto-granted on localhost)
-- No multi-monitor (`Screen` class is a stub)
+- `Screen`: one virtual browser screen; `PrimaryScreen.Bounds` = `window.screen` dimensions; `WorkingArea` = `window.innerWidth/Height`; no multi-monitor support
 - No MDI (Multiple Document Interface)
 - No `PrintDocument` / print preview (no printer access from WASM)
 - `DoDragDrop` return value is async — the IL translator patches call-sites automatically (see above)

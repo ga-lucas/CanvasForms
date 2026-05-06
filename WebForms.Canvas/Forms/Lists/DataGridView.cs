@@ -31,6 +31,9 @@ public class DataGridView : ScrollableControl
     private SortOrder _sortOrder = SortOrder.None;
     private int _sortColIndex = -1;
 
+    // Multi-column sort list (primary first)
+    private readonly List<SortedColumnInfo> _sortedColumns = new();
+
     // ── Collections ─────────────────────────────────────────────
     public DataGridViewColumnCollection Columns { get; }
     public DataGridViewRowCollection Rows { get; }
@@ -239,24 +242,155 @@ public class DataGridView : ScrollableControl
 
     // ── Sort ─────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Read-only list of active sort criteria (primary first).
+    /// Each entry carries a column index and sort direction.
+    /// </summary>
+    public IReadOnlyList<SortedColumnInfo> SortedColumns => _sortedColumns;
+
+    /// <summary>
+    /// Sets the primary sort column, replacing any existing sort.
+    /// </summary>
     public void Sort(DataGridViewColumn col, ListSortDirection direction)
     {
         _sortColIndex = col.Index;
-        _sortOrder = direction == ListSortDirection.Ascending ? SortOrder.Ascending : SortOrder.Descending;
-        if (_boundRows.Count > 0 && col.Index < (_boundRows.FirstOrDefault()?.Length ?? 0))
+        _sortOrder    = direction == ListSortDirection.Ascending ? SortOrder.Ascending : SortOrder.Descending;
+        _sortedColumns.Clear();
+        _sortedColumns.Add(new SortedColumnInfo(col.Index, direction));
+        ApplyMultiSort();
+    }
+
+    /// <summary>
+    /// Appends a secondary sort criterion (Ctrl+click on a header).
+    /// If the column is already in the sort list its direction is toggled.
+    /// </summary>
+    public void AddSort(DataGridViewColumn col, ListSortDirection direction)
+    {
+        var existing = _sortedColumns.FindIndex(s => s.ColumnIndex == col.Index);
+        if (existing >= 0)
+            _sortedColumns[existing] = new SortedColumnInfo(col.Index, direction);
+        else
+            _sortedColumns.Add(new SortedColumnInfo(col.Index, direction));
+        ApplyMultiSort();
+    }
+
+    /// <summary>Removes all active sort criteria and restores insertion order.</summary>
+    public void RemoveSort()
+    {
+        _sortColIndex = -1;
+        _sortOrder    = SortOrder.None;
+        _sortedColumns.Clear();
+        Invalidate();
+    }
+
+    private void ApplyMultiSort()
+    {
+        if (_sortedColumns.Count == 0 || _boundRows.Count == 0) { Invalidate(); return; }
+        _boundRows.Sort((a, b) =>
         {
-            _boundRows.Sort((a, b) =>
+            foreach (var s in _sortedColumns)
             {
-                var av = a[col.Index]?.ToString() ?? string.Empty;
-                var bv = b[col.Index]?.ToString() ?? string.Empty;
-                int cmp = string.Compare(av, bv, StringComparison.OrdinalIgnoreCase);
-                return direction == ListSortDirection.Ascending ? cmp : -cmp;
-            });
-        }
+                int ci = s.ColumnIndex;
+                if (ci >= a.Length || ci >= b.Length) continue;
+                var av = a[ci]; var bv = b[ci];
+                int cmp;
+                if (av == null && bv == null) cmp = 0;
+                else if (av == null) cmp = -1;
+                else if (bv == null) cmp = 1;
+                else if (av is IComparable ac && av.GetType() == bv.GetType())
+                    cmp = ac.CompareTo(bv);
+                else
+                    cmp = string.Compare(av.ToString(), bv.ToString(), StringComparison.OrdinalIgnoreCase);
+                if (cmp != 0)
+                    return s.Direction == ListSortDirection.Ascending ? cmp : -cmp;
+            }
+            return 0;
+        });
         Invalidate();
     }
 
     // ── Paint ────────────────────────────────────────────────────
+
+    private int FrozenColumnsWidth()
+    {
+        int total = 0;
+        foreach (var col in Columns)
+            if (col.Visible && col.Frozen) total += col.Width;
+        return total;
+    }
+
+    private int TotalColumnsWidth()
+    {
+        int total = 0;
+        foreach (var col in Columns) if (col.Visible) total += col.Width;
+        return total;
+    }
+
+    // Draw one column header cell, clipped to [clipLeft, clipRight).
+    private void DrawColumnHeader(Graphics g, int ci, DataGridViewColumn col, int cx, int y0, int colHdrH,
+                                   int clipLeft, int clipRight)
+    {
+        int right = cx + col.Width;
+        if (right <= clipLeft || cx >= clipRight) return;
+        int visRight = Math.Min(right - 1, clipRight - 1);
+        using var hdrPen = new Pen(Color.FromArgb(166, 166, 166));
+        g.DrawLine(hdrPen, visRight, y0, visRight, y0 + colHdrH);
+        g.DrawLine(hdrPen, clipLeft, y0 + colHdrH - 1, clipRight, y0 + colHdrH - 1);
+        string sortIndicator = string.Empty;
+        int sortEntry = _sortedColumns.FindIndex(s => s.ColumnIndex == ci);
+        if (sortEntry >= 0)
+        {
+            var se = _sortedColumns[sortEntry];
+            string arrow = se.Direction == ListSortDirection.Ascending ? "▲" : "▼";
+            sortIndicator = _sortedColumns.Count > 1 ? $" {arrow}{sortEntry + 1}" : $" {arrow}";
+        }
+        using var textBrush = new SolidBrush(Color.Black);
+        g.DrawString(col.HeaderText + sortIndicator, Font, textBrush,
+            Math.Max(cx, clipLeft) + 3, y0 + (colHdrH - Font.Height) / 2);
+    }
+
+    // Draw one data cell, clipped to [clipLeft, clipRight).
+    private void DrawCell(Graphics g, int ri, int ci, DataGridViewColumn col, int cx, int ry, int rowH,
+                           bool rowSelected, Color rowBg, int clipLeft, int clipRight)
+    {
+        int right = cx + col.Width;
+        if (right <= clipLeft || cx >= clipRight) return;
+
+        bool cellSelected = (rowSelected && SelectionMode == DataGridViewSelectionMode.FullRowSelect)
+                            || _selectedCell == (ri, ci);
+
+        if (cellSelected && !rowSelected)
+        {
+            Color cellBg = Focused ? Color.FromArgb(0, 120, 215) : Color.FromArgb(204, 228, 247);
+            using var cellBrush = new SolidBrush(cellBg);
+            int clipX = Math.Max(cx, clipLeft);
+            g.FillRectangle(cellBrush, clipX, ry, Math.Min(right, clipRight) - clipX, rowH);
+        }
+
+        string text = GetCellText(ri, ci);
+        Color textColor = (rowSelected || cellSelected) && Focused ? Color.White : ForeColor;
+        using var textBrush = new SolidBrush(textColor);
+        g.DrawString(text, Font, textBrush, Math.Max(cx, clipLeft) + 3, ry + (rowH - Font.Height) / 2);
+
+        if (col is DataGridViewCheckBoxColumn)
+        {
+            var raw = ri < _boundRows.Count && ci < _boundRows[ri].Length ? _boundRows[ri][ci] : null;
+            bool chk = raw is true || (raw is string sv && sv.Equals("true", StringComparison.OrdinalIgnoreCase));
+            int cbSize = 13, cbX = cx + (col.Width - cbSize) / 2, cbY = ry + (rowH - cbSize) / 2;
+            using var cbPen = new Pen(Color.FromArgb(122, 122, 122));
+            g.DrawRectangle(cbPen, cbX, cbY, cbSize, cbSize);
+            if (chk)
+            {
+                using var checkPen = new Pen(Color.FromArgb(0, 120, 215), 2);
+                g.DrawLine(checkPen, cbX + 2, cbY + cbSize / 2, cbX + 5, cbY + cbSize - 3);
+                g.DrawLine(checkPen, cbX + 5, cbY + cbSize - 3, cbX + cbSize - 2, cbY + 2);
+            }
+        }
+
+        using var gridPen = new Pen(GridColor);
+        g.DrawLine(gridPen, Math.Min(right - 1, clipRight - 1), ry,
+                            Math.Min(right - 1, clipRight - 1), ry + rowH);
+    }
 
     protected internal override void OnPaint(PaintEventArgs e)
     {
@@ -265,11 +399,9 @@ public class DataGridView : ScrollableControl
         int x0 = bw, y0 = bw;
         int w = Width - bw * 2, h = Height - bw * 2;
 
-        // Background
         using (var bgBrush = new SolidBrush(BackColor))
             g.FillRectangle(bgBrush, x0, y0, w, h);
 
-        // Border
         if (BorderStyle != BorderStyle.None)
         {
             using var borderPen = new Pen(Color.FromArgb(122, 122, 122));
@@ -278,48 +410,49 @@ public class DataGridView : ScrollableControl
 
         int rowHdrW = RowHeadersVisible ? RowHeadersWidth : 0;
         int colHdrH = ColumnHeadersVisible ? ColumnHeadersHeight : 0;
+        int frozenW  = FrozenColumnsWidth();
 
-        int totalCols = TotalColumnsWidth();
-        int totalRows = GetDisplayRowCount();
-        int rowH = RowHeightDefault;
+        int totalCols  = TotalColumnsWidth();
+        int totalRows  = GetDisplayRowCount();
+        int rowH       = RowHeightDefault;
         int totalRowsH = totalRows * rowH;
+
+        // Scrollable columns begin after row-header + frozen zone
+        int scrollOriginX = x0 + rowHdrW + frozenW;
 
         bool needScrollV = (ScrollBars == DataGridViewScrollBars.Vertical || ScrollBars == DataGridViewScrollBars.Both)
                            && totalRowsH > h - colHdrH;
         bool needScrollH = (ScrollBars == DataGridViewScrollBars.Horizontal || ScrollBars == DataGridViewScrollBars.Both)
-                           && totalCols > w - rowHdrW;
+                           && (totalCols - frozenW) > w - rowHdrW - frozenW;
 
         int clientW = w - rowHdrW - (needScrollV ? ScrollBarW : 0);
         int clientH = h - colHdrH - (needScrollH ? ScrollBarW : 0);
+        int rightEdge = x0 + rowHdrW + clientW;
 
         // ── Column headers ──────────────────────────────────────
         if (ColumnHeadersVisible)
         {
             using var hdrBrush = new SolidBrush(Color.FromArgb(240, 240, 240));
-            g.FillRectangle(hdrBrush, x0 + rowHdrW, y0, w - rowHdrW - (needScrollV ? ScrollBarW : 0), colHdrH);
+            g.FillRectangle(hdrBrush, x0 + rowHdrW, y0, clientW, colHdrH);
 
-            int cx = x0 + rowHdrW - _scrollOffsetX;
+            // Frozen headers
+            int fcx = x0 + rowHdrW;
             for (int ci = 0; ci < Columns.Count; ci++)
             {
                 var col = Columns[ci];
-                if (!col.Visible) continue;
-                int right = cx + col.Width;
-                if (cx >= x0 + rowHdrW + clientW) break;
-                if (right > x0 + rowHdrW)
-                {
-                    // Clip header to visible area
-                    using var hdrPen = new Pen(Color.FromArgb(166, 166, 166));
-                    g.DrawLine(hdrPen, right - 1, y0, right - 1, y0 + colHdrH);
-                    g.DrawLine(hdrPen, x0 + rowHdrW, y0 + colHdrH - 1,
-                        x0 + w - (needScrollV ? ScrollBarW : 0), y0 + colHdrH - 1);
-
-                    bool sorted = _sortColIndex == ci;
-                    using var textBrush = new SolidBrush(Color.Black);
-                    int tx = Math.Max(cx, x0 + rowHdrW) + 3;
-                    g.DrawString(col.HeaderText + (sorted ? (_sortOrder == SortOrder.Ascending ? " ▲" : " ▼") : ""),
-                        Font, textBrush, tx, y0 + (colHdrH - Font.Height) / 2);
-                }
-                cx += col.Width;
+                if (!col.Visible || !col.Frozen) continue;
+                DrawColumnHeader(g, ci, col, fcx, y0, colHdrH, x0 + rowHdrW, rightEdge);
+                fcx += col.Width;
+            }
+            // Scrollable headers
+            int scx = scrollOriginX - _scrollOffsetX;
+            for (int ci = 0; ci < Columns.Count; ci++)
+            {
+                var col = Columns[ci];
+                if (!col.Visible || col.Frozen) continue;
+                if (scx >= rightEdge) break;
+                DrawColumnHeader(g, ci, col, scx, y0, colHdrH, scrollOriginX, rightEdge);
+                scx += col.Width;
             }
 
             // Row header corner
@@ -342,103 +475,69 @@ public class DataGridView : ScrollableControl
             if (ry >= y0 + colHdrH + clientH) break;
 
             bool rowSelected = ri == _selectedRowIndex;
-            bool rowHovered = ri == _hoveredRow;
+            bool rowHovered  = ri == _hoveredRow;
 
             Color rowBg = BackColor;
             if (ri % 2 == 1 && AlternatingRowsDefaultCellStyle.BackColor != Color.Empty)
                 rowBg = AlternatingRowsDefaultCellStyle.BackColor;
-            if (rowHovered) rowBg = Color.FromArgb(229, 241, 251);
+            if (rowHovered)  rowBg = Color.FromArgb(229, 241, 251);
             if (rowSelected) rowBg = Focused ? Color.FromArgb(0, 120, 215) : Color.FromArgb(204, 228, 247);
 
-            // Row background
             using (var rowBrush = new SolidBrush(rowBg))
                 g.FillRectangle(rowBrush, x0 + rowHdrW, ry, clientW, rowH);
 
-            // Row header
             if (RowHeadersVisible)
             {
                 using var rHdrBrush = new SolidBrush(Color.FromArgb(240, 240, 240));
                 g.FillRectangle(rHdrBrush, x0, ry, rowHdrW, rowH);
                 if (rowSelected)
                 {
-                    // Draw selection triangle in row header
                     using var triPen = new Pen(Color.FromArgb(0, 90, 158), 2);
-                    int mx = x0 + rowHdrW / 2;
-                    int my = ry + rowH / 2;
-                    g.DrawLine(triPen, mx - 4, my - 4, mx + 4, my);
-                    g.DrawLine(triPen, mx + 4, my, mx - 4, my + 4);
+                    int mx2 = x0 + rowHdrW / 2, my2 = ry + rowH / 2;
+                    g.DrawLine(triPen, mx2 - 4, my2 - 4, mx2 + 4, my2);
+                    g.DrawLine(triPen, mx2 + 4, my2, mx2 - 4, my2 + 4);
                 }
                 using var rHdrPen = new Pen(Color.FromArgb(166, 166, 166));
                 g.DrawLine(rHdrPen, x0 + rowHdrW - 1, ry, x0 + rowHdrW - 1, ry + rowH);
                 g.DrawLine(rHdrPen, x0, ry + rowH - 1, x0 + rowHdrW, ry + rowH - 1);
             }
 
-            // Cells
-            int cx = x0 + rowHdrW - _scrollOffsetX;
+            // Frozen cells
+            int fCellX = x0 + rowHdrW;
             for (int ci = 0; ci < Columns.Count; ci++)
             {
                 var col = Columns[ci];
-                if (!col.Visible) { continue; }
-                int right = cx + col.Width;
-                if (cx >= x0 + rowHdrW + clientW) break;
-                if (right > x0 + rowHdrW)
-                {
-                    bool cellSelected = rowSelected && SelectionMode == DataGridViewSelectionMode.FullRowSelect
-                                        || (_selectedCell == (ri, ci));
-
-                    // Cell background override
-                    Color cellBg = rowBg;
-                    if (cellSelected && !rowSelected)
-                    {
-                        cellBg = Focused ? Color.FromArgb(0, 120, 215) : Color.FromArgb(204, 228, 247);
-                        using var cellBrush = new SolidBrush(cellBg);
-                        int clipX = Math.Max(cx, x0 + rowHdrW);
-                        g.FillRectangle(cellBrush, clipX, ry, right - clipX, rowH);
-                    }
-
-                    // Cell text
-                    string text = GetCellText(ri, ci);
-                    Color textColor = (rowSelected || cellSelected) && Focused ? Color.White : ForeColor;
-                    using var textBrush = new SolidBrush(textColor);
-                    int tx = Math.Max(cx, x0 + rowHdrW) + 3;
-                    int ty = ry + (rowH - Font.Height) / 2;
-                    g.DrawString(text, Font, textBrush, tx, ty);
-
-                    // Checkbox column
-                    if (col is DataGridViewCheckBoxColumn)
-                    {
-                        bool chk = false;
-                        var raw = _boundRows.Count > 0 && ri < _boundRows.Count && ci < _boundRows[ri].Length
-                            ? _boundRows[ri][ci] : null;
-                        chk = raw is true || (raw is string s && s.Equals("true", StringComparison.OrdinalIgnoreCase));
-                        int cbSize = 13;
-                        int cbX = cx + (col.Width - cbSize) / 2;
-                        int cbY = ry + (rowH - cbSize) / 2;
-                        using var cbPen = new Pen(Color.FromArgb(122, 122, 122));
-                        g.DrawRectangle(cbPen, cbX, cbY, cbSize, cbSize);
-                        if (chk)
-                        {
-                            using var checkPen = new Pen(Color.FromArgb(0, 120, 215), 2);
-                            g.DrawLine(checkPen, cbX + 2, cbY + cbSize / 2, cbX + 5, cbY + cbSize - 3);
-                            g.DrawLine(checkPen, cbX + 5, cbY + cbSize - 3, cbX + cbSize - 2, cbY + 2);
-                        }
-                    }
-
-                    // Grid lines
-                    using var gridPen = new Pen(GridColor);
-                    g.DrawLine(gridPen, right - 1, ry, right - 1, ry + rowH);
-                }
-                cx += col.Width;
+                if (!col.Visible || !col.Frozen) continue;
+                DrawCell(g, ri, ci, col, fCellX, ry, rowH, rowSelected, rowBg,
+                         x0 + rowHdrW, rightEdge);
+                fCellX += col.Width;
             }
 
-            // Row bottom line
+            // Scrollable cells
+            int sCellX = scrollOriginX - _scrollOffsetX;
+            for (int ci = 0; ci < Columns.Count; ci++)
+            {
+                var col = Columns[ci];
+                if (!col.Visible || col.Frozen) continue;
+                if (sCellX >= rightEdge) break;
+                DrawCell(g, ri, ci, col, sCellX, ry, rowH, rowSelected, rowBg,
+                         scrollOriginX, rightEdge);
+                sCellX += col.Width;
+            }
+
             using var rowPen = new Pen(GridColor);
             g.DrawLine(rowPen, x0 + rowHdrW, ry + rowH - 1, x0 + rowHdrW + clientW, ry + rowH - 1);
-
             ry += rowH;
         }
 
-        // ── Scrollbars (simple rendered indicators) ─────────────
+        // Frozen column separator
+        if (frozenW > 0)
+        {
+            using var frozenPen = new Pen(Color.FromArgb(100, 100, 100));
+            g.DrawLine(frozenPen, scrollOriginX, y0, scrollOriginX, y0 + colHdrH + clientH);
+        }
+
+        // ── Scrollbars ───────────────────────────────────────────
         if (needScrollV)
         {
             int sbX = x0 + w - ScrollBarW;
@@ -447,21 +546,12 @@ public class DataGridView : ScrollableControl
             g.FillRectangle(sbBrush, sbX, y0, ScrollBarW, sbH);
             using var sbPen = new Pen(Color.FromArgb(166, 166, 166));
             g.DrawRectangle(sbPen, sbX, y0, ScrollBarW - 1, sbH - 1);
-
-            // Thumb
             int maxScroll = Math.Max(1, totalRowsH - clientH);
             int thumbH = Math.Max(20, (int)((double)clientH / Math.Max(1, totalRowsH) * sbH));
             int thumbY = y0 + (int)((double)_scrollOffsetY / maxScroll * (sbH - thumbH));
             using var thumbBrush = new SolidBrush(Color.FromArgb(180, 180, 180));
             g.FillRectangle(thumbBrush, sbX + 2, thumbY + 2, ScrollBarW - 4, thumbH - 4);
         }
-    }
-
-    private int TotalColumnsWidth()
-    {
-        int total = 0;
-        foreach (var col in Columns) if (col.Visible) total += col.Width;
-        return total;
     }
 
     // ── Input ────────────────────────────────────────────────────
@@ -478,15 +568,26 @@ public class DataGridView : ScrollableControl
         // Column header click
         if (ColumnHeadersVisible && my < colHdrH)
         {
-            int ci = GetColAtX(mx - rowHdrW + _scrollOffsetX + bw);
+            int ci = GetColAtX(mx - rowHdrW);
             if (ci >= 0)
             {
                 ColumnHeaderMouseClick?.Invoke(this, new DataGridViewColumnEventArgs(Columns[ci]));
                 if (Columns[ci].SortMode != DataGridViewColumnSortMode.NotSortable)
                 {
-                    var dir = (_sortColIndex == ci && _sortOrder == SortOrder.Ascending)
-                        ? ListSortDirection.Descending : ListSortDirection.Ascending;
-                    Sort(Columns[ci], dir);
+                    bool isCtrl = (System.Windows.Forms.Control.ModifierKeys & Keys.Control) != 0;
+                    if (isCtrl && _sortedColumns.Count > 0)
+                    {
+                        var existing = _sortedColumns.FindIndex(s => s.ColumnIndex == ci);
+                        var dir2 = (existing >= 0 && _sortedColumns[existing].Direction == ListSortDirection.Ascending)
+                            ? ListSortDirection.Descending : ListSortDirection.Ascending;
+                        AddSort(Columns[ci], dir2);
+                    }
+                    else
+                    {
+                        var dir = (_sortColIndex == ci && _sortOrder == SortOrder.Ascending)
+                            ? ListSortDirection.Descending : ListSortDirection.Ascending;
+                        Sort(Columns[ci], dir);
+                    }
                 }
             }
             return;
@@ -494,7 +595,7 @@ public class DataGridView : ScrollableControl
 
         // Row click
         int ri = GetRowAtY(my - colHdrH + _scrollOffsetY + bw);
-        int col = GetColAtX(mx - rowHdrW + _scrollOffsetX + bw);
+        int col = GetColAtX(mx - rowHdrW);
         if (ri >= 0 && ri < GetDisplayRowCount())
         {
             _selectedRowIndex = ri;
@@ -537,18 +638,90 @@ public class DataGridView : ScrollableControl
         base.OnMouseWheel(e);
     }
 
+    protected internal override void OnKeyDown(KeyEventArgs e)
+    {
+        if (e.KeyCode == Keys.C && e.Control)
+        {
+            string text = GetClipboardContent();
+            if (!string.IsNullOrEmpty(text))
+                Clipboard.SetText(text);
+            e.Handled = true;
+        }
+        base.OnKeyDown(e);
+    }
+
+    /// <summary>
+    /// Builds tab-separated clipboard text for the current selection (or all rows if nothing is
+    /// selected), honouring <see cref="ClipboardCopyMode"/>.
+    /// </summary>
+    public string GetClipboardContent()
+    {
+        if (ClipboardCopyMode == DataGridViewClipboardCopyMode.Disable) return string.Empty;
+
+        bool includeHeaders = ClipboardCopyMode == DataGridViewClipboardCopyMode.EnableAlwaysIncludeHeaderText
+            || (ClipboardCopyMode == DataGridViewClipboardCopyMode.EnableWithAutoHeaderText
+                && SelectionMode == DataGridViewSelectionMode.FullRowSelect);
+
+        var sb = new System.Text.StringBuilder();
+
+        // Header row
+        if (includeHeaders)
+        {
+            for (int ci = 0; ci < Columns.Count; ci++)
+            {
+                if (!Columns[ci].Visible) continue;
+                if (sb.Length > 0) sb.Append('\t');
+                sb.Append(Columns[ci].HeaderText);
+            }
+            sb.AppendLine();
+        }
+
+        // Data rows — copy selected row when available, else all rows
+        int rowCount = GetDisplayRowCount();
+        bool hasSelection = _selectedRowIndex >= 0 && _selectedRowIndex < rowCount;
+        for (int ri = 0; ri < rowCount; ri++)
+        {
+            if (hasSelection && SelectionMode == DataGridViewSelectionMode.FullRowSelect
+                && ri != _selectedRowIndex)
+                continue;
+
+            bool firstCell = true;
+            for (int ci = 0; ci < Columns.Count; ci++)
+            {
+                if (!Columns[ci].Visible) continue;
+                if (!firstCell) sb.Append('\t');
+                firstCell = false;
+                sb.Append(GetCellText(ri, ci));
+            }
+            sb.AppendLine();
+        }
+
+        return sb.ToString().TrimEnd();
+    }
+
     private int GetRowAtY(int relY) => relY < 0 ? -1 : relY / RowHeightDefault;
 
-    private int GetColAtX(int relX)
+    // mouseX is relative to the grid interior (bw already removed), rowHdrW already removed.
+    // Frozen columns are at fixed positions; scrollable columns are offset by _scrollOffsetX.
+    private int GetColAtX(int mouseX)
     {
-        if (relX < 0) return -1;
-        int cx = 0;
+        // Check frozen columns first (they sit at the left, no scroll offset)
+        int fcx = 0;
         for (int ci = 0; ci < Columns.Count; ci++)
         {
             var col = Columns[ci];
-            if (!col.Visible) continue;
-            if (relX < cx + col.Width) return ci;
-            cx += col.Width;
+            if (!col.Visible || !col.Frozen) continue;
+            if (mouseX >= fcx && mouseX < fcx + col.Width) return ci;
+            fcx += col.Width;
+        }
+        // Then scrollable columns
+        int scx = fcx - _scrollOffsetX;
+        for (int ci = 0; ci < Columns.Count; ci++)
+        {
+            var col = Columns[ci];
+            if (!col.Visible || col.Frozen) continue;
+            if (mouseX >= scx && mouseX < scx + col.Width) return ci;
+            scx += col.Width;
         }
         return -1;
     }
@@ -670,3 +843,6 @@ public class DataGridViewSortCompareEventArgs : EventArgs
         Column = column; CellValue1 = cellValue1; CellValue2 = cellValue2; RowIndex1 = rowIndex1; RowIndex2 = rowIndex2;
     }
 }
+
+/// <summary>Describes one sort criterion in a multi-column sort.</summary>
+public record SortedColumnInfo(int ColumnIndex, ListSortDirection Direction);

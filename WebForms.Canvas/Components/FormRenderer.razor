@@ -151,7 +151,9 @@
         var (epRelX, epRelY) = ep.ComputePosition();
         var epX = Form.Left + BorderWidth + epRelX;
         var epY = Form.Top  + TitleBarHeight + BorderWidth + epRelY;
-        var epAnim = ep.Blink ? "ep-blink 1s step-start infinite" : "none";
+        var epAnim = ep.Blink
+            ? $"ep-blink {ep.BlinkPeriodMs}ms step-start {ep.BlinkIterations}"
+            : "none";
         <div title="@ep.Message"
              style="position: absolute;
                     left: @(epX)px;
@@ -316,6 +318,10 @@
 
             // Register the JS runtime for the Clipboard bridge so Copy/Paste reach the real browser clipboard.
             Forms.Clipboard._jsRuntime = JSRuntime;
+
+            // Register the JS runtime for Screen so PrimaryScreen reflects live browser dimensions.
+            Forms.Screen._jsRuntime = JSRuntime;
+            await Forms.Screen.RefreshAsync();
 
             // Setup keyboard handling for the canvas - use try/catch in case JS isn't loaded yet
             try
