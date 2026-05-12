@@ -10,8 +10,8 @@ public class Button : ButtonBase
     {
         Width = 75;
         Height = 23;
-        BackColor = Color.FromArgb(240, 240, 240);
-        ForeColor = Color.Black;
+        BackColor = Canvas.Windows.Forms.Theming.CanvasTheme.Current.ButtonBackColor;
+        ForeColor = Canvas.Windows.Forms.Theming.CanvasTheme.Current.ButtonForeColor;
         Text = "Button";
     }
 
@@ -85,7 +85,7 @@ public class Button : ButtonBase
         {
             var textColor = Enabled
                 ? (Color)ForeColor
-                : (Color)Color.FromArgb(109, 109, 109);
+                : (Color)Canvas.Windows.Forms.Theming.CanvasTheme.Current.ButtonDisabledForeColor;
 
             var measureService = FindForm()?.TextMeasurementService;
             int fontSize   = Font != null ? (int)Font.Size : 12;
@@ -103,7 +103,7 @@ public class Button : ButtonBase
         if (Focused && Enabled)
         {
             var focusRect = new Rectangle(3, 3, Width - 6, Height - 6);
-            using var focusPen = new Pen(Color.FromArgb(80, 80, 80)) { DashStyle = DashStyle.Dot };
+            using var focusPen = new Pen(Canvas.Windows.Forms.Theming.CanvasTheme.Current.FocusRectColor) { DashStyle = DashStyle.Dot };
             g.DrawRoundRect(focusPen, focusRect, CornerRadius - 1);
         }
 
@@ -118,24 +118,24 @@ public class Button : ButtonBase
         switch (state)
         {
             case ButtonState.Disabled:
-                colorTop    = Color.FromArgb(240, 240, 240);
-                colorBottom = Color.FromArgb(240, 240, 240);
-                borderColor = Color.FromArgb(173, 173, 173);
+                colorTop    = Canvas.Windows.Forms.Theming.CanvasTheme.Current.ButtonBackColor;
+                colorBottom = Canvas.Windows.Forms.Theming.CanvasTheme.Current.ButtonBackColor;
+                borderColor = Canvas.Windows.Forms.Theming.CanvasTheme.Current.DisabledBorderColor;
                 break;
             case ButtonState.Pushed:
                 colorTop    = DarkenColor(BackColor, 0.18f);
                 colorBottom = DarkenColor(BackColor, 0.08f);
-                borderColor = Color.FromArgb(0, 84, 153);
+                borderColor = Canvas.Windows.Forms.Theming.CanvasTheme.Current.ButtonBorderPressed;
                 break;
             case ButtonState.Hot:
                 colorTop    = LightenColor(BackColor, 0.22f);
                 colorBottom = LightenColor(BackColor, 0.08f);
-                borderColor = Color.FromArgb(0, 120, 215);
+                borderColor = Canvas.Windows.Forms.Theming.CanvasTheme.Current.ButtonBorderHover;
                 break;
             default:
                 colorTop    = LightenColor(BackColor, 0.10f);
                 colorBottom = DarkenColor(BackColor, 0.05f);
-                borderColor = Color.FromArgb(173, 173, 173);
+                borderColor = Canvas.Windows.Forms.Theming.CanvasTheme.Current.ButtonBorderNormal;
                 break;
         }
 
@@ -162,7 +162,7 @@ public class Button : ButtonBase
             // Popup: show border + slight highlight on hover
             fillColor = LightenColor(BackColor, 0.12f);
         else if (state == ButtonState.Disabled)
-            fillColor = Color.FromArgb(240, 240, 240);
+            fillColor = Canvas.Windows.Forms.Theming.CanvasTheme.Current.ButtonBackColor;
         else if (state == ButtonState.Hot)
             fillColor = LightenColor(BackColor, 0.12f);
         else if (state == ButtonState.Pushed)
@@ -181,7 +181,9 @@ public class Button : ButtonBase
         {
             Color bc = !fa.BorderColor.IsEmpty
                 ? fa.BorderColor
-                : (state == ButtonState.Disabled ? Color.FromArgb(173, 173, 173) : Color.FromArgb(100, 100, 100));
+                : (state == ButtonState.Disabled
+                    ? (Color)Canvas.Windows.Forms.Theming.CanvasTheme.Current.DisabledBorderColor
+                    : Canvas.Windows.Forms.Theming.CanvasTheme.Current.FocusRectColor);
 
             using var borderPen = new Pen(bc, fa.BorderSize);
             g.DrawRoundRect(borderPen, bounds, 2);

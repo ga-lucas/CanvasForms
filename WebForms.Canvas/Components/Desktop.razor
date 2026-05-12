@@ -5,10 +5,10 @@
 @inject IJSRuntime JSRuntime
 @implements IDisposable
 
-<div class="desktop-container" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100vw; height: 100vh; background-color: #008080; overflow: hidden;">
+<div class="desktop-container" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100vw; height: 100vh; @_desktopStyle overflow: hidden;">
 
     <!-- Taskbar at top -->
-    <div class="taskbar" style="position: absolute; top: 0; left: 0; right: 0; height: @(TaskbarHeight)px; background: linear-gradient(180deg, #f0f0f0 0%, #d0d0d0 100%); border-bottom: 1px solid #a0a0a0; z-index: 10000; display: flex; align-items: center; padding: 0 8px; padding-left: @(TaskbarLeftPadding)px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+    <div class="taskbar" style="position: absolute; top: 0; left: 0; right: 0; height: @(TaskbarHeight)px; background: @_taskbarGradient; border-bottom: 1px solid @_taskbarBorder; z-index: 10000; display: flex; align-items: center; padding: 0 8px; padding-left: @(TaskbarLeftPadding)px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 
         <!-- Window buttons -->
         <div style="display: flex; align-items: center; flex: 1; overflow: hidden; gap: 0;">
@@ -17,10 +17,17 @@
             var isActive = form == _formManager.ActiveForm;
             var isMinimized = form.WindowState == FormWindowState.Minimized;
 
+            var btnBg     = isActive ? _taskbarBtnActiveGradient : _taskbarBtnInactiveGradient;
+            var btnBorder = isActive ? _taskbarBtnActiveBorder   : _taskbarBtnInactiveBorder;
+            var btnBorderBottom = isActive ? $"3px solid {_taskbarBtnActiveBorder}" : $"1px solid {_taskbarBtnInactiveBorder}";
+            var btnColor  = isMinimized ? _taskbarBtnMinimizedColor
+                          : (isActive   ? _taskbarBtnActiveColor
+                                        : _taskbarBtnInactiveColor);
+
             <div class="window-button" 
-                 style="background: @(isActive ? "linear-gradient(180deg, #e3f2fd 0%, #bbdefb 100%)" : "linear-gradient(180deg, #f5f5f5 0%, #d5d5d5 100%)"); 
-                        border: 1px solid @(isActive ? "#2196f3" : "#a0a0a0");
-                        border-bottom: @(isActive ? "3px solid #1976d2" : "1px solid #a0a0a0");
+                 style="background: @btnBg; 
+                        border: 1px solid @btnBorder;
+                        border-bottom: @btnBorderBottom;
                         padding: 4px 12px; 
                         margin-right: 4px; 
                         border-radius: 3px 3px 0 0; 
@@ -31,10 +38,10 @@
                         overflow: hidden; 
                         text-overflow: ellipsis;
                         font-size: 13px;
-                        color: @(isMinimized ? "#808080" : (isActive ? "#1565c0" : "#000000"));
+                        color: @btnColor;
                         font-weight: @(isActive ? "600" : "normal");
                         font-style: @(isMinimized ? "italic" : "normal");
-                        box-shadow: @(isActive ? "0 -2px 4px rgba(33, 150, 243, 0.3), inset 0 1px 0 rgba(255,255,255,0.5)" : "0 1px 2px rgba(0,0,0,0.1)");
+                        box-shadow: @(isActive ? $"0 -2px 4px rgba(33, 150, 243, 0.3), inset 0 1px 0 rgba(255,255,255,0.5)" : "0 1px 2px rgba(0,0,0,0.1)");
                         transform: @(isActive ? "translateY(-2px)" : "none");
                         transition: all 0.2s ease;"
                  @onclick="() => ActivateForm(form)"
@@ -45,7 +52,9 @@
         </div>
 
         <!-- System tray (right side) -->
-        <SystemTray Registry="@_trayRegistry" />
+        <div style="display: flex; align-items: center; gap: 4px;">
+            <SystemTray Registry="@_trayRegistry" />
+        </div>
     </div>
 
     <!-- Desktop area (below taskbar) -->
@@ -77,7 +86,46 @@
     private int _viewportWidth = 1920;
     private int _viewportHeight = 1080;
     private DotNetObjectReference<Desktop>? _dotNetRef;
-    private Form? _lastTitleForm;     // last form whose title/icon was pushed to the browser
+    private Form? _lastTitleForm;
+
+    // ?? Theme-derived style helpers ????????????????????????????????????????????
+
+    private static string Hex(System.Drawing.Color c)
+        => c.A == 255 ? $"#{c.R:X2}{c.G:X2}{c.B:X2}"
+                      : $"rgba({c.R},{c.G},{c.B},{c.A / 255.0:F3})";
+
+    private string _desktopStyle
+    {
+        get
+        {
+            var t = Canvas.Windows.Forms.Theming.CanvasTheme.Current;
+            var bg = $"background-color: {Hex(t.DesktopBackColor)};";
+            if (!string.IsNullOrWhiteSpace(t.DesktopBackgroundImage))
+                bg += $" background-image: url('{t.DesktopBackgroundImage}');"
+                    + $" background-size: {t.DesktopBackgroundSize};"
+                    + $" background-position: {t.DesktopBackgroundPosition};"
+                    + " background-repeat: no-repeat;";
+            return bg;
+        }
+    }
+
+    private string _taskbarGradient
+    {
+        get
+        {
+            var t = Canvas.Windows.Forms.Theming.CanvasTheme.Current;
+            return $"linear-gradient(180deg, {Hex(t.TaskbarGradientTop)} 0%, {Hex(t.TaskbarGradientBottom)} 100%)";
+        }
+    }
+
+    private string _taskbarBorder         => Hex(Canvas.Windows.Forms.Theming.CanvasTheme.Current.TaskbarBorderColor);
+    private string _taskbarBtnActiveGradient   => $"linear-gradient(180deg, {Hex(Canvas.Windows.Forms.Theming.CanvasTheme.Current.TaskbarButtonActiveTop)} 0%, {Hex(Canvas.Windows.Forms.Theming.CanvasTheme.Current.TaskbarButtonActiveBottom)} 100%)";
+    private string _taskbarBtnInactiveGradient => $"linear-gradient(180deg, {Hex(Canvas.Windows.Forms.Theming.CanvasTheme.Current.TaskbarButtonInactiveTop)} 0%, {Hex(Canvas.Windows.Forms.Theming.CanvasTheme.Current.TaskbarButtonInactiveBottom)} 100%)";
+    private string _taskbarBtnActiveBorder     => Hex(Canvas.Windows.Forms.Theming.CanvasTheme.Current.TaskbarButtonActiveBorder);
+    private string _taskbarBtnInactiveBorder   => Hex(Canvas.Windows.Forms.Theming.CanvasTheme.Current.TaskbarButtonInactiveBorder);
+    private string _taskbarBtnActiveColor      => Hex(Canvas.Windows.Forms.Theming.CanvasTheme.Current.TaskbarButtonActiveForeColor);
+    private string _taskbarBtnInactiveColor    => Hex(Canvas.Windows.Forms.Theming.CanvasTheme.Current.TaskbarButtonInactiveForeColor);
+    private string _taskbarBtnMinimizedColor   => Hex(Canvas.Windows.Forms.Theming.CanvasTheme.Current.TaskbarButtonMinimizedForeColor);
 
     protected override void OnInitialized()
     {
@@ -86,6 +134,9 @@
 
         // Initialize BrowserNavigationService with JSRuntime
         Canvas.Windows.Forms.BrowserNavigationService.JSRuntime = JSRuntime;
+
+        // Re-render and push updated theme tokens whenever the theme changes
+        Canvas.Windows.Forms.Theming.CanvasTheme.ThemeChanged += OnThemeChanged;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -93,6 +144,10 @@
         if (firstRender)
         {
             _dotNetRef = DotNetObjectReference.Create(this);
+
+            // Push C# theme tokens to the JS renderer so chrome colors stay in sync.
+            var tokens = Canvas.Windows.Forms.Theming.CanvasTheme.Current.ToJsDictionary();
+            await JSRuntime.InvokeVoidAsync("applyCanvasTheme", tokens);
 
             // Get initial viewport size and set up resize listener
             await JSRuntime.InvokeVoidAsync("setupViewportTracking", _dotNetRef);
@@ -192,6 +247,14 @@
 
     public void Dispose()
     {
+        Canvas.Windows.Forms.Theming.CanvasTheme.ThemeChanged -= OnThemeChanged;
         _dotNetRef?.Dispose();
+    }
+
+    private async void OnThemeChanged(object? sender, EventArgs e)
+    {
+        var tokens = Canvas.Windows.Forms.Theming.CanvasTheme.Current.ToJsDictionary();
+        await JSRuntime.InvokeVoidAsync("applyCanvasTheme", tokens);
+        await InvokeAsync(StateHasChanged);
     }
 }

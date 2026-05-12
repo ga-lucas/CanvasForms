@@ -655,7 +655,7 @@ public class Form : ContainerControl
         Height = 600;
         Left = 50;
         Top = 50;
-        BackColor = Color.FromArgb(240, 240, 240);
+        BackColor = Canvas.Windows.Forms.Theming.CanvasTheme.Current.ControlBackColor;
         ZIndex = _nextZIndex++;
     }
 

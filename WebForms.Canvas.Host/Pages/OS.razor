@@ -77,6 +77,36 @@
                 <div class="menu-desc">Upload & translate WinForms app</div>
             </div>
         </div>
+
+        @* Settings submenu *@
+        <div style="border-top: 1px solid #e0e0e0;"></div>
+        <div class="menu-item" style="position: relative;"
+             @onmouseenter="() => _showSettingsMenu = true"
+             @onmouseleave="() => _showSettingsMenu = false">
+            <span class="menu-icon">⚙️</span>
+            <div class="menu-text">
+                <div class="menu-title">Settings</div>
+                <div class="menu-desc">Appearance and options</div>
+            </div>
+            <span style="margin-left: auto; color: #666; font-size: 11px;">▶</span>
+
+            @* Submenu flyout *@
+            @if (_showSettingsMenu)
+            {
+                <div style="position: absolute; left: 100%; top: 0; background: white;
+                            border: 1px solid #a0a0a0; min-width: 200px; z-index: 10003;
+                            box-shadow: 2px 2px 12px rgba(0,0,0,0.25);"
+                     @onclick:stopPropagation="true">
+                    <div class="menu-item" @onclick="OpenThemePicker">
+                        <span class="menu-icon">🎨</span>
+                        <div class="menu-text">
+                            <div class="menu-title">Theme...</div>
+                            <div class="menu-desc">Classic, Light, or Dark</div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
     </div>
 
     @* Click-away backdrop *@
@@ -137,6 +167,7 @@
 @code {
     private Desktop? _desktop;
     private bool _showStartMenu;
+    private bool _showSettingsMenu;
     private bool _showInstallDialog;
 
     // Install dialog state
@@ -155,7 +186,38 @@
         // In the future these can be driven by appsettings/config.
         Canvas.Windows.Forms.CanvasFormsOptions.EnableFileDialogUpload = true;
 
+        await LoadThemesFromServerAsync();
         await RefreshInstalledApps();
+    }
+
+    // ============ Themes ============
+
+    private async Task LoadThemesFromServerAsync()
+    {
+        try
+        {
+            var names = await Http.GetFromJsonAsync<string[]>("/api/themes");
+            if (names == null || names.Length == 0) return;
+
+            foreach (var name in names)
+            {
+                try
+                {
+                    var json = await Http.GetStringAsync($"/api/themes/{name}");
+                    // Capitalise first letter so "classic" → "Classic" matches the const names
+                    var displayName = char.ToUpperInvariant(name[0]) + name[1..];
+                    Canvas.Windows.Forms.Theming.CanvasThemeRegistry.Register(displayName, json);
+                }
+                catch
+                {
+                    // Skip individual themes that fail — fallback stays registered
+                }
+            }
+        }
+        catch
+        {
+            // Server unreachable — embedded fallbacks remain in the registry
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -171,6 +233,17 @@
 
     private void ToggleStartMenu() => _showStartMenu = !_showStartMenu;
     private void CloseStartMenu() => _showStartMenu = false;
+
+    private void OpenThemePicker()
+    {
+        _showStartMenu = false;
+        _showSettingsMenu = false;
+        if (_desktop == null) return;
+        if (_desktop.FormManager.OpenForms.OfType<Canvas.Windows.Forms.Theming.ThemePickerForm>().Any())
+            return;
+        var picker = new Canvas.Windows.Forms.Theming.ThemePickerForm();
+        _desktop.FormManager.ShowForm(picker);
+    }
 
     // ============ Demo App Launchers ============
 

@@ -1,0 +1,67 @@
+{
+  "_comment": "CanvasForms theme file. All entries are optional — omit any key to keep the built-in default.",
+  "_colorFormats": "Accepted formats: #RGB, #RRGGBB, #AARRGGBB, rgb(r,g,b), rgba(r,g,b,a)",
+
+  "controlBackColor":           "#F0F0F0",
+  "controlForeColor":           "#000000",
+  "windowBackColor":            "#FFFFFF",
+  "windowForeColor":            "#000000",
+
+  "titleBarGradientTop":        "#4A90E2",
+  "titleBarGradientBottom":     "#357ABD",
+  "titleBarText":               "#FFFFFF",
+  "formBorderColor":            "rgba(74,144,226,0.5)",
+  "titleBarCloseHover":         "rgba(204,0,0,0.7)",
+  "titleBarButtonHover":        "rgba(255,255,255,0.3)",
+
+  "buttonBackColor":            "#F0F0F0",
+  "buttonForeColor":            "#000000",
+  "buttonBorderNormal":         "#ADADAD",
+  "buttonBorderHover":          "#0078D7",
+  "buttonBorderPressed":        "#005499",
+  "buttonDisabledForeColor":    "#6D6D6D",
+
+  "focusRectColor":             "#505050",
+  "selectionBackColor":         "#0078D7",
+  "selectionForeColor":         "#FFFFFF",
+
+  "menuBackColor":              "#F0F0F0",
+  "menuForeColor":              "#000000",
+  "menuItemHoverBackColor":     "#0078D7",
+  "menuItemHoverForeColor":     "#FFFFFF",
+  "menuSeparatorColor":         "#C8C8C8",
+
+  "borderColor":                "#C8C8C8",
+  "disabledBorderColor":        "#ADADAD",
+
+  "imagePlaceholderBackColor":  "#F0F0F0",
+  "imagePlaceholderBorderColor":"#CCCCCC",
+  "imagePlaceholderTextColor":  "#999999",
+  "imageErrorBackColor":        "#FFE0E0",
+  "imageErrorBorderColor":      "#FF0000",
+  "imageErrorTextColor":        "#CC0000",
+
+  "scrollBarTrackColor":        "#F0F0F0",
+  "scrollBarThumbColor":        "#BEBEBE",
+  "scrollBarThumbHoverColor":   "#828282",
+
+  "_section_desktop": "── Desktop ──────────────────────────────────────────",
+  "desktopBackColor":           "#008080",
+  "desktopBackgroundImage":     "",
+  "desktopBackgroundSize":      "cover",
+  "desktopBackgroundPosition":  "center",
+
+  "_section_taskbar": "── Taskbar ──────────────────────────────────────────",
+  "taskbarGradientTop":               "#F0F0F0",
+  "taskbarGradientBottom":            "#D0D0D0",
+  "taskbarBorderColor":               "#A0A0A0",
+  "taskbarButtonActiveTop":           "#E3F2FD",
+  "taskbarButtonActiveBottom":        "#BBDEFB",
+  "taskbarButtonActiveBorder":        "#2196F3",
+  "taskbarButtonActiveForeColor":     "#1565C0",
+  "taskbarButtonInactiveTop":         "#F5F5F5",
+  "taskbarButtonInactiveBottom":      "#D5D5D5",
+  "taskbarButtonInactiveBorder":      "#A0A0A0",
+  "taskbarButtonInactiveForeColor":   "#000000",
+  "taskbarButtonMinimizedForeColor":  "#808080"
+}

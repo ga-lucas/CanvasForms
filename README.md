@@ -368,6 +368,75 @@ For a more detailed narrative review (including gaps and missing members), see `
 
 ---
 
+## Theming
+
+CanvasForms ships a token-based theming system that controls every colour used by the desktop shell, window chrome, and canvas-rendered controls.
+
+### Built-in themes
+
+| Theme | Description |
+|-------|-------------|
+| **Classic** | Default blue-gradient chrome — mirrors the CanvasForms default palette |
+| **Light** | Clean white/grey palette inspired by modern Windows light mode |
+| **Dark** | Dark-surface palette inspired by modern Windows dark mode |
+
+### External theme files
+
+The three built-in themes are stored as editable JSON files in the server project, under `Canvas.Windows.Forms.Host.Server/themes/`.  
+Edit any file and restart the server — no recompile required.
+
+| File | Theme |
+|------|-------|
+| `themes/classic.json` | Classic |
+| `themes/light.json` | Light |
+| `themes/dark.json` | Dark |
+
+The server exposes the files through two minimal API endpoints:
+
+```
+GET /api/themes          → string[]   (list of available theme names)
+GET /api/themes/{name}   → JSON text  (raw token object for that theme)
+```
+
+At startup the Blazor shell fetches all available themes and registers them with `CanvasThemeRegistry.Register(name, json)`.  
+If the server is unreachable the registry falls back to embedded compile-time copies of the same JSON.
+
+### Adding a custom theme
+
+1. Drop a new `.json` file in `Canvas.Windows.Forms.Host.Server/themes/` (same token keys as the built-ins).
+2. Restart the server — the file is automatically discovered and listed by `/api/themes`.
+3. The theme name (capitalised file stem) will appear in the **Settings → Theme…** picker.
+
+You can also register a theme in code at startup:
+
+```csharp
+CanvasThemeRegistry.Register("MyTheme", myThemeJson);
+```
+
+Or assign a hand-crafted `CanvasTheme` directly:
+
+```csharp
+CanvasTheme.Current = new CanvasTheme { DesktopBackColor = Color.MidnightBlue, ... };
+```
+
+### Rounded window corners
+
+Set `windowCornerRadius` in your theme JSON to control how much window corners are rounded (pixels, default `0` for Classic, `8` for Light/Dark):
+
+```json
+{ "windowCornerRadius": 12, ... }
+```
+
+### How it works
+
+1. `CanvasTheme` — holds all named `System.Drawing.Color` tokens (title bar gradients, taskbar colours, button states, desktop background, `WindowCornerRadius`, etc.). Setting `CanvasTheme.Current` raises the static `ThemeChanged` event.
+2. `CanvasThemeRegistry` — seeds from embedded JSON fallbacks at startup, then accepts `Register(name, json)` calls; exposes `Apply(name)` to switch themes.
+3. `CanvasThemeLoader` — parses JSON into `CanvasTheme` instances; supports non-mutating `LoadFromJsonWithoutApplying()` for preview swatches.
+4. `ThemePickerForm` — a canvas WinForms dialog (opens from **Start → Settings → Theme…**) that lists available themes, shows colour swatches, and calls `CanvasThemeRegistry.Apply()` on confirm.
+5. `Desktop.razor` — subscribes to `CanvasTheme.ThemeChanged`; on change it pushes updated tokens to the JS renderer via `applyCanvasTheme(tokens)` and re-renders the Blazor shell.
+
+---
+
 ## Controls roadmap
 
 Status legend: ✅ Good &nbsp;|&nbsp; ⚠️ Partial &nbsp;|&nbsp; 🧩 Stub &nbsp;|&nbsp; 🔲 Not started
@@ -468,6 +537,9 @@ Items are ordered by estimated prevalence in designer-generated / translated Win
 | `APPLICATION_FORMMANAGER.md` | `Application` + `FormManager` model |
 | `EXTENDING.md` | Extending drawing primitives and controls |
 | `WebForms.Canvas/Docs/PictureBox.md` | `PictureBox` specifics |
+| `WebForms.Canvas/Theming/CanvasTheme.cs` | Theme token model — all named colour properties |
+| `WebForms.Canvas/Theming/CanvasThemeRegistry.cs` | Built-in theme registry (Classic / Light / Dark) + `Apply()` |
+| `WebForms.Canvas/Theming/ThemePickerForm.cs` | Theme picker dialog (canvas WinForms Form) |
 
 ---
 

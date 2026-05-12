@@ -128,8 +128,8 @@ public abstract class Control
     }
 
 
-    private System.Drawing.Color _backColor = System.Drawing.Color.White;
-    private System.Drawing.Color _foreColor = System.Drawing.Color.Black;
+    private System.Drawing.Color _backColor = Canvas.Windows.Forms.Theming.CanvasTheme.Current.ControlBackColor;
+    private System.Drawing.Color _foreColor = Canvas.Windows.Forms.Theming.CanvasTheme.Current.ControlForeColor;
 
     public System.Drawing.Color BackColor
     {
@@ -649,8 +649,8 @@ public abstract class Control
     public object? WindowTarget { get; set; }
 
     // Default static properties
-    public static System.Drawing.Color DefaultBackColor => System.Drawing.Color.White;
-    public static System.Drawing.Color DefaultForeColor => System.Drawing.Color.Black;
+    public static System.Drawing.Color DefaultBackColor => Canvas.Windows.Forms.Theming.CanvasTheme.Current.ControlBackColor;
+    public static System.Drawing.Color DefaultForeColor => Canvas.Windows.Forms.Theming.CanvasTheme.Current.ControlForeColor;
     public static Font DefaultFont => new Font("Segoe UI", 12);
     public static Cursor DefaultCursor => Cursor.Default;
     public static ImeMode DefaultImeMode => ImeMode.NoControl;

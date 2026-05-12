@@ -50,7 +50,8 @@
                    cursor: @GetCanvasCursor();
                    user-select: none;
                    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-                   transition: @(_enableAnimation ? $"left {AnimationDurationMs}ms ease-out, top {AnimationDurationMs}ms ease-out, width {AnimationDurationMs}ms ease-out, height {AnimationDurationMs}ms ease-out" : "none");
+                   border-radius: @(Canvas.Windows.Forms.Theming.CanvasTheme.Current.WindowCornerRadius)px;
+                   transition:
                    will-change: @(_isResizing || _isDragging ? "transform" : "auto");">
     </canvas>
 
@@ -63,6 +64,7 @@
                     height: @(Form.Height)px;
                     z-index: @(Form.ZIndex + 1);
                     background-color: rgba(255,255,255,0.10);
+                    border-radius: @(Canvas.Windows.Forms.Theming.CanvasTheme.Current.WindowCornerRadius)px;
                     pointer-events: auto;
                     cursor: not-allowed;">
         </div>

@@ -1,0 +1,63 @@
+{
+  "controlBackColor":           "#FFFFFF",
+  "controlForeColor":           "#1A1A1A",
+  "windowBackColor":            "#FAFAFA",
+  "windowForeColor":            "#1A1A1A",
+
+  "titleBarGradientTop":        "#E8F0FE",
+  "titleBarGradientBottom":     "#C7D9FC",
+  "titleBarText":               "#1A3A6E",
+  "formBorderColor":            "rgba(100,149,237,0.4)",
+  "titleBarCloseHover":         "rgba(220,50,50,0.75)",
+  "titleBarButtonHover":        "rgba(100,149,237,0.25)",
+
+  "buttonBackColor":            "#FFFFFF",
+  "buttonForeColor":            "#1A1A1A",
+  "buttonBorderNormal":         "#C8C8C8",
+  "buttonBorderHover":          "#4A90D9",
+  "buttonBorderPressed":        "#2A6FB0",
+  "buttonDisabledForeColor":    "#AAAAAA",
+
+  "focusRectColor":             "#4A90D9",
+  "selectionBackColor":         "#4A90D9",
+  "selectionForeColor":         "#FFFFFF",
+
+  "menuBackColor":              "#FFFFFF",
+  "menuForeColor":              "#1A1A1A",
+  "menuItemHoverBackColor":     "#4A90D9",
+  "menuItemHoverForeColor":     "#FFFFFF",
+  "menuSeparatorColor":         "#E0E0E0",
+
+  "borderColor":                "#DEDEDE",
+  "disabledBorderColor":        "#C8C8C8",
+
+  "imagePlaceholderBackColor":  "#F5F5F5",
+  "imagePlaceholderBorderColor":"#DDDDDD",
+  "imagePlaceholderTextColor":  "#BBBBBB",
+  "imageErrorBackColor":        "#FFF0F0",
+  "imageErrorBorderColor":      "#FF6666",
+  "imageErrorTextColor":        "#CC3333",
+
+  "scrollBarTrackColor":        "#F0F0F0",
+  "scrollBarThumbColor":        "#C0C0C0",
+  "scrollBarThumbHoverColor":   "#909090",
+
+  "desktopBackColor":           "#D6E4F0",
+  "desktopBackgroundImage":     "",
+  "desktopBackgroundSize":      "cover",
+  "desktopBackgroundPosition":  "center",
+
+  "taskbarGradientTop":               "#EEF3FB",
+  "taskbarGradientBottom":            "#D8E5F8",
+  "taskbarBorderColor":               "#B0C4DE",
+  "taskbarButtonActiveTop":           "#FFFFFF",
+  "taskbarButtonActiveBottom":        "#D0E4FF",
+  "taskbarButtonActiveBorder":        "#4A90D9",
+  "taskbarButtonActiveForeColor":     "#1A3A6E",
+  "taskbarButtonInactiveTop":         "#F5F8FF",
+  "taskbarButtonInactiveBottom":      "#E0EAFA",
+  "taskbarButtonInactiveBorder":      "#B0C4DE",
+  "taskbarButtonInactiveForeColor":   "#333333",
+  "taskbarButtonMinimizedForeColor":  "#7090B0",
+  "windowCornerRadius":               4
+}

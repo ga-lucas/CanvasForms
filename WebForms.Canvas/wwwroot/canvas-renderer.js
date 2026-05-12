@@ -4,6 +4,48 @@ const offscreenBuffers = new WeakMap();
 // Prevent buffer resizing during active render
 const activeRenders = new WeakMap();
 
+// ── Theme ─────────────────────────────────────────────────────────────────────
+// Default token values mirror CanvasTheme C# defaults.
+// Call window.applyCanvasTheme(tokens) from Blazor/startup to override.
+const _theme = {
+    controlBackColor:           '#F0F0F0',
+    controlForeColor:           '#000000',
+    windowBackColor:            '#FFFFFF',
+    windowForeColor:            '#000000',
+    titleBarGradientTop:        '#4a90e2',
+    titleBarGradientBottom:     '#357abd',
+    titleBarText:               '#FFFFFF',
+    formBorderColor:            'rgba(74,144,226,0.5)',
+    titleBarCloseHover:         'rgba(204,0,0,0.7)',
+    titleBarButtonHover:        'rgba(255,255,255,0.3)',
+    focusRectColor:             '#505050',
+    selectionBackColor:         '#0078D7',
+    selectionForeColor:         '#FFFFFF',
+    menuBackColor:              '#F0F0F0',
+    menuForeColor:              '#000000',
+    menuItemHoverBackColor:     '#0078D7',
+    menuItemHoverForeColor:     '#FFFFFF',
+    menuSeparatorColor:         '#C8C8C8',
+    borderColor:                '#C8C8C8',
+    disabledBorderColor:        '#ADADAD',
+    imagePlaceholderBackColor:  '#F0F0F0',
+    imagePlaceholderBorderColor:'#CCCCCC',
+    imagePlaceholderTextColor:  '#999999',
+    imageErrorBackColor:        '#FFE0E0',
+    imageErrorBorderColor:      '#FF0000',
+    imageErrorTextColor:        '#CC0000',
+    scrollBarTrackColor:        '#F0F0F0',
+    scrollBarThumbColor:        '#BEBEBE',
+    scrollBarThumbHoverColor:   '#828282',
+    windowCornerRadius:         8,
+};
+
+window.applyCanvasTheme = function(tokens) {
+    if (!tokens) return;
+    Object.assign(_theme, tokens);
+};
+
+
 // Cache for loaded images
 const imageCache = new Map();
 
@@ -593,11 +635,11 @@ window.drawImageAsync = async function(ctx, imageUrl, x, y, width, height, srcX,
     if (failedImages.has(imageUrl)) {
         // Draw cached placeholder for failed image
         ctx.save();
-        ctx.fillStyle = '#f0f0f0';
+        ctx.fillStyle = _theme.imagePlaceholderBackColor;
         ctx.fillRect(x, y, width, height);
-        ctx.strokeStyle = '#cccccc';
+        ctx.strokeStyle = _theme.imagePlaceholderBorderColor;
         ctx.strokeRect(x, y, width, height);
-        ctx.fillStyle = '#999999';
+        ctx.fillStyle = _theme.imagePlaceholderTextColor;
         ctx.font = '12px Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -639,11 +681,11 @@ window.drawImageAsync = async function(ctx, imageUrl, x, y, width, height, srcX,
 
                 // Draw placeholder rectangle instead
                 ctx.save();
-                ctx.fillStyle = '#f0f0f0';
+                ctx.fillStyle = _theme.imagePlaceholderBackColor;
                 ctx.fillRect(x, y, width, height);
-                ctx.strokeStyle = '#cccccc';
+                ctx.strokeStyle = _theme.imagePlaceholderBorderColor;
                 ctx.strokeRect(x, y, width, height);
-                ctx.fillStyle = '#999999';
+                ctx.fillStyle = _theme.imagePlaceholderTextColor;
                 ctx.font = '12px Arial';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
@@ -663,9 +705,9 @@ window.drawImageAsync = async function(ctx, imageUrl, x, y, width, height, srcX,
         } else {
             // Image in cache but not loaded properly - draw placeholder
             ctx.save();
-            ctx.fillStyle = '#f0f0f0';
+            ctx.fillStyle = _theme.imagePlaceholderBackColor;
             ctx.fillRect(x, y, width, height);
-            ctx.strokeStyle = '#cccccc';
+            ctx.strokeStyle = _theme.imagePlaceholderBorderColor;
             ctx.strokeRect(x, y, width, height);
             ctx.restore();
         }
@@ -673,11 +715,11 @@ window.drawImageAsync = async function(ctx, imageUrl, x, y, width, height, srcX,
         console.error('Error in drawImageAsync:', error);
         // Draw error placeholder
         ctx.save();
-        ctx.fillStyle = '#ffe0e0';
+        ctx.fillStyle = _theme.imageErrorBackColor;
         ctx.fillRect(x, y, width, height);
-        ctx.strokeStyle = '#ff0000';
+        ctx.strokeStyle = _theme.imageErrorBorderColor;
         ctx.strokeRect(x, y, width, height);
-        ctx.fillStyle = '#cc0000';
+        ctx.fillStyle = _theme.imageErrorTextColor;
         ctx.font = '12px Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -833,26 +875,32 @@ window.measureFontHeight = (fontFamily, fontSize) => {
 
     // Clear and reset to prevent artifacts during resize
     ctx.clearRect(0, 0, offscreen.width, offscreen.height);
+
+    const r = Math.max(0, Math.min(Number(_theme.windowCornerRadius) || 0, 16));
+
+    // Clip everything to the rounded window shape so no drawing escapes the corners
+    ctx.save();
+    ctx.beginPath();
+    _roundRect(ctx, 0, 0, width, height, r);
+    ctx.closePath();
+    ctx.clip();
+
+    // Fill background
     ctx.fillStyle = backColor;
-    ctx.fillRect(0, 0, offscreen.width, offscreen.height);
+    ctx.fillRect(0, 0, width, height);
 
-    // Draw outer border
-    ctx.strokeStyle = 'rgba(74, 144, 226, 0.5)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(1, 1, width - 2, height - 2);
-
-    // Draw title bar with gradient
+    // Draw title bar with gradient (top corners rounded, bottom square — clipped by outer path)
     const titleBarHeight = 32;
     const borderWidth = 2;
     const gradient = ctx.createLinearGradient(0, borderWidth, 0, titleBarHeight + borderWidth);
-    gradient.addColorStop(0, '#4a90e2');
-    gradient.addColorStop(1, '#357abd');
+    gradient.addColorStop(0, _theme.titleBarGradientTop);
+    gradient.addColorStop(1, _theme.titleBarGradientBottom);
 
     ctx.fillStyle = gradient;
     ctx.fillRect(borderWidth, borderWidth, width - (borderWidth * 2), titleBarHeight);
 
     // Draw title text with anti-aliasing
-    ctx.fillStyle = 'white';
+    ctx.fillStyle = _theme.titleBarText;
     ctx.font = '14px "Segoe UI", Arial, sans-serif';
     ctx.textBaseline = 'middle';
     ctx.fillText(title, 10, titleBarHeight / 2 + borderWidth);
@@ -865,14 +913,14 @@ window.measureFontHeight = (fontFamily, fontSize) => {
     // Close button (rightmost)
     const closeButtonX = width - buttonSize - buttonMargin;
     if (closeButtonHover) {
-        ctx.fillStyle = 'rgba(255, 0, 0, 0.7)';
+        ctx.fillStyle = _theme.titleBarCloseHover;
     } else {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
     }
     ctx.fillRect(closeButtonX, buttonY, buttonSize, buttonSize);
 
     // Close button X
-    ctx.strokeStyle = 'white';
+    ctx.strokeStyle = _theme.titleBarText;
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(closeButtonX + 5, buttonY + 5);
@@ -884,44 +932,55 @@ window.measureFontHeight = (fontFamily, fontSize) => {
     // Maximize button (second from right)
     const maximizeButtonX = closeButtonX - buttonSize - 4;
     if (maximizeButtonHover) {
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.fillStyle = _theme.titleBarButtonHover;
     } else {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
     }
     ctx.fillRect(maximizeButtonX, buttonY, buttonSize, buttonSize);
 
     // Maximize/Restore button icon
-    ctx.strokeStyle = 'white';
+    ctx.strokeStyle = _theme.titleBarText;
     ctx.lineWidth = 2;
     if (isMaximized) {
         // Restore icon (two overlapping squares)
-        // Back square
         ctx.strokeRect(maximizeButtonX + 7, buttonY + 5, buttonSize - 12, buttonSize - 12);
-        // Front square (offset)
         ctx.strokeRect(maximizeButtonX + 5, buttonY + 7, buttonSize - 12, buttonSize - 12);
     } else {
-        // Maximize icon (single square)
         ctx.strokeRect(maximizeButtonX + 5, buttonY + 5, buttonSize - 10, buttonSize - 10);
     }
 
     // Minimize button (third from right)
     const minimizeButtonX = maximizeButtonX - buttonSize - 4;
     if (minimizeButtonHover) {
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.fillStyle = _theme.titleBarButtonHover;
     } else {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
     }
     ctx.fillRect(minimizeButtonX, buttonY, buttonSize, buttonSize);
 
     // Minimize button icon (horizontal line)
-    ctx.strokeStyle = 'white';
+    ctx.strokeStyle = _theme.titleBarText;
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(minimizeButtonX + 5, buttonY + buttonSize / 2);
     ctx.lineTo(minimizeButtonX + buttonSize - 5, buttonY + buttonSize / 2);
     ctx.stroke();
 
-    // Client area background was already covered by the full-canvas fill above.
+    ctx.restore(); // remove rounded clip
+
+    // Draw rounded outer border on top (so it overlaps any fill that bled to the edge)
+    if (r > 0) {
+        ctx.strokeStyle = _theme.formBorderColor;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        _roundRect(ctx, 1, 1, width - 2, height - 2, r);
+        ctx.closePath();
+        ctx.stroke();
+    } else {
+        ctx.strokeStyle = _theme.formBorderColor;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(1, 1, width - 2, height - 2);
+    }
 
     // Copy offscreen canvas to visible canvas in one operation (double buffering)
     const visibleCtx = canvas.getContext('2d');
@@ -1308,7 +1367,7 @@ window.renderMdiChildCanvas = async function(canvasId, width, clientHeight, back
     if (!ctx) return;
 
     // Fill background
-    ctx.fillStyle = backColor || '#f0f0f0';
+    ctx.fillStyle = backColor || _theme.controlBackColor;
     ctx.fillRect(0, 0, width, clientHeight);
 
     // Reuse the existing structured command renderer by passing the canvas directly.

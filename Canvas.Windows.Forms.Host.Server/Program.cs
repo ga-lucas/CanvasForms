@@ -271,6 +271,39 @@ app.MapGet("/api/status", (AppRuntime runtime, AppManager manager) => new
     installedApps = manager.List().Count
 });
 
+// ── Themes API ───────────────────────────────────────────────────────────────
+
+var themesDir = Path.Combine(app.Environment.ContentRootPath, "themes");
+
+// List available theme names (file stems in the themes/ directory)
+app.MapGet("/api/themes", () =>
+{
+    if (!Directory.Exists(themesDir))
+        return Results.Ok(Array.Empty<string>());
+
+    var names = Directory.GetFiles(themesDir, "*.json")
+        .Select(f => Path.GetFileNameWithoutExtension(f)!)
+        .OrderBy(n => n)
+        .ToArray();
+
+    return Results.Ok(names);
+});
+
+// Return the raw JSON for a single theme by name
+app.MapGet("/api/themes/{name}", (string name) =>
+{
+    // Sanitise: only allow simple alphanumeric + dash/underscore names
+    if (string.IsNullOrWhiteSpace(name) || name.Any(c => !char.IsLetterOrDigit(c) && c != '-' && c != '_'))
+        return Results.BadRequest("Invalid theme name.");
+
+    var file = Path.Combine(themesDir, $"{name}.json");
+    if (!File.Exists(file))
+        return Results.NotFound();
+
+    var json = File.ReadAllText(file);
+    return Results.Content(json, "application/json");
+});
+
 // List installed apps
 app.MapGet("/api/apps", (AppManager manager) => manager.List());
 
