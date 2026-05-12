@@ -355,7 +355,26 @@
     }
 
     private void OnChildKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e, Forms.Form child)
-        => child.FocusedControl?.OnKeyDown(MapKey(e));
+    {
+        // Ctrl+Tab / Ctrl+Shift+Tab — cycle through MDI children (WinForms behavior)
+        if (e.CtrlKey && e.Key == "Tab" && MdiParent != null)
+        {
+            var children = MdiParent.MdiChildren
+                .Where(c => c.Visible && c.WindowState != Forms.FormWindowState.Minimized)
+                .ToList();
+            if (children.Count > 1)
+            {
+                var idx = children.IndexOf(child);
+                var next = e.ShiftKey
+                    ? (idx - 1 + children.Count) % children.Count
+                    : (idx + 1) % children.Count;
+                MdiParent.ActivateMdiChild(children[next]);
+                StateHasChanged();
+            }
+            return;
+        }
+        child.FocusedControl?.OnKeyDown(MapKey(e));
+    }
 
     private void OnChildKeyUp(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e, Forms.Form child)
         => child.FocusedControl?.OnKeyUp(MapKey(e));

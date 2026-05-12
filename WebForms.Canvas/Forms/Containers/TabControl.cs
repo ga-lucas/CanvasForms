@@ -82,6 +82,22 @@ public class TabControl : Control
     public event TabControlCancelEventHandler? Deselecting;
     public event TabControlEventHandler? Deselected;
 
+    /// <summary>Gets the number of tabs in the tab strip.</summary>
+    public int TabCount => _tabPages.Count;
+
+    /// <summary>
+    /// Returns the bounding rectangle of the tab header at the given index,
+    /// matching WinForms <c>TabControl.GetTabRect(int index)</c>.
+    /// </summary>
+    public Rectangle GetTabRect(int index)
+    {
+        if (index < 0 || index >= _tabPages.Count)
+            throw new ArgumentOutOfRangeException(nameof(index));
+        if (_tabHeaderRects.Count != _tabPages.Count)
+            BuildHeaderRects();
+        return _tabHeaderRects[index];
+    }
+
     protected virtual void OnSelectedIndexChanged(EventArgs e) => SelectedIndexChanged?.Invoke(this, e);
 
     protected virtual void OnSelecting(TabControlCancelEventArgs e) => Selecting?.Invoke(this, e);

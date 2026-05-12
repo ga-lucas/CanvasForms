@@ -341,7 +341,7 @@ public class RichTextBox : TextBoxBase
 
             // Build font for this run.
             var fontFamily = string.IsNullOrEmpty(run.FontFamily) ? baseFont.Family : run.FontFamily;
-            var fontSize   = run.FontSize > 0 ? run.FontSize : (int)baseFont.Size;
+            var fontSize   = (int)Math.Max(1, (run.FontSize > 0 ? run.FontSize : (int)baseFont.Size) * _zoomFactor);
             var style      = FontStyle.Regular;
             if (run.Bold)      style |= FontStyle.Bold;
             if (run.Italic)    style |= FontStyle.Italic;
@@ -603,7 +603,34 @@ public class RichTextBox : TextBoxBase
     }
 
     public new void SelectAll() => Select(0, Text.Length);
-    public new void ScrollToCaret() { /* stub */ }
+    public new void ScrollToCaret()
+    {
+        // Scroll the view so the caret's line is visible.
+        var baseFont   = Font ?? new Font("Segoe UI", 12);
+        var lineHeight = (int)(baseFont.Size * _zoomFactor * 1.4f) + 2;
+        if (lineHeight <= 0) return;
+
+        // Estimate which line the caret is on.
+        var text = Text ?? string.Empty;
+        var caretPos = Math.Max(0, Math.Min(SelectionStart, text.Length));
+        var lineIndex = 0;
+        for (int i = 0; i < caretPos && i < text.Length; i++)
+            if (text[i] == '\n') lineIndex++;
+
+        var caretY = lineIndex * lineHeight;
+
+        const int borderWidth = 2;
+        const int textPadding = 3;
+        var visibleH = Height - borderWidth * 2 - textPadding * 2;
+
+        if (caretY < _scrollOffsetY)
+            _scrollOffsetY = caretY;
+        else if (caretY + lineHeight > _scrollOffsetY + visibleH)
+            _scrollOffsetY = caretY + lineHeight - visibleH;
+
+        _scrollOffsetY = Math.Max(0, _scrollOffsetY);
+        Invalidate();
+    }
 
     // ── Static helpers ────────────────────────────────────────────────────────
 

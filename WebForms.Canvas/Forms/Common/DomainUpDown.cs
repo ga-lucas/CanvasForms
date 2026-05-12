@@ -114,8 +114,47 @@ public class DomainUpDown : UpDownBase
                 DownButton();
                 e.Handled = true;
                 break;
+            case Keys.Home:
+                if (Items.Count > 0) { SelectedIndex = 0; e.Handled = true; }
+                break;
+            case Keys.End:
+                if (Items.Count > 0) { SelectedIndex = Items.Count - 1; e.Handled = true; }
+                break;
         }
         base.OnKeyDown(e);
+    }
+
+    protected internal override void OnKeyPress(KeyPressEventArgs e)
+    {
+        if (ReadOnly || Items.Count == 0) { base.OnKeyPress(e); return; }
+
+        // First-letter type-ahead: find the next item starting with the pressed character,
+        // beginning the search after the current selection (wraps around).
+        char key = char.ToUpperInvariant(e.KeyChar);
+        if (char.IsControl(key)) { base.OnKeyPress(e); return; }
+
+        int start = _selectedIndex < 0 ? 0 : (_selectedIndex + 1) % Items.Count;
+        for (int i = 0; i < Items.Count; i++)
+        {
+            int idx = (start + i) % Items.Count;
+            var text = Items[idx] ?? string.Empty;
+            if (text.Length > 0 && char.ToUpperInvariant(text[0]) == key)
+            {
+                SelectedIndex = idx;
+                e.Handled = true;
+                break;
+            }
+        }
+
+        base.OnKeyPress(e);
+    }
+
+    protected internal override void OnMouseWheel(MouseEventArgs e)
+    {
+        if (!Enabled) { base.OnMouseWheel(e); return; }
+        if (e.Delta > 0) UpButton();
+        else if (e.Delta < 0) DownButton();
+        base.OnMouseWheel(e);
     }
 }
 

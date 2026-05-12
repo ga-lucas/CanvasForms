@@ -102,6 +102,24 @@ public class ProgressBar : Control
 
     public void Increment(int value) => Value = Math.Min(_maximum, _value + value);
 
+    /// <summary>
+    /// Sets Minimum and Maximum in one call, matching WinForms API.
+    /// </summary>
+    public void SetRange(int minimum, int maximum)
+    {
+        if (minimum > maximum) throw new ArgumentException("minimum must be ≤ maximum");
+        _minimum = minimum;
+        _maximum = maximum;
+        _value = Math.Max(_minimum, Math.Min(_maximum, _value));
+        Invalidate();
+    }
+
+    /// <summary>
+    /// When true, draws the percentage value centred over the progress bar track.
+    /// Not a WinForms property but commonly needed; defaults to false.
+    /// </summary>
+    public bool ShowPercentage { get; set; } = false;
+
     private const int TrackRadius = 3;
     private const int FillRadius  = 2;
 
@@ -176,6 +194,17 @@ public class ProgressBar : Control
                     fillTop, fillBottom);
                 g.FillRoundRect(fillBrush, fillRect, FillRadius);
             }
+        }
+
+        // Optional percentage text overlay
+        if (ShowPercentage && _maximum > _minimum)
+        {
+            double pct = (double)(_value - _minimum) / (_maximum - _minimum) * 100.0;
+            string label = $"{(int)Math.Round(pct)}%";
+            var textColor = Color.FromArgb(60, 60, 60);
+            int cx = Width / 2;
+            int cy = Height / 2 - 6;
+            g.DrawString(label, cx, cy, textColor);
         }
 
         base.OnPaint(e);

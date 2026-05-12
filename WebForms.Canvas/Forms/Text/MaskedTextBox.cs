@@ -114,28 +114,211 @@ public class MaskedTextBox : TextBoxBase
         return result.ToString();
     }
 
-    protected internal override void OnKeyDown(KeyEventArgs e)
+    // ── Mask helpers ─────────────────────────────────────────────────────────
+
+    /// <summary>Returns a list of every editable position in the mask as (maskIndex, maskToken) pairs.</summary>
+    private List<(int MaskIndex, char Token)> GetEditPositions()
     {
-        if (!string.IsNullOrEmpty(_mask) && !ValidateKey(e.KeyCode) && !e.Control && !IsNavigationKey(e.KeyCode))
+        var list = new List<(int, char)>();
+        for (int i = 0; i < _mask.Length; i++)
         {
-            e.Handled = true;
-            MaskInputRejected?.Invoke(this, new MaskInputRejectedEventArgs(Text.Length, MaskedTextResultHint.DigitExpected));
+            char m = _mask[i];
+            if (IsEditToken(m))
+                list.Add((i, m));
+        }
+        return list;
+    }
+
+    private static bool IsEditToken(char m) =>
+        m == '0' || m == '9' || m == '#' ||
+        m == 'L' || m == '?' ||
+        m == 'A' || m == 'a' ||
+        m == '&' || m == 'C';
+
+    /// <summary>
+    /// Maps a raw-text index (character stored in <see cref="TextBoxBase.Text"/>) to the
+    /// corresponding 0-based edit-position index within <see cref="GetEditPositions"/>.
+    /// </summary>
+    private int GetEditPositionIndexForRawIndex(int rawIndex) => rawIndex; // 1-to-1: raw text only stores editable chars
+
+    /// <summary>
+    /// Maps the current display caret (position in <see cref="MaskedText"/>) to the
+    /// raw-text (editable-only) index that the next typed character would land on.
+    /// </summary>
+    private int DisplayCaretToRawIndex(int displayCaret)
+    {
+        if (string.IsNullOrEmpty(_mask)) return displayCaret;
+
+        var editPositions = GetEditPositions();
+        // Count how many editable positions are before or at displayCaret in the masked string.
+        int editCount = 0;
+        int maskPos = 0;
+        for (int d = 0; d < displayCaret && maskPos < _mask.Length; d++, maskPos++)
+        {
+            if (IsEditToken(_mask[maskPos]))
+                editCount++;
+        }
+        return Math.Min(editCount, editPositions.Count);
+    }
+
+    /// <summary>
+    /// Validates <paramref name="c"/> against the mask token at the given edit-position index.
+    /// </summary>
+    private bool CharMatchesToken(char c, char token)
+    {
+        return token switch
+        {
+            '0'       => char.IsDigit(c),                        // required digit
+            '9'       => char.IsDigit(c) || c == ' ',            // optional digit or space
+            '#'       => char.IsDigit(c) || c == '+' || c == '-' || c == ' ', // digit, sign, or space
+            'L'       => char.IsLetter(c),                       // required letter
+            '?'       => char.IsLetter(c) || c == ' ',           // optional letter or space
+            'A'       => char.IsLetterOrDigit(c),                // required alphanumeric
+            'a'       => char.IsLetterOrDigit(c) || c == ' ',    // optional alphanumeric
+            '&'       => c != '\0',                              // any non-null
+            'C'       => true,                                   // any character
+            _         => false
+        };
+    }
+
+    // ── Input overrides ───────────────────────────────────────────────────────
+
+    protected internal override void OnKeyPress(KeyPressEventArgs e)
+    {
+        if (ReadOnly || !Enabled || string.IsNullOrEmpty(_mask))
+        {
+            base.OnKeyPress(e);
             return;
         }
+
+        var c = e.KeyChar;
+        if (char.IsControl(c))
+        {
+            base.OnKeyPress(e);
+            return;
+        }
+
+        var editPositions = GetEditPositions();
+        // The caret within the raw text (editable-only chars)
+        var rawCaret = DisplayCaretToRawIndex(_selectionStart);
+
+        // If past the last editable position the mask is full — reject
+        if (rawCaret >= editPositions.Count)
+        {
+            e.Handled = true;
+            MaskInputRejected?.Invoke(this, new MaskInputRejectedEventArgs(rawCaret, MaskedTextResultHint.UnavailableEditPosition));
+            return;
+        }
+
+        var token = editPositions[rawCaret].Token;
+        if (!CharMatchesToken(c, token))
+        {
+            e.Handled = true;
+            var hint = token is '0' or '9' or '#'
+                ? MaskedTextResultHint.DigitExpected
+                : token is 'L' or '?'
+                    ? MaskedTextResultHint.LetterExpected
+                    : MaskedTextResultHint.InvalidInput;
+            MaskInputRejected?.Invoke(this, new MaskInputRejectedEventArgs(rawCaret, hint));
+            return;
+        }
+
+        // Accept — let base insert the raw character into Text
+        base.OnKeyPress(e);
+    }
+
+    protected internal override void OnKeyDown(KeyEventArgs e)
+    {
+        if (string.IsNullOrEmpty(_mask) || e.Control || IsNavigationKey(e.KeyCode))
+        {
+            base.OnKeyDown(e);
+            return;
+        }
+
+        if (e.KeyCode == Keys.Back)
+        {
+            // Erase last editable position before caret, leave literals intact
+            if (_selectionLength > 0)
+            {
+                // Selection: clear all editable chars in the selection range
+                var rawStart = DisplayCaretToRawIndex(_selectionStart);
+                var rawEnd   = DisplayCaretToRawIndex(_selectionStart + _selectionLength);
+                if (rawStart < rawEnd)
+                {
+                    var t = Text;
+                    Text = t.Remove(rawStart, rawEnd - rawStart);
+                    _selectionStart = rawStart;
+                    _selectionLength = 0;
+                }
+                e.Handled = true;
+                return;
+            }
+
+            var rawCaret = DisplayCaretToRawIndex(_selectionStart);
+            if (rawCaret > 0)
+            {
+                var t = Text;
+                Text = t.Remove(rawCaret - 1, 1);
+                _selectionStart = Math.Max(0, _selectionStart - 1);
+                _selectionLength = 0;
+            }
+            e.Handled = true;
+            return;
+        }
+
+        if (e.KeyCode == Keys.Delete)
+        {
+            var rawCaret = DisplayCaretToRawIndex(_selectionStart);
+            if (_selectionLength > 0)
+            {
+                var rawEnd = DisplayCaretToRawIndex(_selectionStart + _selectionLength);
+                if (rawCaret < rawEnd)
+                {
+                    var t = Text;
+                    Text = t.Remove(rawCaret, rawEnd - rawCaret);
+                    _selectionLength = 0;
+                }
+                e.Handled = true;
+                return;
+            }
+            if (rawCaret < Text.Length)
+            {
+                Text = Text.Remove(rawCaret, 1);
+                e.Handled = true;
+            }
+            return;
+        }
+
         base.OnKeyDown(e);
     }
 
-    private bool ValidateKey(Keys key)
+    private bool IsNavigationKey(Keys key) =>
+        key == Keys.Left || key == Keys.Right || key == Keys.Home || key == Keys.End ||
+        key == Keys.Up   || key == Keys.Down  || key == Keys.Tab;
+
+    // ── Additional WinForms properties ────────────────────────────────────────
+
+    /// <summary>
+    /// Gets a value indicating whether all required editable positions in the mask have been filled.
+    /// </summary>
+    public bool MaskFull
     {
-        return key == Keys.Back || key == Keys.Delete
-            || (key >= Keys.D0 && key <= Keys.D9)
-            || (key >= Keys.A && key <= Keys.Z);
+        get
+        {
+            if (string.IsNullOrEmpty(_mask)) return true;
+            var editPositions = GetEditPositions();
+            // Required positions: '0', 'L', 'A', '&' (no space/blank allowed)
+            int required = editPositions.Count(ep =>
+                ep.Token == '0' || ep.Token == 'L' || ep.Token == 'A' || ep.Token == '&');
+            return Text.Length >= required && !MaskedText.Contains(_promptChar);
+        }
     }
 
-    private bool IsNavigationKey(Keys key)
-    {
-        return key == Keys.Left || key == Keys.Right || key == Keys.Home || key == Keys.End;
-    }
+    /// <summary>
+    /// Returns the raw (unmasked) text — only the editable characters the user typed,
+    /// without any literal characters from the mask.
+    /// </summary>
+    public string UnmaskedText => Text;
 }
 
 public enum MaskFormat { ExcludePromptAndLiterals, IncludeLiterals, IncludePrompt, IncludePromptAndLiterals }

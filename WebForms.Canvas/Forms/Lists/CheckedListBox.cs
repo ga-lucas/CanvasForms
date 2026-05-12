@@ -433,6 +433,18 @@ public class CheckedListBox : ListControl
         base.OnMouseLeave(e);
     }
 
+    protected internal override void OnMouseWheel(MouseEventArgs e)
+    {
+        if (!Enabled) { base.OnMouseWheel(e); return; }
+        int lines = Math.Max(1, Math.Abs(e.Delta) / 120);
+        if (e.Delta > 0)
+            _topIndex = Math.Max(0, _topIndex - lines);
+        else
+            _topIndex = Math.Min(Math.Max(0, Items.Count - VisibleItemCount), _topIndex + lines);
+        Invalidate();
+        base.OnMouseWheel(e);
+    }
+
     #endregion
 
     #region Keyboard Handling
@@ -530,6 +542,31 @@ public class CheckedListBox : ListControl
 
         base.OnKeyDown(e);
     }
+
+    protected internal override void OnKeyPress(KeyPressEventArgs e)
+    {
+        if (!Enabled || Items.Count == 0) { base.OnKeyPress(e); return; }
+        char key = char.ToUpperInvariant(e.KeyChar);
+        if (char.IsControl(key)) { base.OnKeyPress(e); return; }
+
+        // First-letter type-ahead — search forward from the item after the current selection
+        int start = _selectedIndex < 0 ? 0 : (_selectedIndex + 1) % Items.Count;
+        for (int i = 0; i < Items.Count; i++)
+        {
+            int idx = (start + i) % Items.Count;
+            var text = GetItemText(Items[idx]) ?? string.Empty;
+            if (text.Length > 0 && char.ToUpperInvariant(text[0]) == key)
+            {
+                SelectedIndex = idx;
+                EnsureVisible(idx);
+                e.Handled = true;
+                break;
+            }
+        }
+        base.OnKeyPress(e);
+    }
+
+    private int VisibleItemCount => Math.Max(1, (Height - BorderWidth * 2 - 4) / ItemHeight);
 
     #endregion
 }

@@ -15,32 +15,32 @@
 | Core | `UserControl` | Stub | Base lifecycle present; composite paint partial |
 | Windowing | `Form` | Partial | Chrome, move/resize done; Icon → browser favicon + Text → browser tab title when active; MDI support: IsMdiContainer, MdiParent, MdiChildren, ActiveMdiChild, ActivateMdiChild, LayoutMdi (Cascade/TileH/TileV), MdiChildActivate event, constrained drag, resize handles (8-dir), z-index management, mouse/keyboard routing to child controls, child Invalidate→re-render wiring; OwnedForms present |
 | Text | `Label` | Partial | Multi-line, alignment, AutoEllipsis done; Image/ImageIndex/ImageKey/ImageList rendered with ImageAlign (all 9 alignments); border styles present |
-| Text | `LinkLabel` | Partial | Click/visited + optional browser nav; multi-link partial |
+| Text | `LinkLabel` | Partial | `Links` collection with `Add(start, length, data)` overloads; multi-span hit-testing; per-link `Visited`/`Enabled`/`LinkData`; `LinkLabelLinkClickedEventArgs.Link` carries the clicked span; `LinkUrl` legacy mode preserved; browser nav via JS |
 | Text | `TextBox / TextBoxBase` | Partial | Editing, selection, redo, placeholder, autocomplete done; IME absent |
-| Text | `MaskedTextBox` | Partial | Mask display + validation; provider/culture hooks thin |
-| Text | `RichTextBox` | Partial | RTF parsed into styled runs; bold/italic/underline/colour/font-size rendered per-run; SelectionFont/Color/Bold/Italic/Underline; Find(); LoadFile/SaveFile; HTML clipboard round-trip |
+| Text | `MaskedTextBox` | Partial | Mask display + per-token input validation; BackSpace/Delete aware; MaskFull/UnmaskedText; provider/culture hooks thin |
+| Text | `RichTextBox` | Partial | RTF parsed into styled runs; bold/italic/underline/colour/font-size rendered per-run; SelectionFont/Color/Bold/Italic/Underline; Find(); LoadFile/SaveFile; HTML clipboard round-trip; ScrollToCaret(); ZoomFactor applied to run font sizes |
 | Buttons | `Button / ButtonBase` | Good | Hover/pressed/focus/keyboard; gradient + flat rendering; Image on face; FlatAppearance |
 | Buttons | `CheckBox` | Good | Toggle, ThreeState, CheckAlign, Appearance |
 | Buttons | `RadioButton` | Good | Mutual exclusion within parent |
 | Lists | `ListBox` | Good | SelectionMode, owner-draw, ItemHeight, IntegralHeight, double-click |
-| Lists | `CheckedListBox` | Partial | Basic checked-item behavior; CheckOnClick done |
+| Lists | `CheckedListBox` | Partial | Basic checked-item behavior; CheckOnClick done; mouse wheel + first-letter type-ahead added |
 | Lists | `ComboBox` | Partial | Drop-down + selection; autocomplete partial; DrawMode (OwnerDrawFixed/Variable) + DrawItem + MeasureItem implemented |
 | Lists | `ListControl` (base) | Partial | DataSource, DisplayMember, ValueMember wired |
 | Collections | `TreeView` | Good | Nodes, expand/collapse, LabelEdit, ToolTipText, BeginUpdate |
 | Collections | `ListView` | Good | Details/List/LargeIcon; keyboard nav; EnsureVisible; BeginUpdate |
 | Display | `PictureBox` | Partial | URL/Image; SizeMode (Normal/CenterImage/Zoom/StretchImage — all correctly implemented using natural image dimensions from JS); ImageLocation; LoadAsync; LoadCompleted; ErrorImage |
-| Display | `ProgressBar` | Partial | Blocks/continuous/marquee; RightToLeftLayout |
+| Display | `ProgressBar` | Partial | Blocks/continuous/marquee; RightToLeftLayout; SetRange; ShowPercentage overlay |
 | Display | `MonthCalendar` | Good | SelectionRange; BoldedDates; keyboard/mouse nav |
 | Common | `DateTimePicker` | Good | Format/CustomFormat; ShowUpDown/ShowCheckBox; calendar |
 | Common | `NumericUpDown / UpDownBase` | Partial | Value clamping, keyboard entry, TextAlign |
 | Common | `DomainUpDown` | Partial | Items, Sorted, Wrap, SelectedIndex/SelectedItem |
 | Common | `TrackBar` | Partial | H/V; ticks; keyboard/mouse; SetRange |
-| Common | `HScrollBar / VScrollBar` | Partial | SmallChange/LargeChange; Scroll/ValueChanged |
+| Common | `HScrollBar / VScrollBar` | Partial | SmallChange/LargeChange; Scroll/ValueChanged; mouse wheel; WinForms effective-maximum clamping |
 | Common | `ImageList` | Partial | URL/key storage; ImageSize; wired into ListView, TreeView, TabControl |
 | Common | `Timer` | Good | PeriodicTimer-based; Interval; fires on SynchronizationContext |
-| Containers | `Panel / ScrollableControl` | Partial | Child painting + input routing; scroll offset |
-| Containers | `GroupBox` | Partial | Border/caption + child routing/clipping |
-| Containers | `TabControl` | Partial | Tab strip + page switching |
+| Containers | `Panel / ScrollableControl` | Partial | Child painting + input routing; scroll offset; AutoSize + AutoSizeMode |
+| Containers | `GroupBox` | Partial | Border/caption + child routing/clipping; AutoSize + AutoSizeMode |
+| Containers | `TabControl` | Partial | Tab strip + page switching; Ctrl+Tab keyboard nav; TabCount; GetTabRect |
 | Containers | `SplitContainer` | Good | Resizable panes; fixed/min-size; double-click reset |
 | Layout | `FlowLayoutPanel` | Good | FlowDirection + wrap/break; SetFlowBreak |
 | Layout | `TableLayoutPanel` | Good | Row/column styles + spans; CellBorderStyle; GetControlFromPosition |
@@ -57,6 +57,7 @@
 | Dialogs | `FontDialog` | Partial | Family/style/size; ShowEffects; ShowColor; Apply event |
 | Data | `DataGridView` | Partial | IList/BindingSource/DataTable binding; auto-col gen; sort; col types; frozen columns; clipboard copy (Ctrl+C); multi-column sort (Ctrl+click header) |
 | Data | `BindingSource` | Partial | IList/IBindingList; Filter/Sort/Find; server-backed |
+| Data | `BindingNavigator` | Partial | ToolStrip-based navigation bar; First/Prev/Next/Last/Add/Delete; position + count labels; bound to BindingSource events |
 | Data | `DataTable` | Partial | DataView/DefaultView; DataRowView (ICustomTypeDescriptor); typed RowChanged/RowDeleted/ColumnChanged events; Select(filter, sort); DataSet/DataTableCollection/DataRelation; IListSource; BindingSource wired |
 | Non-visual | `NotifyIcon` | Partial | Canvas system tray; ContextMenuStrip popup; balloon tips |
 | Non-visual | `ToolTip` | Partial | InitialDelay/AutoPopDelay/ReshowDelay; ShowAlways (form-active gate); balloon + icon title; overlay div in FormRenderer |
@@ -142,7 +143,7 @@
 - AutoScroll, AutoScrollPosition: via ScrollableControl; partial
 
 ### Partial
-- MDI: `IsMdiContainer`, `MdiParent`, `MdiChildren`, `ActiveMdiChild`, `ActivateMdiChild()`, `LayoutMdi()` (Cascade/TileHorizontal/TileVertical), `MdiChildActivate` event — all implemented via `MdiClientArea` Blazor component; constrained drag (children cannot leave workspace), 8-direction resize handles, z-index layering (active child on top), full mouse/keyboard event routing to child `Form`/`Control` handlers, child `Invalidate()` wired to canvas re-render via `RequestRender` callback; minimized icon strip; `ArrangeIcons` layout not yet implemented
+- MDI: `IsMdiContainer`, `MdiParent`, `MdiChildren`, `ActiveMdiChild`, `ActivateMdiChild()`, `LayoutMdi()` (Cascade/TileHorizontal/TileVertical/ArrangeIcons), `MdiChildActivate` event — all implemented via `MdiClientArea` Blazor component; constrained drag (children cannot leave workspace), 8-direction resize handles, z-index layering (active child on top), full mouse/keyboard event routing to child `Form`/`Control` handlers, child `Invalidate()` wired to canvas re-render via `RequestRender` callback; minimized icon strip; **Ctrl+Tab / Ctrl+Shift+Tab** child cycling in `MdiClientArea.OnChildKeyDown`; **`ArrangeIcons`** arranges minimized icon strips in left-to-right slots along the bottom of the MDI client area
 
 ### Not implemented
 - OwnedForms collection (stub only)
@@ -308,6 +309,24 @@
 
 ---
 
+## BindingNavigator
+
+### Partial — implemented this session
+- Inherits from `ToolStrip`; matches WinForms `BindingNavigator : ToolStrip` class hierarchy
+- `BindingSource` property — subscribes to `PositionChanged` and `ListChanged` to refresh state
+- Default item layout (matches Visual Studio designer output):
+  - `MoveFirstItem` (◀◀), `MovePreviousItem` (◀), separator, `PositionItem` (current index), `CountItem` (/ total), separator, `MoveNextItem` (▶), `MoveLastItem` (▶▶), separator, `AddNewItem` (＋), `DeleteItem` (✕)
+- All navigation buttons delegate to `BindingSource.MoveFirst/MovePrevious/MoveNext/MoveLast`
+- `AddNewItem` calls `BindingSource.Add(null)` + `MoveLast`; `DeleteItem` calls `BindingSource.RemoveAt(Position)`
+- `OnAddNew()` / `OnDeleteCurrent()` are `protected virtual` — override to customise
+- Buttons auto-enable/disable based on current position (First/Prev disabled at start; Next/Last disabled at end)
+
+### Not implemented
+- `PositionItem` is a read-only label (no in-place text editing to jump to record)
+- No `ToolStripTextBox` position-entry field (common in VS designer output — can be added by replacing `PositionItem`)
+
+---
+
 ## NotifyIcon (System Tray)
 
 ### Partial - functional canvas tray
@@ -349,6 +368,10 @@
 - Arrow buttons, track page-scroll, thumb drag, keyboard navigation
 - HScrollBar (default 200x17) and VScrollBar (default 17x200)
 
+#### Implemented (this session)
+- **Mouse wheel**: scroll up/down maps to SmallDecrement/SmallIncrement on the focused scrollbar
+- **WinForms effective-maximum clamping**: `Value` is clamped to `Maximum - LargeChange + 1` (matching WinForms `ScrollBar` semantics); `EffectiveMaximum` helper used throughout `RaiseScroll`, keyboard `End` key, and thumb-drag
+
 ---
 
 ## DomainUpDown
@@ -361,6 +384,11 @@
 - SelectedItemChanged event
 - Keyboard Up/Down navigation
 
+#### Implemented (this session)
+- **Mouse wheel**: scroll up/down cycles through items (respects Wrap)
+- **First-letter type-ahead**: pressing a printable character selects the next item whose text starts with that character; search wraps around
+- **Home / End**: jump to first / last item
+
 ---
 
 ## NumericUpDown / UpDownBase
@@ -372,6 +400,16 @@
 - Direct keyboard entry with buffer; Enter to commit
 - UpButton(), DownButton()
 - ValueChanged event
+
+#### Implemented (this session)
+- **Mouse wheel**: scroll up/down increments/decrements `Value`
+- **Live typing buffer display**: text area shows the in-progress typed string rather than the committed value while editing
+- **SelectAll on focus**: entire text is highlighted when the control gains focus (blue overlay); first keystroke replaces
+- **Ctrl+A**: programmatic select-all mirrors WinForms `SelectAll()`
+- **Escape**: discards the current typing buffer and reverts display to committed value
+- **PageUp / PageDown**: large-step navigation by `Increment × 10`; commits any active typing buffer first
+- **`Text` property**: string get/set wrapper around `Value` for designer compatibility
+- **`OnPaint` selection highlight**: semi-transparent blue overlay drawn over the text area when all-selected
 
 ---
 
@@ -467,6 +505,46 @@
 
 ---
 
+## GroupBox
+
+### Partial
+- FlatStyle (Standard / Flat / System) + etched / flat border rendering
+- Caption text with gap in border
+- Child mouse routing, clipping
+
+#### Implemented (this session)
+- **`AutoSize`**: when enabled, the GroupBox resizes to wrap all visible children; width/height padded with 8px margins and caption height clearance
+- **`AutoSizeMode`** (`GrowOnly` / `GrowAndShrink`): controls whether the auto-sized box can shrink below its current explicit size
+
+---
+
+## Panel
+
+### Partial
+- BorderStyle (None / FixedSingle / Fixed3D)
+- Child painting + input routing; scroll offset via ScrollableControl
+
+#### Implemented (this session)
+- **`AutoSize`**: when enabled, the Panel resizes to wrap all visible children; accounts for border width and Padding on all sides
+- **`AutoSizeMode`** (`GrowOnly` / `GrowAndShrink`): controls whether the panel can shrink below its current explicit size
+
+---
+
+## RichTextBox (container section)
+
+### Partial
+- `Rtf`, `HtmlContent`, styled-run rendering (bold/italic/underline/colour/font-size)
+- `SelectionFont`, `SelectionColor`, `SelectionBold`, `SelectionItalic`, `SelectionUnderline`
+- `Find()` / `LoadFile()` / `SaveFile()`
+- HTML clipboard round-trip (Copy/Paste)
+- `ScrollToCaret()` — stub previously; now functional (see Text section above)
+
+#### Implemented (this session)
+- **`ZoomFactor`**: each RTF run's rendered font size is multiplied by `ZoomFactor` in `DrawRtfRuns`; `Invalidate()` is called on assignment
+- **`ScrollToCaret()`**: estimates the line index of the current caret position by counting newlines, converts to pixel offset, and adjusts `_scrollOffsetY` to bring the line into the visible text bounds; clamps to `>= 0`
+
+---
+
 ## FlowLayoutPanel
 
 ### Good
@@ -484,6 +562,54 @@
 - CellBorderStyle
 - GetControlFromPosition(), GetPositionFromControl()
 - Anchor/Dock within cells; correct Padding/Margin semantics
+
+---
+
+## CheckedListBox
+
+### Partial
+- Items, GetItemChecked/SetItemChecked, GetItemCheckState/SetItemCheckState
+- CheckOnClick, ThreeState
+- CheckedIndices, CheckedItems collections
+- ItemCheck event (with ItemCheckEventArgs.NewValue / CurrentValue)
+- Mouse click on checkbox area toggles state; selection tracking
+
+#### Implemented (this session)
+- **Mouse wheel**: scrolls the visible item list up/down (speed scales with `e.Delta`)
+- **First-letter type-ahead**: pressing a printable character moves selection to the next item whose text starts with that character; wraps around
+
+---
+
+## ProgressBar
+
+### Partial
+- Minimum, Maximum, Value, Step
+- PerformStep(), Increment()
+- Style (Blocks / Continuous / Marquee); MarqueeAnimationSpeed
+- RightToLeftLayout
+- Gradient + rounded-rect rendering for all three styles
+
+#### Implemented (this session)
+- **`SetRange(min, max)`**: sets Minimum and Maximum in one call, matching WinForms API; clamps current Value
+- **`ShowPercentage`**: when `true`, draws the integer percentage text centred over the bar track (non-WinForms extension; useful for translated apps that previously used label overlays)
+
+---
+
+## TabControl
+
+### Partial
+- TabPages collection; Add, Remove, Insert
+- SelectedIndex, SelectedTab
+- Alignment (Top / Bottom / Left / Right)
+- Appearance, SizeMode, Multiline, HotTrack
+- ImageList / per-tab ImageIndex/ImageKey
+- Selecting / Selected / Deselecting / Deselected / SelectedIndexChanged events
+- Header scroll buttons for single-row overflow
+- DrawMode (Normal / OwnerDrawFixed) + DrawItem
+
+#### Implemented (this session)
+- **`TabCount`** property: returns `TabPages.Count` (matches WinForms public API)
+- **`GetTabRect(index)`**: returns the bounding `Rectangle` of the header tab at the given index; builds header rects on demand if stale
 
 ---
 
@@ -621,7 +747,7 @@ These gaps are architectural — they require OS integration unavailable in a br
 - No actual system tray — canvas tray is a visual simulation inside the page
 - Clipboard JS bridge implemented: `Clipboard.SetText`/`GetText`/`SetTextAsync`/`GetTextAsync` use `navigator.clipboard` with local-cache fallback; `clipboard-read` permission required for cross-app paste (auto-granted on localhost)
 - `Screen`: one virtual browser screen; `PrimaryScreen.Bounds` = `window.screen` dimensions; `WorkingArea` = `window.innerWidth/Height`; no multi-monitor support
-- MDI: constrained drag/resize, z-index, mouse/keyboard routing, and child invalidation re-render all implemented (see `Form` section); `ArrangeIcons` layout not yet implemented
+- MDI: constrained drag/resize, z-index, mouse/keyboard routing, and child invalidation re-render all implemented (see `Form` section); Ctrl+Tab child cycling and `ArrangeIcons` now implemented
 - No `PrintDocument` / print preview (no printer access from WASM)
 - `DoDragDrop` return value is async — the IL translator patches call-sites automatically (see above)
 - `WebBrowser` / `WebView2`: cross-origin `Document` DOM access blocked by browser sandbox; `GoBack`/`GoForward` only work for same-origin history entries

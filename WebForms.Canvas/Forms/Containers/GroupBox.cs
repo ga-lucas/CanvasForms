@@ -4,6 +4,8 @@ namespace System.Windows.Forms;
 public class GroupBox : Control
 {
     private FlatStyle _flatStyle = FlatStyle.Standard;
+    private bool _autoSize = false;
+    private AutoSizeMode _autoSizeMode = AutoSizeMode.GrowOnly;
 
     public GroupBox()
     {
@@ -27,6 +29,69 @@ public class GroupBox : Control
                 _flatStyle = value;
                 Invalidate();
             }
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets whether the GroupBox resizes to wrap its children.
+    /// Matches WinForms <c>GroupBox.AutoSize</c>.
+    /// </summary>
+    public new bool AutoSize
+    {
+        get => _autoSize;
+        set
+        {
+            if (_autoSize != value)
+            {
+                _autoSize = value;
+                if (_autoSize) PerformAutoSize();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets whether AutoSize only grows, or also shrinks.
+    /// Matches WinForms <c>GroupBox.AutoSizeMode</c>.
+    /// </summary>
+    public AutoSizeMode AutoSizeMode
+    {
+        get => _autoSizeMode;
+        set { _autoSizeMode = value; if (_autoSize) PerformAutoSize(); }
+    }
+
+    public override void PerformLayout()
+    {
+        base.PerformLayout();
+        if (_autoSize) PerformAutoSize();
+    }
+
+    private void PerformAutoSize()
+    {
+        const int padding = 8;
+        var captionHeight = Math.Max(0, Font.Height);
+
+        var maxRight  = 0;
+        var maxBottom = 0;
+
+        foreach (var child in Controls)
+        {
+            if (!child.Visible) continue;
+            maxRight  = Math.Max(maxRight,  child.Left + child.Width);
+            maxBottom = Math.Max(maxBottom, child.Top  + child.Height);
+        }
+
+        var preferredW = maxRight  + padding * 2;
+        var preferredH = maxBottom + captionHeight + padding;
+
+        // GrowOnly: never shrink below current explicit size.
+        var newW = _autoSizeMode == AutoSizeMode.GrowOnly ? Math.Max(Width,  preferredW) : preferredW;
+        var newH = _autoSizeMode == AutoSizeMode.GrowOnly ? Math.Max(Height, preferredH) : preferredH;
+
+        if (newW != Width || newH != Height)
+        {
+            Width  = newW;
+            Height = newH;
+            Invalidate();
         }
     }
 

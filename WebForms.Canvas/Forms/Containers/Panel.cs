@@ -4,6 +4,8 @@ namespace System.Windows.Forms;
 public class Panel : ScrollableControl
 {
     private BorderStyle _borderStyle = BorderStyle.None;
+    private bool _autoSize = false;
+    private AutoSizeMode _autoSizeMode = AutoSizeMode.GrowOnly;
 
     public Panel()
     {
@@ -21,6 +23,68 @@ public class Panel : ScrollableControl
                 _borderStyle = value;
                 Invalidate();
             }
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets whether the Panel resizes itself to wrap its children.
+    /// Matches WinForms <c>Panel.AutoSize</c>.
+    /// </summary>
+    public new bool AutoSize
+    {
+        get => _autoSize;
+        set
+        {
+            if (_autoSize != value)
+            {
+                _autoSize = value;
+                if (_autoSize) PerformAutoSize();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets whether AutoSize only grows, or can also shrink.
+    /// Matches WinForms <c>Panel.AutoSizeMode</c>.
+    /// </summary>
+    public AutoSizeMode AutoSizeMode
+    {
+        get => _autoSizeMode;
+        set { _autoSizeMode = value; if (_autoSize) PerformAutoSize(); }
+    }
+
+    public override void PerformLayout()
+    {
+        base.PerformLayout();
+        if (_autoSize) PerformAutoSize();
+    }
+
+    private void PerformAutoSize()
+    {
+        var border  = GetBorderWidth();
+        var padding = Padding.Left + Padding.Right;
+
+        var maxRight  = 0;
+        var maxBottom = 0;
+
+        foreach (var child in Controls)
+        {
+            if (!child.Visible) continue;
+            maxRight  = Math.Max(maxRight,  child.Left + child.Width  + Padding.Right  + border);
+            maxBottom = Math.Max(maxBottom, child.Top  + child.Height + Padding.Bottom + border);
+        }
+
+        var preferredW = Math.Max(1, maxRight  + border + Padding.Left);
+        var preferredH = Math.Max(1, maxBottom + border + Padding.Top);
+
+        var newW = _autoSizeMode == AutoSizeMode.GrowOnly ? Math.Max(Width,  preferredW) : preferredW;
+        var newH = _autoSizeMode == AutoSizeMode.GrowOnly ? Math.Max(Height, preferredH) : preferredH;
+
+        if (newW != Width || newH != Height)
+        {
+            Width  = newW;
+            Height = newH;
+            Invalidate();
         }
     }
 

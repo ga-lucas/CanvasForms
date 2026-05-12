@@ -522,7 +522,21 @@ public class Form : ContainerControl
                 break;
 
             case MdiLayout.ArrangeIcons:
-                // Arrange minimized icons along bottom — stub
+                // Arrange minimized icon strips along the bottom of the MDI client area.
+                // Each minimized child occupies a fixed 160×24 slot; slots fill left-to-right.
+                var minimized = _mdiChildren
+                    .Where(c => c.Visible && c.WindowState == FormWindowState.Minimized)
+                    .ToList();
+                const int iconW = 162;
+                const int iconH = 26;
+                int slotsPerRow = Math.Max(1, cw / iconW);
+                for (int i = 0; i < minimized.Count; i++)
+                {
+                    int col = i % slotsPerRow;
+                    int row = i / slotsPerRow;
+                    minimized[i].Left = col * iconW;
+                    minimized[i].Top  = ch - iconH * (row + 1);
+                }
                 break;
         }
 

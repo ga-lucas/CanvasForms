@@ -302,16 +302,36 @@ public abstract class ScrollBar : Control
                 e.Handled = true;
                 break;
             case Keys.End:
-                RaiseScroll(ScrollEventType.Last, _maximum);
+                RaiseScroll(ScrollEventType.Last, EffectiveMaximum);
                 e.Handled = true;
                 break;
         }
         base.OnKeyDown(e);
     }
 
+    /// <summary>
+    /// The WinForms effective maximum: the scroll position cannot exceed Maximum - LargeChange + 1.
+    /// This matches real WinForms ScrollBar behaviour where the thumb sits flush at the end when
+    /// Value == Maximum - LargeChange + 1, not when Value == Maximum.
+    /// </summary>
+    private int EffectiveMaximum => Math.Max(_minimum, _maximum - _largeChange + 1);
+
+    protected internal override void OnMouseWheel(MouseEventArgs e)
+    {
+        if (!Enabled) { base.OnMouseWheel(e); return; }
+        int lines = Math.Max(1, Math.Abs(e.Delta) / 120);
+        if (e.Delta > 0)
+            RaiseScroll(ScrollEventType.SmallDecrement, Value - _smallChange * lines);
+        else if (e.Delta < 0)
+            RaiseScroll(ScrollEventType.SmallIncrement, Value + _smallChange * lines);
+        base.OnMouseWheel(e);
+    }
+
     private void RaiseScroll(ScrollEventType type, int newValue)
     {
         int old = _value;
+        // Clamp to [Minimum, EffectiveMaximum] — matches WinForms scrollbar clamping.
+        newValue = Math.Max(_minimum, Math.Min(EffectiveMaximum, newValue));
         Value = newValue;
         Scroll?.Invoke(this, new ScrollEventArgs(type, old, _value, IsHorizontal ? ScrollOrientation.HorizontalScroll : ScrollOrientation.VerticalScroll));
     }

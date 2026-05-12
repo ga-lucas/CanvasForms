@@ -241,67 +241,12 @@ Controls below have **no source file** in the repo yet. Everything else either h
 - `HelpProvider`
 - `WebBrowser` / WebView2
 - `Chart`
-- MDI (`MdiClient`, MDI Forms) — initial implementation done; keyboard routing + `ArrangeIcons` pending
+- MDI (`MdiClient`, MDI Forms) — initial implementation done; Ctrl+Tab child cycling + `ArrangeIcons` implemented
 - `Clipboard` (JS bridge needed)
 
 Controls live in `WebForms.Canvas/Forms/...` (project: `Canvas.Windows.Forms`).
-See `COMPATIBILITY_REVIEW.md` for a full per-control breakdown, and the test project for property-level tracking:
+See [`COMPATIBILITY_REVIEW.md`](COMPATIBILITY_REVIEW.md) for a full per-control breakdown of implemented APIs, known gaps, and session notes.
 
-Status legend:
-
-- ✅ **Good**: usable for typical demos/apps.
-- ⚠️ **Partial**: core behavior exists, but missing WinForms features and/or rendering fidelity.
-- 🧩 **Stub/Compatibility**: API exists primarily for porting; limited behavior.
-
-| Area | Control | Status | Notes |
-|------|---------|--------|-------|
-| Windowing | `Form` | ⚠️ Partial | Window chrome, move/resize, min/max/close are implemented. |
-| Core | `Control` | ⚠️ Partial | API surface is prioritized (see tests); many members are compatibility-oriented in a canvas environment. `Validate()` fires `Validating`/`Validated`; wired into `Focus()` focus-leave path. |
-| Core | `ContainerControl` | ⚠️ Partial | `ValidateChildren()` / `ValidateChildren(ValidationConstraints)` walk control tree; `Validate()` blocks focus transfer if cancelled. |
-| Text | `Label` | ⚠️ Partial | Basic multi-line + alignment, approximate measurement. |
-| Text | `LinkLabel` | ⚠️ Partial | Click/visited + optional browser navigation via `LinkUrl`. |
-| Text | `TextBox` / `TextBoxBase` | ⚠️ Partial | Basic editing, selection, shortcuts; autocomplete support is evolving. |
-| Text | `MaskedTextBox` | ⚠️ Partial | Masked display + basic validation. |
-| Text | `RichTextBox` | ⚠️ Partial | RTF parsed into styled runs; bold/italic/underline/colour/font-size per run; SelectionFont/Color/Bold/Italic/Underline; Find(); LoadFile/SaveFile; HTML clipboard. |
-| Buttons | `Button` / `ButtonBase` | ✅ Good | Hover/pressed/focus states + click via mouse/keyboard. |
-| Buttons | `CheckBox` | ✅ Good | Toggle behavior + indicator rendering. |
-| Buttons | `RadioButton` | ✅ Good | Mutual exclusivity within parent. |
-| Lists | `ListControl` | ⚠️ Partial | Base type for list-like controls. |
-| Lists | `ListBox` | ⚠️ Partial | Selection + basic navigation; missing advanced modes. |
-| Lists | `CheckedListBox` | ⚠️ Partial | Basic checked item behavior. |
-| Lists | `ComboBox` | ⚠️ Partial | Editable DropDown input + DropDownList type-ahead; `AutoCompleteMode` (Suggest/Append/SuggestAppend); `FindString`/`FindStringExact`; OwnerDraw not implemented. |
-| Collections | `TreeView` | ⚠️ Partial | Nodes + expand/collapse + selection. |
-| Collections | `ListView` | ⚠️ Partial | Details view + columns/items; feature coverage still growing. |
-| Display | `PictureBox` | ⚠️ Partial | URL-based image loading; `SizeMode` (Normal/CenterImage/Zoom/StretchImage) correctly implemented using natural image dimensions from browser; `ImageLocation` alias; `LoadAsync`; `LoadCompleted`. |
-| Display | `ProgressBar` | ⚠️ Partial | Blocks/continuous/marquee-style rendering (simplified). |
-| Display | `MonthCalendar` | ⚠️ Partial | Single-month view + basic keyboard/mouse navigation. |
-| Common | `DateTimePicker` | ⚠️ Partial | Simplified text rendering + drop-down calendar. |
-| Common | `NumericUpDown` / `UpDownBase` | ⚠️ Partial | Spinner UI + value clamping/events; missing WinForms edge cases. |
-| Common | `ImageList` | ⚠️ Partial | URL/key storage; ImageSize; wired into ListView, TreeView, TabControl. |
-| Common | `Timer` | ✅ Good | `PeriodicTimer`-based async loop; fires on captured `SynchronizationContext`. |
-| Containers | `Panel` / `ScrollableControl` | ⚠️ Partial | Child painting + input routing; supports scroll offset behavior used by nested controls. |
-| Containers | `GroupBox` | ⚠️ Partial | Border/caption + child routing/clipping. |
-| Containers | `TabControl` | ⚠️ Partial | Tab strip + page switching. |
-| Containers | `SplitContainer` | ⚠️ Partial | Resizable pane splitter. |
-| Containers | `UserControl` | 🧩 Stub/Compatibility | Base present; full composite lifecycle partial. |
-| Layout | `FlowLayoutPanel` | ⚠️ Partial | FlowDirection + wrap/flow-break behavior. |
-| Layout | `TableLayoutPanel` | ⚠️ Partial | Row/column styles + spans; anchors/dock within cells. |
-| Menus | `MenuStrip` | ⚠️ Partial | Top-level menu bar with dropdowns. |
-| Menus | `ContextMenuStrip` | ⚠️ Partial | Right-click overlay menus. |
-| Menus | `ToolStrip` | ⚠️ Partial | Toolbar with icons, hover, checked state. |
-| Menus | `StatusStrip` / `ToolStripStatusLabel` | ⚠️ Partial | Status bar; Spring, BorderSides, SizingGrip. |
-| Menus | `ToolStripMenuItem` | 🧩 Stub/Compatibility | Dropdowns, check state, shortcuts. |
-| Menus | `ToolStripContainer` / `ToolStripPanel` | ⚠️ Partial | Auto-show/hide bands; row layout of child ToolStrips; content panel fills remainder. |
-| Dialogs | `OpenFileDialog` | ⚠️ Partial | Host FS + browser upload. |
-| Dialogs | `SaveFileDialog` | ⚠️ Partial | `CreatePrompt`, `OverwritePrompt`, `OpenFile()`. |
-| Dialogs | `FolderBrowserDialog` | ⚠️ Partial | `SelectedPath`, `Description`, `ShowNewFolderButton`; host FS aware. |
-| Dialogs | `ColorDialog` | ⚠️ Partial | Swatch palette + Hex/RGB/HSV inputs. |
-| Dialogs | `FontDialog` | ⚠️ Partial | Family/style/size lists; `ShowEffects`, `ShowColor`, `Apply` event. |
-| Data | `DataGridView` | ⚠️ Partial | `IList`/`BindingSource`/`DataTable` binding; auto-column gen; sort; frozen columns; **frozen rows**; **CellValidating/RowValidating** (Cancel blocks move + red border feedback); clipboard copy (Ctrl+C); multi-column sort (Ctrl+click header). |
-| Data | `DataTable` | ⚠️ Partial | DataView/DefaultView; DataRowView; typed RowChanged/ColumnChanged events; Select(filter, sort); DataSet/DataRelation; IListSource; BindingSource wired. |
-| Data | `BindingSource` | ⚠️ Partial | `IList`/`IBindingList`/`DataTable`/`DataSet` wrapper; `Current`/`Position` navigation; server-backed via `CanvasDataService`. |
-| Non-visual | `ToolTip` | 🧩 Stub/Compatibility | API present; rendering may be incomplete. |
-| Non-visual | `NotifyIcon` | ⚠️ Partial | Canvas system tray: icon in taskbar, ContextMenuStrip popup, balloon tips, Click/DoubleClick events. |
 ### Layout
 
 - Docking and anchoring (`Dock`, `Anchor`)
@@ -454,9 +399,9 @@ Items are ordered by estimated prevalence in designer-generated / translated Win
 | ✅ | `Label` | Multi-line, alignment, UseMnemonic, AutoEllipsis, AutoSize, BorderStyle, FlatStyle |
 | ⚠️ | `ComboBox` | Editable DropDown input; DropDownList type-ahead; AutoCompleteMode (Suggest/Append/SuggestAppend); FindString/FindStringExact |
 | ✅ | `ListBox` | Selection + navigation; owner-draw, MeasureItem, ItemHeight, IntegralHeight, double-click |
-| ⚠️ | `Panel` / `ScrollableControl` | Child painting, input routing, scroll offset |
-| ⚠️ | `GroupBox` | Border/caption + child routing |
-| ⚠️ | `TabControl` | Tab strip + page switching |
+| ⚠️ | `Panel` / `ScrollableControl` | Child painting, input routing, scroll offset; AutoSize + AutoSizeMode |
+| ⚠️ | `GroupBox` | Border/caption + child routing; AutoSize + AutoSizeMode |
+| ⚠️ | `TabControl` | Tab strip + page switching; TabCount; GetTabRect(index); Ctrl+Tab keyboard navigation |
 | ⚠️ | `MenuStrip` | Top-level menu bar with dropdowns |
 | ⚠️ | `ContextMenuStrip` | Right-click overlay menus |
 | ⚠️ | `ToolStrip` | Toolbar with icons, hover, checked state |
@@ -484,9 +429,10 @@ Items are ordered by estimated prevalence in designer-generated / translated Win
 
 | Status | Control | Notes |
 |--------|---------|-------|
-| ⚠️ | `RichTextBox` | RTF parsed into styled runs; bold/italic/underline/colour/font-size; SelectionFont/Color; Find(); LoadFile/SaveFile; HTML clipboard |
-| ⚠️ | `MaskedTextBox` | Masked display + basic validation |
-| ⚠️ | `CheckedListBox` | Basic checked item behaviour |
+| ⚠️ | `RichTextBox` | RTF parsed into styled runs; bold/italic/underline/colour/font-size; SelectionFont/Color/Bold/Italic/Underline; Find(); LoadFile/SaveFile; HTML clipboard; ScrollToCaret(); ZoomFactor |
+| ⚠️ | `LinkLabel` | Links collection; multi-span hit testing; LinkClicked event; ActiveLinkColor/LinkColor/VisitedLinkColor; LinkBehavior; visited-state tracking |
+| ⚠️ | `MaskedTextBox` | Masked display + per-token input validation; `MaskFull`; `MaskInputRejected`; Backspace/Delete mask-aware |
+| ⚠️ | `CheckedListBox` | Checked item behaviour; ThreeState; ItemCheck/ItemChecked events; keyboard nav (Space/arrows/Home/End/PageUp/PageDown); mouse wheel scrolling; first-letter type-ahead |
 | ✅ | `MonthCalendar` | Single-month view; SelectionRange; BoldedDates; keyboard/mouse nav |
 | ⚠️ | `NotifyIcon` | Canvas system tray in taskbar; ContextMenuStrip popup; balloon tips; Click/DoubleClick |
 | 🧩 | `UserControl` | Base present; full composite lifecycle partial |
@@ -494,8 +440,8 @@ Items are ordered by estimated prevalence in designer-generated / translated Win
 | ⚠️ | `ToolStripContainer` / `ToolStripPanel` | Auto-show/hide bands; row layout |
 | 🔲 | **`PropertyGrid`** | Common in tools and settings panels |
 | ⚠️ | **`TrackBar`** | Slider; Horizontal/Vertical; tick marks; keyboard/mouse; SetRange |
-| ⚠️ | **`HScrollBar` / `VScrollBar`** | Standalone scrollbars; SmallChange/LargeChange; Scroll/ValueChanged events |
-| ⚠️ | **`DomainUpDown`** | String-list up-down; Sorted/Wrap; SelectedItem/SelectedIndex; pair to NumericUpDown |
+| ⚠️ | **`HScrollBar` / `VScrollBar`** | Standalone scrollbars; SmallChange/LargeChange; Scroll/ValueChanged events; mouse wheel; WinForms effective-maximum clamping (Maximum − LargeChange + 1) |
+| ⚠️ | **`DomainUpDown`** | String-list up-down; Sorted/Wrap; SelectedItem/SelectedIndex; mouse wheel scrolling; first-letter type-ahead; Home/End keyboard navigation |
 | 🔲 | **`HelpProvider`** | F1 help integration |
 | 🔲 | **`ToolStripProgressBar`** | Common in status strips for background tasks |
 | 🔲 | **`ToolStripSplitButton`** | Split-action toolbar button |
@@ -509,7 +455,7 @@ Items are ordered by estimated prevalence in designer-generated / translated Win
 |--------|---------|-------|
 | 🔲 | **`DataGrid`** (legacy) | Older apps use instead of `DataGridView` |
 | ✅ | **`BindingSource`** | IList/IBindingList wrapper; `Current`/`Position`; `Filter`/`Sort`/`Find`; server-backed via `CanvasDataService` |
-| 🔲 | **`BindingNavigator`** | Record-navigation bar; paired with `BindingSource` |
+| ⚠️ | **`BindingNavigator`** | Record-navigation bar; First/Prev/Next/Last/Add/Delete; bound to `BindingSource.Position`; `PositionItem`/`CountItem` labels |
 | 🔲 | **`StatusBar`** (legacy) | Pre-`StatusStrip`; thin wrapper for translator compat |
 | 🔲 | **`ToolBar`** (legacy) | Pre-`ToolStrip` |
 | 🔲 | **`MainMenu`** (legacy) | Pre-`MenuStrip` |
@@ -517,9 +463,9 @@ Items are ordered by estimated prevalence in designer-generated / translated Win
 | 🔲 | **`Splitter`** (legacy) | Pre-`SplitContainer` |
 | 🔲 | **`PrintPreviewControl`** | Embedded (non-dialog) print preview |
 | ⚠️ | **`Screen`** | `PrimaryScreen`/`AllScreens`; `Bounds` from `window.screen`; `WorkingArea` from `window.innerWidth/Height`; `FromControl`/`FromPoint`/`GetWorkingArea`/`GetBounds`; JS interop via `getScreenInfo`; 1920×1080 fallback; no multi-monitor |
-| 🔲 | **`Clipboard`** | Cut/Copy/Paste; requires JS bridge |
+| ⚠️ | **`Clipboard`** | SetText/GetText (plain + HTML formats); async SetTextAsync/GetTextAsync/SetHtmlAsync/GetHtmlAsync; SetDataObject/GetDataObject; ContainsText/ContainsData; Clear; JS interop bridge |
 | ⚠️ | **`WebBrowser` / WebView2** | iframe overlay; Navigate, GoBack/Forward, Stop, Refresh, DocumentText, ExecuteScriptAsync, events; cross-origin DOM access blocked by browser sandbox |
-| ⚠️ | **MDI (`MdiClient`, MDI Forms)** | `IsMdiContainer`, `MdiParent`, `MdiChildren`, `ActiveMdiChild`, `ActivateMdiChild`, `LayoutMdi` (Cascade/TileH/TileV), `MdiChildActivate`; `MdiClientArea` Blazor component renders child windows with title bar, min/max/restore/close, and minimize strip; keyboard routing inside children and `ArrangeIcons` pending |
+| ⚠️ | **MDI (`MdiClient`, MDI Forms)** | `IsMdiContainer`, `MdiParent`, `MdiChildren`, `ActiveMdiChild`, `ActivateMdiChild`, `LayoutMdi` (Cascade/TileH/TileV/ArrangeIcons), `MdiChildActivate`; `MdiClientArea` Blazor component renders child windows with title bar, min/max/restore/close, and minimize strip; Ctrl+Tab / Ctrl+Shift+Tab child cycling; `ArrangeIcons` slots minimized children along bottom |
 | ✅ | **`DataGridViewColumn` types** | TextBox/CheckBox/ComboBox/Button/Image/Link column variants; `DataGridViewCellStyle`; `DataGridViewRow`/`DataGridViewCell` model |
 | ✅ | **`CanvasDataService`** | Server-backed ADO.NET provider; `ICanvasDataService.Fill(DataTable, sql)`; SQLite default; ambient `CanvasDataService.Current` accessor for native and translated apps |
 
