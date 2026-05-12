@@ -12,7 +12,7 @@
 
         <!-- Window buttons -->
         <div style="display: flex; align-items: center; flex: 1; overflow: hidden; gap: 0;">
-        @foreach (var form in _formManager.OpenForms.OrderBy(f => f.CreatedAt))
+        @foreach (var form in _formManager.TopLevelForms.OrderBy(f => f.CreatedAt))
         {
             var isActive = form == _formManager.ActiveForm;
             var isMinimized = form.WindowState == FormWindowState.Minimized;
@@ -50,7 +50,7 @@
 
     <!-- Desktop area (below taskbar) -->
     <div class="desktop-area" style="position: absolute; top: @(TaskbarHeight)px; left: 0; right: 0; bottom: 0;">
-        @foreach (var form in _formManager.OpenForms.Where(f => f.WindowState != FormWindowState.Minimized))
+        @foreach (var form in _formManager.TopLevelForms.Where(f => f.WindowState != FormWindowState.Minimized))
         {
             var isModalBlock = _formManager.ModalForm != null && !ReferenceEquals(_formManager.ModalForm, form);
 
@@ -77,6 +77,7 @@
     private int _viewportWidth = 1920;
     private int _viewportHeight = 1080;
     private DotNetObjectReference<Desktop>? _dotNetRef;
+    private Form? _lastTitleForm;     // last form whose title/icon was pushed to the browser
 
     protected override void OnInitialized()
     {
@@ -96,7 +97,20 @@
             // Get initial viewport size and set up resize listener
             await JSRuntime.InvokeVoidAsync("setupViewportTracking", _dotNetRef);
         }
+
+        // Sync browser title + favicon whenever the active form (or its title/icon) changes.
+        var active = _formManager.ActiveForm;
+        if (active != _lastTitleForm ||
+            (active != null && active.Text != document_title_cache))
+        {
+            _lastTitleForm = active;
+            document_title_cache = active?.Text;
+            var iconUrl = active?.Icon?.ResourcePath ?? string.Empty;
+            await JSRuntime.InvokeVoidAsync("updateBrowserTitle", active?.Text ?? string.Empty, iconUrl);
+        }
     }
+
+    private string? document_title_cache;
 
     [JSInvokable]
     public void OnViewportResize(int width, int height)

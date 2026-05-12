@@ -31,6 +31,12 @@ public class FormManager
     public IReadOnlyList<Form> OpenForms => _forms.AsReadOnly();
 
     /// <summary>
+    /// Gets only the top-level forms (excludes MDI children, which are hosted inside their MDI parent).
+    /// Use this for taskbar rendering and desktop-area layout.
+    /// </summary>
+    public IEnumerable<Form> TopLevelForms => _forms.Where(f => f.MdiParent == null);
+
+    /// <summary>
     /// Gets the currently active form (the one with focus/on top)
     /// </summary>
     public Form? ActiveForm => _activeForm;

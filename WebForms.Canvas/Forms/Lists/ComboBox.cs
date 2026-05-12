@@ -18,12 +18,76 @@ public class ComboBox : ListControl
     private string _text = "";
     private int _dropDownHoveredIndex = -1;
 
+    // AutoComplete state for DropDown editable mode
+    // _acUserText = what the user has actually typed (no appended suffix)
+    // _acSuffix   = the suggested suffix appended after the user's text (displayed as "selected")
+    private string _acUserText = "";
+    private string _acSuffix   = "";
+
     public ComboBox()
     {
         Width = 121;
         Height = 23;
         BackColor = Color.White;
         ForeColor = Color.Black;
+    }
+
+    // ── Owner-draw support ────────────────────────────────────────────────────
+
+    private DrawMode _drawMode = DrawMode.Normal;
+
+    /// <summary>
+    /// Gets or sets whether the control elements are drawn by the operating system
+    /// or by user code.  Mirrors the real WinForms API; <see cref="DrawMode.OwnerDrawFixed"/>
+    /// and <see cref="DrawMode.OwnerDrawVariable"/> both route item rendering through
+    /// <see cref="DrawItem"/>.
+    /// </summary>
+    public DrawMode DrawMode
+    {
+        get => _drawMode;
+        set { _drawMode = value; Invalidate(); }
+    }
+
+    /// <summary>Raised before an item is drawn so the caller can supply its height (OwnerDrawVariable only).</summary>
+    public event MeasureItemEventHandler? MeasureItem;
+
+    /// <summary>Raised when an item needs to be painted (any owner-draw mode).</summary>
+    public event DrawItemEventHandler? DrawItem;
+
+    /// <summary>
+    /// The item height used for fixed-height modes. For <see cref="DrawMode.OwnerDrawVariable"/>
+    /// the height is queried per-item via <see cref="MeasureItem"/>.
+    /// </summary>
+    private int _ownerDrawItemHeight = DefaultItemHeight;
+
+    protected override int ItemHeight =>
+        _drawMode == DrawMode.Normal ? DefaultItemHeight : _ownerDrawItemHeight;
+
+    /// <summary>Returns the height for a specific item index, firing MeasureItem when needed.</summary>
+    private int GetItemHeightAt(int index)
+    {
+        if (_drawMode != DrawMode.OwnerDrawVariable)
+            return ItemHeight;
+
+        using var tmpGraphics = new Graphics(Width, ItemHeight);
+        var args = new MeasureItemEventArgs(tmpGraphics, index, DefaultItemHeight);
+        MeasureItem?.Invoke(this, args);
+        return Math.Max(1, args.ItemHeight);
+    }
+
+    /// <summary>
+    /// Raises DrawItem for a single item. Returns the bounds actually passed to the handler.
+    /// When DrawItem is null the method falls back to the default rendering.
+    /// </summary>
+    private void RaiseDrawItem(Graphics g, int index, Rectangle bounds, DrawItemState state)
+    {
+        if (DrawItem == null) return;
+        var args = new DrawItemEventArgs(g, Font, bounds, index, state)
+        {
+            BackColor = BackColor,
+            ForeColor = ForeColor
+        };
+        DrawItem.Invoke(this, args);
     }
 
     internal Rectangle GetDropDownBounds()
@@ -134,6 +198,8 @@ public class ComboBox : ListControl
             if (_text != value)
             {
                 _text = value ?? "";
+                _acUserText = _text;
+                _acSuffix   = "";
 
                 // Try to find matching item
                 if (_dropDownStyle == ComboBoxStyle.DropDownList)
@@ -319,13 +385,46 @@ public class ComboBox : ListControl
             Height - (BorderWidth * 2) - 4
         );
 
-        // Draw selected text or editable text
-        var displayText = _dropDownStyle == ComboBoxStyle.DropDownList
-            ? (_selectedIndex >= 0 ? GetItemText(Items[_selectedIndex]) : "")
-            : _text;
+        // Owner-draw: fire DrawItem for the selected-item face (ComboBoxEdit state)
+        if (_drawMode != DrawMode.Normal && DrawItem != null && _selectedIndex >= 0)
+        {
+            var faceState = DrawItemState.ComboBoxEdit;
+            if (Focused) faceState |= DrawItemState.Focus;
+            RaiseDrawItem(g, _selectedIndex, textBounds, faceState);
+        }
+        else
+        {
+            // Draw selected text or editable text
+            var displayText = _dropDownStyle == ComboBoxStyle.DropDownList
+                ? (_selectedIndex >= 0 ? GetItemText(Items[_selectedIndex]) : "")
+                : _text;
 
-        var textColor = Enabled ? ForeColor : System.Drawing.Color.FromArgb(109, 109, 109);
-        g.DrawString(displayText, textBounds.X, textBounds.Y + 1, textColor);
+            var textColor = Enabled ? ForeColor : System.Drawing.Color.FromArgb(109, 109, 109);
+
+            if (_dropDownStyle == ComboBoxStyle.DropDown && _acSuffix.Length > 0)
+            {
+                // Draw user-typed part normally, then the autocomplete suffix with a selection highlight
+                g.DrawString(_acUserText, textBounds.X, textBounds.Y + 1, textColor);
+
+                // Estimate pixel width of the user-typed portion using ~7px/char heuristic
+                var userWidth = EstimateTextWidth(_acUserText);
+                var suffixBounds = new Rectangle(
+                    textBounds.X + userWidth,
+                    textBounds.Y,
+                    textBounds.Width - userWidth,
+                    textBounds.Height);
+
+                // Selection highlight behind suffix
+                var suffixWidth = Math.Min(suffixBounds.Width, EstimateTextWidth(_acSuffix) + 2);
+                using var selBrush = new SolidBrush(Color.FromArgb(0, 120, 215));
+                g.FillRectangle(selBrush, suffixBounds.X, suffixBounds.Y, suffixWidth, suffixBounds.Height);
+                g.DrawString(_acSuffix, suffixBounds.X, textBounds.Y + 1, System.Drawing.Color.White);
+            }
+            else
+            {
+                g.DrawString(displayText, textBounds.X, textBounds.Y + 1, textColor);
+            }
+        }
 
         // Drop-down button
         DrawDropDownButton(g, bounds);
@@ -377,24 +476,17 @@ public class ComboBox : ListControl
         using var borderPen = new Pen(Color.FromArgb(100, 100, 100));
         g.DrawRectangle(borderPen, dropDownBounds);
 
-        // Calculate visible items
-        var itemsPerPage = (dropDownHeight - 2) / ItemHeight;
-        var visibleCount = Math.Min(itemsPerPage, Items.Count - _topIndex);
-
-        // Draw items
-        for (int i = 0; i < visibleCount; i++)
+        // Draw items — supports variable height for OwnerDrawVariable
+        int yOffset = 1;
+        int maxY    = dropDownHeight - 2;
+        for (int i = _topIndex; i < Items.Count; i++)
         {
-            var itemIndex = _topIndex + i;
-            if (itemIndex >= Items.Count) break;
+            var h = _drawMode == DrawMode.OwnerDrawVariable ? GetItemHeightAt(i) : ItemHeight;
+            if (yOffset + h > maxY) break;
 
-            var itemBounds = new Rectangle(
-                1,
-                Height + 1 + (i * ItemHeight),
-                contentWidth,
-                ItemHeight
-            );
-
-            DrawDropDownItem(g, itemIndex, itemBounds);
+            var itemBounds = new Rectangle(1, Height + yOffset, contentWidth, h);
+            DrawDropDownItem(g, i, itemBounds);
+            yOffset += h;
         }
 
         // Draw scrollbar if needed
@@ -406,9 +498,19 @@ public class ComboBox : ListControl
 
     private void DrawDropDownItem(Graphics g, int index, Rectangle bounds)
     {
-        var item = Items[index];
         var isSelected = index == _selectedIndex;
-        var isHovered = index == _dropDownHoveredIndex;
+        var isHovered  = index == _dropDownHoveredIndex;
+        var state      = DrawItemState.Default;
+        if (isSelected || isHovered) state |= DrawItemState.Selected;
+        if (index == _selectedIndex)  state |= DrawItemState.Focus;
+
+        if (_drawMode != DrawMode.Normal && DrawItem != null)
+        {
+            RaiseDrawItem(g, index, bounds, state);
+            return;
+        }
+
+        var item = Items[index];
 
         // Background
         Color itemBgColor;
@@ -505,6 +607,8 @@ public class ComboBox : ListControl
             {
                 SelectedIndex = itemIndex;
                 OnSelectionChangeCommitted(EventArgs.Empty);
+                _acUserText = GetItemText(Items[itemIndex]);
+                _acSuffix   = "";
                 DroppedDown = false;
             }
         }
@@ -711,17 +815,23 @@ public class ComboBox : ListControl
             case Keys.Enter:
                 if (_isDroppedDown)
                 {
+                    // If a suggestion is highlighted, select it
+                    if (_dropDownHoveredIndex >= 0 && _dropDownHoveredIndex < Items.Count)
+                    {
+                        SelectedIndex = _dropDownHoveredIndex;
+                        OnSelectionChangeCommitted(EventArgs.Empty);
+                    }
                     DroppedDown = false;
-                    handled = true;
                 }
+                CommitAutoComplete();
+                handled = true;
                 break;
 
             case Keys.Escape:
                 if (_isDroppedDown)
-                {
                     DroppedDown = false;
-                    handled = true;
-                }
+                RevertAutoComplete();
+                handled = true;
                 break;
 
             case Keys.Home:
@@ -781,12 +891,182 @@ public class ComboBox : ListControl
 
     protected internal override void OnLostFocus(EventArgs e)
     {
-        // Close drop-down when losing focus
+        // Close drop-down when losing focus — commit any pending autocomplete suffix
         if (_isDroppedDown)
-        {
             DroppedDown = false;
-        }
+        CommitAutoComplete();
         base.OnLostFocus(e);
+    }
+
+    protected internal override void OnKeyPress(KeyPressEventArgs e)
+    {
+        if (!Enabled)
+        {
+            base.OnKeyPress(e);
+            return;
+        }
+
+        // DropDownList: type-ahead — select first item whose text starts with the typed char
+        if (_dropDownStyle == ComboBoxStyle.DropDownList)
+        {
+            if (!char.IsControl(e.KeyChar))
+            {
+                var match = FindString(e.KeyChar.ToString(), _selectedIndex);
+                if (match == -1)
+                    match = FindString(e.KeyChar.ToString(), -1); // wrap around
+                if (match >= 0)
+                {
+                    SelectedIndex = match;
+                    OnSelectionChangeCommitted(EventArgs.Empty);
+                }
+                e.Handled = true;
+            }
+            base.OnKeyPress(e);
+            return;
+        }
+
+        // DropDown (editable): build _acUserText char by char
+        if (_dropDownStyle == ComboBoxStyle.DropDown)
+        {
+            if (e.KeyChar == '\b') // Backspace
+            {
+                if (_acSuffix.Length > 0)
+                {
+                    // Discard suffix, keep user text as-is
+                    _acSuffix = "";
+                    _text = _acUserText;
+                }
+                else if (_acUserText.Length > 0)
+                {
+                    _acUserText = _acUserText[..^1];
+                    _text = _acUserText;
+                }
+                ApplyAutoComplete();
+                Invalidate();
+                e.Handled = true;
+            }
+            else if (!char.IsControl(e.KeyChar))
+            {
+                // If a suffix was selected and user types a char that matches its start, advance
+                if (_acSuffix.Length > 0 && char.ToLowerInvariant(e.KeyChar) == char.ToLowerInvariant(_acSuffix[0]))
+                {
+                    _acUserText += _acSuffix[0];
+                    _acSuffix = _acSuffix[1..];
+                    _text = _acUserText + _acSuffix;
+                }
+                else
+                {
+                    _acSuffix = "";
+                    _acUserText += e.KeyChar;
+                    _text = _acUserText;
+                    ApplyAutoComplete();
+                }
+                Invalidate();
+                e.Handled = true;
+            }
+        }
+
+        base.OnKeyPress(e);
+    }
+
+    // ── AutoComplete helpers ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Simple character-width estimate (~7 px per char at default font size).
+    /// Matches the heuristic used by <c>TextMeasurementService.EstimateTextWidth</c>.
+    /// </summary>
+    private static int EstimateTextWidth(string text)
+        => string.IsNullOrEmpty(text) ? 0 : (int)(text.Length * 7.0);
+
+    /// <summary>
+    /// Applies the current AutoCompleteMode to <see cref="_acUserText"/> and
+    /// updates <see cref="_acSuffix"/> / dropdown state accordingly.
+    /// </summary>
+    private void ApplyAutoComplete()
+    {
+        if (AutoCompleteMode == AutoCompleteMode.None || string.IsNullOrEmpty(_acUserText))
+        {
+            _acSuffix = "";
+            return;
+        }
+
+        var match = FindBestMatch(_acUserText);
+
+        bool append  = AutoCompleteMode is AutoCompleteMode.Append  or AutoCompleteMode.SuggestAppend;
+        bool suggest = AutoCompleteMode is AutoCompleteMode.Suggest or AutoCompleteMode.SuggestAppend;
+
+        if (match != null)
+        {
+            if (append)
+            {
+                // Suffix = the part of the matched text beyond what the user typed
+                _acSuffix = match.Length > _acUserText.Length
+                    ? match[_acUserText.Length..]
+                    : "";
+                _text = _acUserText + _acSuffix;
+            }
+
+            if (suggest)
+            {
+                // Highlight the matching item in the dropdown and open it
+                var idx = FindStringExact(match);
+                if (idx < 0) idx = FindString(match);
+                _dropDownHoveredIndex = idx;
+                if (!_isDroppedDown)
+                    DroppedDown = true;
+            }
+        }
+        else
+        {
+            _acSuffix = "";
+        }
+    }
+
+    /// <summary>
+    /// Returns the best matching item text for <paramref name="prefix"/>,
+    /// consulting <see cref="AutoCompleteSource"/> and
+    /// <see cref="AutoCompleteCustomSource"/>.
+    /// </summary>
+    private string? FindBestMatch(string prefix)
+    {
+        IEnumerable<string> candidates;
+
+        if (AutoCompleteSource == AutoCompleteSource.CustomSource)
+        {
+            candidates = AutoCompleteCustomSource.Cast<string>();
+        }
+        else
+        {
+            // ListItems (and the default when source is not Custom)
+            candidates = Items.Cast<object>().Select(GetItemText);
+        }
+
+        return candidates.FirstOrDefault(s =>
+            s.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Commits the pending autocomplete suffix into the user text (called on
+    /// Enter, Tab, LostFocus, and explicit item selection).
+    /// </summary>
+    private void CommitAutoComplete()
+    {
+        if (_acSuffix.Length > 0)
+        {
+            _acUserText = _acUserText + _acSuffix;
+            _acSuffix   = "";
+            _text = _acUserText;
+        }
+    }
+
+    /// <summary>
+    /// Discards the pending autocomplete suffix (called on Escape).
+    /// </summary>
+    private void RevertAutoComplete()
+    {
+        _acSuffix = "";
+        _text = _acUserText;
+        Invalidate();
     }
 
     /// <summary>
@@ -794,7 +1074,9 @@ public class ComboBox : ListControl
     /// </summary>
     public void SelectAll()
     {
-        // For now, just a stub - would need text selection support
+        // Commits any pending suffix so the whole text is "selected"
+        CommitAutoComplete();
+        Invalidate();
     }
 
     /// <summary>

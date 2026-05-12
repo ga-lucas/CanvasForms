@@ -79,9 +79,14 @@ public class Form : ContainerControl
     public double FormOpacity => _opacity;
 
     /// <summary>
-    /// Gets or sets the icon for the form. Stub — no canvas rendering, but keeps designer-generated code compatible.
+    /// Gets or sets the icon for the form. When set, the browser favicon is updated for the active form.
     /// </summary>
-    public object? Icon { get; set; }
+    private Icon? _icon;
+    public Icon? Icon
+    {
+        get => _icon;
+        set { _icon = value; Invalidate(); }
+    }
 
     /// <summary>
     /// Gets or sets the <see cref="MenuStrip"/> that is the main menu container for the form.
@@ -412,13 +417,149 @@ public class Form : ContainerControl
     // ── MDI stubs (Tier 3 — not yet implemented) ─────────────────────────────
 
     /// <summary>Stub. MDI container support is not yet implemented.</summary>
-    public bool IsMdiContainer { get; set; } = false;
+    // ── MDI ───────────────────────────────────────────────────────────────────
 
-    /// <summary>Stub. Returns null — MDI parent is not yet implemented.</summary>
-    public Form? MdiParent { get; set; } = null;
+    private bool _isMdiContainer;
+    private Form? _mdiParent;
+    private readonly List<Form> _mdiChildren = [];
+    private Form? _activeMdiChild;
 
-    /// <summary>Stub. Returns an empty array — MDI child enumeration is not yet implemented.</summary>
-    public Form[] MdiChildren => [];
+    /// <summary>
+    /// Gets or sets whether this form is an MDI parent container.
+    /// When true the form hosts MDI child windows in its client area.
+    /// </summary>
+    public bool IsMdiContainer
+    {
+        get => _isMdiContainer;
+        set { _isMdiContainer = value; Invalidate(); }
+    }
+
+    /// <summary>
+    /// Gets or sets the MDI parent form for this child form.
+    /// Setting this property registers the child with the parent's MDI child list.
+    /// </summary>
+    public Form? MdiParent
+    {
+        get => _mdiParent;
+        set
+        {
+            if (_mdiParent == value) return;
+            _mdiParent?.RemoveMdiChild(this);
+            _mdiParent = value;
+            _mdiParent?.AddMdiChild(this);
+            OnMdiParentChanged();
+        }
+    }
+
+    /// <summary>Returns the MDI child forms hosted by this MDI parent.</summary>
+    public Form[] MdiChildren => [.. _mdiChildren];
+
+    /// <summary>Gets the currently active MDI child form, or null if none.</summary>
+    public Form? ActiveMdiChild => _activeMdiChild;
+
+    /// <summary>Fires when the active MDI child changes.</summary>
+    public event EventHandler? MdiChildActivate;
+
+    protected virtual void OnMdiChildActivate(EventArgs e) => MdiChildActivate?.Invoke(this, e);
+
+    /// <summary>Activates the specified MDI child form.</summary>
+    public void ActivateMdiChild(Form? child)
+    {
+        if (child != null && !_mdiChildren.Contains(child)) return;
+        if (_activeMdiChild == child) return;
+        _activeMdiChild = child;
+        child?.BringToFront();
+        OnMdiChildActivate(EventArgs.Empty);
+        OnMdiChanged();
+    }
+
+    /// <summary>
+    /// Arranges the MDI child windows according to <paramref name="value"/>.
+    /// </summary>
+    public void LayoutMdi(MdiLayout value)
+    {
+        var children = _mdiChildren.Where(c => c.Visible && c.WindowState != FormWindowState.Minimized).ToList();
+        if (children.Count == 0) return;
+
+        // Client area available for layout (title bar already excluded by the renderer)
+        int cw = ClientWidth;
+        int ch = ClientHeight;
+
+        switch (value)
+        {
+            case MdiLayout.Cascade:
+                const int cascadeStep = 24;
+                for (int i = 0; i < children.Count; i++)
+                {
+                    var c = children[i];
+                    c.Left = i * cascadeStep;
+                    c.Top  = i * cascadeStep;
+                    c.Width  = Math.Max(200, cw - i * cascadeStep - cascadeStep);
+                    c.Height = Math.Max(150, ch - i * cascadeStep - cascadeStep);
+                }
+                break;
+
+            case MdiLayout.TileHorizontal:
+                int rowH = ch / children.Count;
+                for (int i = 0; i < children.Count; i++)
+                {
+                    children[i].Left = 0;
+                    children[i].Top  = i * rowH;
+                    children[i].Width  = cw;
+                    children[i].Height = rowH;
+                }
+                break;
+
+            case MdiLayout.TileVertical:
+                int colW = cw / children.Count;
+                for (int i = 0; i < children.Count; i++)
+                {
+                    children[i].Left = i * colW;
+                    children[i].Top  = 0;
+                    children[i].Width  = colW;
+                    children[i].Height = ch;
+                }
+                break;
+
+            case MdiLayout.ArrangeIcons:
+                // Arrange minimized icons along bottom — stub
+                break;
+        }
+
+        OnMdiChanged();
+    }
+
+    internal void AddMdiChild(Form child)
+    {
+        if (_mdiChildren.Contains(child)) return;
+        _mdiChildren.Add(child);
+        // Give child a default position / size if not yet set
+        if (child.Width == 0 || child.Height == 0)
+        {
+            child.Width  = Math.Max(300, ClientWidth  / 2);
+            child.Height = Math.Max(200, ClientHeight / 2);
+        }
+        if (_activeMdiChild == null) ActivateMdiChild(child);
+        child.Visible = true;
+        OnMdiChanged();
+    }
+
+    internal void RemoveMdiChild(Form child)
+    {
+        _mdiChildren.Remove(child);
+        if (_activeMdiChild == child)
+            ActivateMdiChild(_mdiChildren.LastOrDefault());
+        OnMdiChanged();
+    }
+
+    private void OnMdiParentChanged()
+    {
+        // When assigned to a parent, hide from the top-level desktop (managed inside parent)
+        Invalidate();
+    }
+
+    /// <summary>Callback to notify the MDI rendering host to refresh.</summary>
+    internal Action? OnMdiChanged { get; set; } = () => { };
 
     // ── StartPosition ─────────────────────────────────────────────────────────
 
@@ -1600,6 +1741,22 @@ public enum FormBorderStyle
     Sizable        = 4,
     FixedToolWindow   = 5,
     SizableToolWindow = 6,
+}
+
+/// <summary>
+/// Specifies the layout of MDI child windows in an MDI parent form.
+/// Matches <c>System.Windows.Forms.MdiLayout</c>.
+/// </summary>
+public enum MdiLayout
+{
+    /// <summary>All MDI child windows are cascaded within the MDI parent form's client area.</summary>
+    Cascade         = 0,
+    /// <summary>All MDI child windows are tiled horizontally within the MDI parent form's client area.</summary>
+    TileHorizontal  = 1,
+    /// <summary>All MDI child windows are tiled vertically within the MDI parent form's client area.</summary>
+    TileVertical    = 2,
+    /// <summary>All MDI child icons are arranged within the MDI parent form's client area.</summary>
+    ArrangeIcons    = 3,
 }
 
 /// <summary>

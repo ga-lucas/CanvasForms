@@ -26,6 +26,7 @@ public class DataGridView : ScrollableControl
     private int _selectedColIndex = -1;
     private (int row, int col) _selectedCell = (-1, -1);
     private int _hoveredRow = -1;
+    private (int row, int col)? _invalidCell = null;  // cell failing CellValidating/RowValidating
     private bool _autoGenerateColumns = true;
     private readonly List<object?[]> _boundRows = new();
     private SortOrder _sortOrder = SortOrder.None;
@@ -52,6 +53,8 @@ public class DataGridView : ScrollableControl
     public event EventHandler<DataGridViewColumnEventArgs>? ColumnAdded;
     public event EventHandler<DataGridViewRowEventArgs>? RowsAdded;
     public event EventHandler? SelectionChanged;
+    public event EventHandler<DataGridViewCellCancelEventArgs>? CellValidating;
+    public event EventHandler<DataGridViewCellCancelEventArgs>? RowValidating;
     public event EventHandler<DataGridViewDataErrorEventArgs>? DataError;
     public event DataGridViewSortCompareEventHandler? SortCompare;
 #pragma warning restore CS0067
@@ -319,6 +322,28 @@ public class DataGridView : ScrollableControl
         return total;
     }
 
+    /// <summary>Total pixel height of all visible frozen rows.</summary>
+    private int FrozenRowsHeight()
+    {
+        int total = 0;
+        int displayCount = GetDisplayRowCount();
+        for (int ri = 0; ri < displayCount; ri++)
+        {
+            if (ri < Rows.Count && Rows[ri].Frozen && Rows[ri].Visible)
+                total += RowHeightDefault;
+        }
+        return total;
+    }
+
+    /// <summary>Number of visible frozen rows.</summary>
+    private int FrozenRowCount()
+    {
+        int count = 0;
+        for (int ri = 0; ri < Rows.Count; ri++)
+            if (Rows[ri].Frozen && Rows[ri].Visible) count++;
+        return count;
+    }
+
     private int TotalColumnsWidth()
     {
         int total = 0;
@@ -390,6 +415,15 @@ public class DataGridView : ScrollableControl
         using var gridPen = new Pen(GridColor);
         g.DrawLine(gridPen, Math.Min(right - 1, clipRight - 1), ry,
                             Math.Min(right - 1, clipRight - 1), ry + rowH);
+
+        // Red inset border when this cell has a pending validation error
+        if (_invalidCell.HasValue && _invalidCell.Value.row == ri && _invalidCell.Value.col == ci)
+        {
+            int bx = Math.Max(cx, clipLeft);
+            int bw2 = Math.Min(right, clipRight) - bx;
+            using var errPen = new Pen(Color.Red, 2);
+            g.DrawRectangle(errPen, bx + 1, ry + 1, bw2 - 3, rowH - 3);
+        }
     }
 
     protected internal override void OnPaint(PaintEventArgs e)
@@ -411,17 +445,21 @@ public class DataGridView : ScrollableControl
         int rowHdrW = RowHeadersVisible ? RowHeadersWidth : 0;
         int colHdrH = ColumnHeadersVisible ? ColumnHeadersHeight : 0;
         int frozenW  = FrozenColumnsWidth();
+        int frozenH  = FrozenRowsHeight();
 
         int totalCols  = TotalColumnsWidth();
         int totalRows  = GetDisplayRowCount();
         int rowH       = RowHeightDefault;
-        int totalRowsH = totalRows * rowH;
+        // Scrollable rows exclude the frozen ones
+        int scrollableRowsH = (totalRows - FrozenRowCount()) * rowH;
 
         // Scrollable columns begin after row-header + frozen zone
         int scrollOriginX = x0 + rowHdrW + frozenW;
+        // Scrollable rows begin after column header + frozen row zone
+        int scrollOriginY = y0 + colHdrH + frozenH;
 
         bool needScrollV = (ScrollBars == DataGridViewScrollBars.Vertical || ScrollBars == DataGridViewScrollBars.Both)
-                           && totalRowsH > h - colHdrH;
+                           && scrollableRowsH > h - colHdrH - frozenH;
         bool needScrollH = (ScrollBars == DataGridViewScrollBars.Horizontal || ScrollBars == DataGridViewScrollBars.Both)
                            && (totalCols - frozenW) > w - rowHdrW - frozenW;
 
@@ -467,12 +505,10 @@ public class DataGridView : ScrollableControl
         }
 
         // ── Rows ────────────────────────────────────────────────
-        int ry = y0 + colHdrH - _scrollOffsetY;
-        int displayCount = GetDisplayRowCount();
-        for (int ri = 0; ri < displayCount; ri++)
+        // Helper: renders one row at pixel position ry, clipped within [clipTop, clipBottom)
+        void DrawRow(int ri, int ry, int clipTop, int clipBottom)
         {
-            if (ry + rowH < y0 + colHdrH) { ry += rowH; continue; }
-            if (ry >= y0 + colHdrH + clientH) break;
+            if (ry + rowH <= clipTop || ry >= clipBottom) return;
 
             bool rowSelected = ri == _selectedRowIndex;
             bool rowHovered  = ri == _hoveredRow;
@@ -527,6 +563,29 @@ public class DataGridView : ScrollableControl
 
             using var rowPen = new Pen(GridColor);
             g.DrawLine(rowPen, x0 + rowHdrW, ry + rowH - 1, x0 + rowHdrW + clientW, ry + rowH - 1);
+        }
+
+        int displayCount = GetDisplayRowCount();
+
+        // Pass 1 — frozen rows (fixed Y, not affected by _scrollOffsetY)
+        int fry = y0 + colHdrH;
+        for (int ri = 0; ri < displayCount; ri++)
+        {
+            bool rowFrozen = ri < Rows.Count && Rows[ri].Frozen && Rows[ri].Visible;
+            if (!rowFrozen) continue;
+            DrawRow(ri, fry, y0 + colHdrH, scrollOriginY + clientH);
+            fry += rowH;
+        }
+
+        // Pass 2 — scrollable rows (offset by _scrollOffsetY, clipped below frozen zone)
+        int ry = scrollOriginY - _scrollOffsetY;
+        for (int ri = 0; ri < displayCount; ri++)
+        {
+            bool rowFrozen = ri < Rows.Count && Rows[ri].Frozen && Rows[ri].Visible;
+            if (rowFrozen) continue; // already drawn in pass 1
+            if (ry + rowH <= scrollOriginY) { ry += rowH; continue; }  // scrolled above frozen zone
+            if (ry >= scrollOriginY + clientH) break;
+            DrawRow(ri, ry, scrollOriginY, scrollOriginY + clientH);
             ry += rowH;
         }
 
@@ -534,7 +593,14 @@ public class DataGridView : ScrollableControl
         if (frozenW > 0)
         {
             using var frozenPen = new Pen(Color.FromArgb(100, 100, 100));
-            g.DrawLine(frozenPen, scrollOriginX, y0, scrollOriginX, y0 + colHdrH + clientH);
+            g.DrawLine(frozenPen, scrollOriginX, y0, scrollOriginX, y0 + colHdrH + frozenH + clientH);
+        }
+
+        // Frozen row separator
+        if (frozenH > 0)
+        {
+            using var frozenRowPen = new Pen(Color.FromArgb(100, 100, 100));
+            g.DrawLine(frozenRowPen, x0 + rowHdrW, scrollOriginY, x0 + rowHdrW + clientW, scrollOriginY);
         }
 
         // ── Scrollbars ───────────────────────────────────────────
@@ -546,8 +612,8 @@ public class DataGridView : ScrollableControl
             g.FillRectangle(sbBrush, sbX, y0, ScrollBarW, sbH);
             using var sbPen = new Pen(Color.FromArgb(166, 166, 166));
             g.DrawRectangle(sbPen, sbX, y0, ScrollBarW - 1, sbH - 1);
-            int maxScroll = Math.Max(1, totalRowsH - clientH);
-            int thumbH = Math.Max(20, (int)((double)clientH / Math.Max(1, totalRowsH) * sbH));
+            int maxScroll = Math.Max(1, scrollableRowsH - clientH);
+            int thumbH = Math.Max(20, (int)((double)clientH / Math.Max(1, scrollableRowsH) * sbH));
             int thumbY = y0 + (int)((double)_scrollOffsetY / maxScroll * (sbH - thumbH));
             using var thumbBrush = new SolidBrush(Color.FromArgb(180, 180, 180));
             g.FillRectangle(thumbBrush, sbX + 2, thumbY + 2, ScrollBarW - 4, thumbH - 4);
@@ -555,6 +621,37 @@ public class DataGridView : ScrollableControl
     }
 
     // ── Input ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Fires <see cref="CellValidating"/> then <see cref="RowValidating"/> for the current cell
+    /// before a selection change.  Returns <c>false</c> (and marks <see cref="_invalidCell"/>) if
+    /// either handler cancels; returns <c>true</c> when validation passes and clears the flag.
+    /// </summary>
+    private bool TryCommitCell(int fromRow, int fromCol)
+    {
+        if (fromRow < 0 || fromCol < 0) return true;
+
+        var cellArgs = new DataGridViewCellCancelEventArgs(fromCol, fromRow);
+        CellValidating?.Invoke(this, cellArgs);
+        if (cellArgs.Cancel)
+        {
+            _invalidCell = (fromRow, fromCol);
+            Invalidate();
+            return false;
+        }
+
+        var rowArgs = new DataGridViewCellCancelEventArgs(fromCol, fromRow);
+        RowValidating?.Invoke(this, rowArgs);
+        if (rowArgs.Cancel)
+        {
+            _invalidCell = (fromRow, fromCol);
+            Invalidate();
+            return false;
+        }
+
+        _invalidCell = null;
+        return true;
+    }
 
     protected internal override void OnMouseDown(MouseEventArgs e)
     {
@@ -594,10 +691,14 @@ public class DataGridView : ScrollableControl
         }
 
         // Row click
-        int ri = GetRowAtY(my - colHdrH + _scrollOffsetY + bw);
+        int ri = GetRowAtY(my - colHdrH + bw);
         int col = GetColAtX(mx - rowHdrW);
         if (ri >= 0 && ri < GetDisplayRowCount())
         {
+            // Validate the current cell before moving selection
+            if (!TryCommitCell(_selectedCell.row, _selectedCell.col))
+                return; // handler cancelled — keep current selection
+
             _selectedRowIndex = ri;
             _selectedColIndex = col;
             _selectedCell = (ri, col >= 0 ? col : 0);
@@ -614,8 +715,8 @@ public class DataGridView : ScrollableControl
         int colHdrH = ColumnHeadersVisible ? ColumnHeadersHeight : 0;
         int my = e.Y - bw;
         if (my < colHdrH) { if (_hoveredRow != -1) { _hoveredRow = -1; Invalidate(); } return; }
-        int ri = GetRowAtY(my - colHdrH + _scrollOffsetY + bw);
-        if (ri != _hoveredRow) { _hoveredRow = ri; Invalidate(); }
+        int ri = GetRowAtY(my - colHdrH + bw);
+        if (ri != _hoveredRow)
         base.OnMouseMove(e);
     }
 
@@ -630,9 +731,9 @@ public class DataGridView : ScrollableControl
         int rowH = RowHeightDefault;
         int colHdrH = ColumnHeadersVisible ? ColumnHeadersHeight : 0;
         int bw = BorderStyle == BorderStyle.None ? 0 : 2;
-        int clientH = Height - bw * 2 - colHdrH - ScrollBarW;
-        int totalH = GetDisplayRowCount() * rowH;
-        int maxScroll = Math.Max(0, totalH - clientH);
+        int clientH = Height - bw * 2 - colHdrH - FrozenRowsHeight() - ScrollBarW;
+        int scrollableH = (GetDisplayRowCount() - FrozenRowCount()) * rowH;
+        int maxScroll = Math.Max(0, scrollableH - clientH);
         _scrollOffsetY = Math.Clamp(_scrollOffsetY - Math.Sign(e.Delta) * rowH * 3, 0, maxScroll);
         Invalidate();
         base.OnMouseWheel(e);
@@ -699,7 +800,38 @@ public class DataGridView : ScrollableControl
         return sb.ToString().TrimEnd();
     }
 
-    private int GetRowAtY(int relY) => relY < 0 ? -1 : relY / RowHeightDefault;
+    private int GetRowAtY(int relY)
+    {
+        if (relY < 0) return -1;
+        int rowH = RowHeightDefault;
+        int frozenH = FrozenRowsHeight();
+        int displayCount = GetDisplayRowCount();
+
+        // Check frozen rows first (fixed zone above the scrollable area)
+        int fy = 0;
+        for (int ri = 0; ri < displayCount; ri++)
+        {
+            bool rowFrozen = ri < Rows.Count && Rows[ri].Frozen && Rows[ri].Visible;
+            if (!rowFrozen) continue;
+            if (relY >= fy && relY < fy + rowH) return ri;
+            fy += rowH;
+        }
+
+        // Then scrollable rows (relY is relative to the top of the scrollable zone)
+        int scrollableRelY = relY - frozenH + _scrollOffsetY;
+        if (scrollableRelY < 0) return -1;
+        int scrollableIdx = scrollableRelY / rowH;
+        // Map scrollableIdx back to the actual row index (skip frozen rows)
+        int skipped = 0;
+        for (int ri = 0; ri < displayCount; ri++)
+        {
+            bool rowFrozen = ri < Rows.Count && Rows[ri].Frozen && Rows[ri].Visible;
+            if (rowFrozen) continue;
+            if (skipped == scrollableIdx) return ri;
+            skipped++;
+        }
+        return -1;
+    }
 
     // mouseX is relative to the grid interior (bw already removed), rowHdrW already removed.
     // Frozen columns are at fixed positions; scrollable columns are offset by _scrollOffsetX.
@@ -846,3 +978,19 @@ public class DataGridViewSortCompareEventArgs : EventArgs
 
 /// <summary>Describes one sort criterion in a multi-column sort.</summary>
 public record SortedColumnInfo(int ColumnIndex, ListSortDirection Direction);
+
+/// <summary>
+/// Provides data for the <see cref="DataGridView.CellValidating"/> and
+/// <see cref="DataGridView.RowValidating"/> events.  Set <see cref="Cancel"/> to
+/// <c>true</c> to block the selection change and keep focus on the current cell.
+/// </summary>
+public class DataGridViewCellCancelEventArgs : CancelEventArgs
+{
+    public int ColumnIndex { get; }
+    public int RowIndex { get; }
+    public DataGridViewCellCancelEventArgs(int columnIndex, int rowIndex)
+    {
+        ColumnIndex = columnIndex;
+        RowIndex = rowIndex;
+    }
+}

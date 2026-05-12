@@ -8,6 +8,10 @@ public class Label : Control
     private bool _useMnemonic = true;
     private FlatStyle _flatStyle = FlatStyle.Standard;
     private ContentAlignment _imageAlign = ContentAlignment.MiddleCenter;
+    private Canvas.Windows.Forms.Drawing.Image? _image;
+    private int _imageIndex = -1;
+    private string? _imageKey;
+    private ImageList? _imageList;
 
     public Label()
     {
@@ -61,6 +65,34 @@ public class Label : Control
     {
         get => _imageAlign;
         set { _imageAlign = value; Invalidate(); }
+    }
+
+    /// <summary>Gets or sets the image displayed on the label.</summary>
+    public Canvas.Windows.Forms.Drawing.Image? Image
+    {
+        get => _image;
+        set { _image = value; Invalidate(); }
+    }
+
+    /// <summary>Gets or sets the index into the <see cref="ImageList"/> for the image to display.</summary>
+    public int ImageIndex
+    {
+        get => _imageIndex;
+        set { _imageIndex = value; Invalidate(); }
+    }
+
+    /// <summary>Gets or sets the key for the image in the <see cref="ImageList"/>.</summary>
+    public string? ImageKey
+    {
+        get => _imageKey;
+        set { _imageKey = value; Invalidate(); }
+    }
+
+    /// <summary>Gets or sets the <see cref="ImageList"/> used to resolve <see cref="ImageIndex"/> or <see cref="ImageKey"/>.</summary>
+    public ImageList? ImageList
+    {
+        get => _imageList;
+        set { _imageList = value; Invalidate(); }
     }
 
     /// <summary>Gets the preferred width of the label based on the current text and font.</summary>
@@ -167,6 +199,14 @@ public class Label : Control
             }
         }
 
+        // Draw image (on top of text, WinForms default for Label)
+        var img = ResolveImage();
+        if (img != null)
+        {
+            var r = _CalcImageRect(img);
+            g.DrawImage(img, r);
+        }
+
         base.OnPaint(e);
     }
 
@@ -219,6 +259,50 @@ public class Label : Control
                 => Math.Max(0, Width - lineWidth),
             _ => 0
         };
+    }
+
+    /// <summary>Returns the effective image to draw: explicit Image, or resolved from ImageList.</summary>
+    private Canvas.Windows.Forms.Drawing.Image? ResolveImage()
+    {
+        if (_image != null) return _image;
+        if (_imageList == null) return null;
+
+        if (!string.IsNullOrEmpty(_imageKey))
+        {
+            var url = _imageList.Images[_imageKey];
+            return url != null ? new Canvas.Windows.Forms.Drawing.Image { Source = url } : null;
+        }
+        if (_imageIndex >= 0 && _imageIndex < _imageList.Images.Count)
+        {
+            var url = _imageList.Images[_imageIndex];
+            return url != null ? new Canvas.Windows.Forms.Drawing.Image { Source = url } : null;
+        }
+        return null;
+    }
+
+    /// <summary>Calculates the destination rectangle for the image inside the label bounds.</summary>
+    private Rectangle _CalcImageRect(Canvas.Windows.Forms.Drawing.Image img)
+    {
+        int imgW = img.Width  > 0 ? img.Width  : 16;
+        int imgH = img.Height > 0 ? img.Height : 16;
+
+        int x, y;
+        switch (_imageAlign)
+        {
+            case ContentAlignment.TopLeft:     x = 2;                          y = 2;                          break;
+            case ContentAlignment.TopCenter:   x = (Width  - imgW) / 2;        y = 2;                          break;
+            case ContentAlignment.TopRight:    x = Width  - imgW - 2;          y = 2;                          break;
+            case ContentAlignment.MiddleLeft:  x = 2;                          y = (Height - imgH) / 2;        break;
+            case ContentAlignment.MiddleRight: x = Width  - imgW - 2;          y = (Height - imgH) / 2;        break;
+            case ContentAlignment.BottomLeft:  x = 2;                          y = Height - imgH - 2;          break;
+            case ContentAlignment.BottomCenter:x = (Width  - imgW) / 2;        y = Height - imgH - 2;          break;
+            case ContentAlignment.BottomRight: x = Width  - imgW - 2;          y = Height - imgH - 2;          break;
+            default: // MiddleCenter
+                x = (Width  - imgW) / 2;
+                y = (Height - imgH) / 2;
+                break;
+        }
+        return new Rectangle(x, y, imgW, imgH);
     }
 }
 

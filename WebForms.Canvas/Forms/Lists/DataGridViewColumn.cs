@@ -217,6 +217,11 @@ public class DataGridViewRow
     public bool Visible { get; set; } = true;
     public bool Selected { get; set; } = false;
     public bool ReadOnly { get; set; } = false;
+    /// <summary>
+    /// When <c>true</c> this row is pinned below the column header and is
+    /// unaffected by vertical scrolling — mirrors <see cref="DataGridViewColumn.Frozen"/>.
+    /// </summary>
+    public bool Frozen { get; set; } = false;
     public object? Tag { get; set; }
     public DataGridView? DataGridView { get; internal set; }
 

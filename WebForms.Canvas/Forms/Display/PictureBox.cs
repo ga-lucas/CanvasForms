@@ -8,6 +8,8 @@ public class PictureBox : Control
     private PictureBoxSizeMode _sizeMode = PictureBoxSizeMode.Normal;
     private BorderStyle _borderStyle = BorderStyle.None;
     private bool _imageLoaded = false;
+    private int _naturalWidth = 0;
+    private int _naturalHeight = 0;
 
     public event EventHandler? LoadCompleted;
 #pragma warning disable CS0067
@@ -25,6 +27,16 @@ public class PictureBox : Control
     /// Gets or sets the image by URL (WinForms compat: maps to ImageUrl)
     /// </summary>
     public string? Image
+    {
+        get => string.IsNullOrEmpty(_imageUrl) ? null : _imageUrl;
+        set => ImageUrl = value ?? string.Empty;
+    }
+
+    /// <summary>
+    /// Gets or sets the path or URL of the image to display.
+    /// Equivalent to <see cref="ImageUrl"/>; provided for WinForms designer compatibility.
+    /// </summary>
+    public string? ImageLocation
     {
         get => string.IsNullOrEmpty(_imageUrl) ? null : _imageUrl;
         set => ImageUrl = value ?? string.Empty;
@@ -71,6 +83,8 @@ public class PictureBox : Control
             {
                 _imageUrl = value;
                 _imageLoaded = false; // Reset loaded flag when URL changes
+                _naturalWidth = 0;
+                _naturalHeight = 0;
 
                 // Preload image asynchronously if we have a URL
                 if (!string.IsNullOrEmpty(_imageUrl))
@@ -84,7 +98,7 @@ public class PictureBox : Control
     }
 
     /// <summary>
-    /// Preload the image into the browser cache
+    /// Preload the image into the browser cache and capture its natural dimensions.
     /// </summary>
     private async Task PreloadImageAsync()
     {
@@ -97,9 +111,22 @@ public class PictureBox : Control
             var form = GetParentForm();
             if (form?.TextMeasurementService?.JSRuntime != null)
             {
-                await form.TextMeasurementService.JSRuntime.InvokeVoidAsync(
-                    "preloadImage", _imageUrl);
+                var js = form.TextMeasurementService.JSRuntime;
+                await js.InvokeVoidAsync("preloadImage", _imageUrl);
                 _imageLoaded = true;
+
+                // Fetch the natural dimensions so SizeMode calculations are accurate.
+                try
+                {
+                    var size = await js.InvokeAsync<ImageSizeResult>("getImageSize", _imageUrl);
+                    if (size.Width > 0 && size.Height > 0)
+                    {
+                        _naturalWidth  = size.Width;
+                        _naturalHeight = size.Height;
+                        Invalidate();
+                    }
+                }
+                catch { /* dimension fetch failure is non-fatal */ }
             }
         }
         catch (Exception ex)
@@ -107,6 +134,8 @@ public class PictureBox : Control
             Console.WriteLine($"Failed to preload image {_imageUrl}: {ex.Message}");
         }
     }
+
+    private record ImageSizeResult(int Width, int Height);
 
     /// <summary>
     /// Get the parent Form
@@ -210,29 +239,47 @@ public class PictureBox : Control
     {
         // Account for border insets
         var inset = _borderStyle == BorderStyle.None ? 0 : (_borderStyle == BorderStyle.Fixed3D ? 2 : 1);
-        var contentWidth = Math.Max(0, Width - (inset * 2));
-        var contentHeight = Math.Max(0, Height - (inset * 2));
+        var contentWidth  = Math.Max(0, Width  - inset * 2);
+        var contentHeight = Math.Max(0, Height - inset * 2);
 
-        // For now, we'll use simple size modes
-        // In a full implementation, we'd need to know the actual image dimensions
+        // If natural dimensions are unknown, fall back to StretchImage so something renders.
+        int natW = _naturalWidth  > 0 ? _naturalWidth  : contentWidth;
+        int natH = _naturalHeight > 0 ? _naturalHeight : contentHeight;
+
         switch (_sizeMode)
         {
             case PictureBoxSizeMode.Normal:
-                // Draw at original size from top-left
-                return new Rectangle(inset, inset, contentWidth, contentHeight);
+                // Draw at natural size from top-left; clip if larger than control.
+                return new Rectangle(inset, inset,
+                    Math.Min(natW, contentWidth),
+                    Math.Min(natH, contentHeight));
 
             case PictureBoxSizeMode.StretchImage:
-                // Stretch to fill entire control
+                // Stretch to fill entire content area.
                 return new Rectangle(inset, inset, contentWidth, contentHeight);
 
             case PictureBoxSizeMode.CenterImage:
-                // Center the image (for now, just center within bounds)
-                return new Rectangle(inset, inset, contentWidth, contentHeight);
+            {
+                // Center at natural size; clip if larger than control.
+                int drawW = Math.Min(natW, contentWidth);
+                int drawH = Math.Min(natH, contentHeight);
+                int x = inset + (contentWidth  - drawW) / 2;
+                int y = inset + (contentHeight - drawH) / 2;
+                return new Rectangle(x, y, drawW, drawH);
+            }
 
             case PictureBoxSizeMode.Zoom:
-                // Maintain aspect ratio and fit within bounds
-                // For now, same as stretch (would need actual image dimensions)
-                return new Rectangle(inset, inset, contentWidth, contentHeight);
+            {
+                // Fit within content area while preserving aspect ratio.
+                double scaleX = (double)contentWidth  / natW;
+                double scaleY = (double)contentHeight / natH;
+                double scale  = Math.Min(scaleX, scaleY);
+                int drawW = Math.Max(1, (int)Math.Round(natW * scale));
+                int drawH = Math.Max(1, (int)Math.Round(natH * scale));
+                int x = inset + (contentWidth  - drawW) / 2;
+                int y = inset + (contentHeight - drawH) / 2;
+                return new Rectangle(x, y, drawW, drawH);
+            }
 
             default:
                 return new Rectangle(inset, inset, contentWidth, contentHeight);

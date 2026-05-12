@@ -107,6 +107,14 @@ window.setupCanvasKeyboardHandling = function(canvas) {
     }, { capture: false }); // Changed to non-capture so Blazor handles it first
 };
 
+// Returns { width, height } for a cached image, or { width: 0, height: 0 } if not yet loaded.
+window.getImageSize = function(imageUrl) {
+    if (!imageUrl) return { width: 0, height: 0 };
+    const img = imageCache.get(imageUrl);
+    if (img) return { width: img.naturalWidth, height: img.naturalHeight };
+    return { width: 0, height: 0 };
+};
+
 // Preload an image into cache without drawing
 window.preloadImage = async function(imageUrl) {
     if (!imageUrl || imageUrl.trim() === '') {
@@ -1284,4 +1292,54 @@ window.getScreenInfo = function () {
         devicePixelRatio: window.devicePixelRatio || 1,
         colorDepth: window.screen.colorDepth || 32
     };
+};
+
+// Render an MDI child's client area onto a canvas identified by element id.
+// Used by MdiClientArea.razor to paint each MDI child form.
+window.renderMdiChildCanvas = async function(canvasId, width, clientHeight, backColor, commands) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+
+    // Resize canvas to match current child size
+    if (canvas.width !== width) canvas.width = width;
+    if (canvas.height !== clientHeight) canvas.height = clientHeight;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Fill background
+    ctx.fillStyle = backColor || '#f0f0f0';
+    ctx.fillRect(0, 0, width, clientHeight);
+
+    // Reuse the existing structured command renderer by passing the canvas directly.
+    // offsetX/offsetY = 0 so commands are relative to (0,0) of the child client area.
+    if (commands && commands.length > 0) {
+        await window.renderClientAreaCommands(canvas, 0, 0, commands);
+    }
+};
+
+// Updates the browser tab title and favicon to reflect the currently active form.
+// iconUrl may be null/empty — in that case the favicon element is removed so the
+// browser falls back to the default (if any) without leaving a broken icon link.
+window.updateBrowserTitle = function (title, iconUrl) {
+    // Update document title
+    if (title != null) {
+        document.title = title;
+    }
+
+    // Update (or remove) the favicon <link> element
+    let link = document.querySelector("link[rel~='icon']");
+    if (iconUrl) {
+        if (!link) {
+            link = document.createElement('link');
+            link.rel = 'icon';
+            document.head.appendChild(link);
+        }
+        link.href = iconUrl;
+    } else {
+        // No icon — remove any existing favicon link so the browser shows nothing
+        if (link) {
+            link.remove();
+        }
+    }
 };

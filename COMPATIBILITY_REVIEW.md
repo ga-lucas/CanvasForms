@@ -10,11 +10,11 @@
 | Category | Control / Component | Status | Key Gaps |
 |----------|---------------------|--------|----------|
 | Core | `Control` (base) | Partial | Some render-side APIs are browser-constrained by design; drag-drop wired via HTML5 events |
-| Core | `ContainerControl` | Partial | `ActiveControl`, `Validate`, `ValidateChildren` |
+| Core | `ContainerControl` | Partial | `ActiveControl` wired; `Validate()` fires Validating/Validated; `ValidateChildren()`/`ValidateChildren(ValidationConstraints)` walk full tree; `AutoValidate` respected in focus path |
 | Core | `ScrollableControl` | Partial | Auto-scroll sizing; no physical scrollbar chrome |
 | Core | `UserControl` | Stub | Base lifecycle present; composite paint partial |
-| Windowing | `Form` | Partial | Chrome, move/resize done; MDI, OwnedForms missing |
-| Text | `Label` | Partial | Multi-line, alignment, AutoEllipsis done; Image not rendered |
+| Windowing | `Form` | Partial | Chrome, move/resize done; Icon → browser favicon + Text → browser tab title when active; MDI support: IsMdiContainer, MdiParent, MdiChildren, ActiveMdiChild, ActivateMdiChild, LayoutMdi (Cascade/TileH/TileV), MdiChildActivate event, constrained drag, resize handles (8-dir), z-index management, mouse/keyboard routing to child controls, child Invalidate→re-render wiring; OwnedForms present |
+| Text | `Label` | Partial | Multi-line, alignment, AutoEllipsis done; Image/ImageIndex/ImageKey/ImageList rendered with ImageAlign (all 9 alignments); border styles present |
 | Text | `LinkLabel` | Partial | Click/visited + optional browser nav; multi-link partial |
 | Text | `TextBox / TextBoxBase` | Partial | Editing, selection, redo, placeholder, autocomplete done; IME absent |
 | Text | `MaskedTextBox` | Partial | Mask display + validation; provider/culture hooks thin |
@@ -24,11 +24,11 @@
 | Buttons | `RadioButton` | Good | Mutual exclusion within parent |
 | Lists | `ListBox` | Good | SelectionMode, owner-draw, ItemHeight, IntegralHeight, double-click |
 | Lists | `CheckedListBox` | Partial | Basic checked-item behavior; CheckOnClick done |
-| Lists | `ComboBox` | Partial | Drop-down + selection; autocomplete partial |
+| Lists | `ComboBox` | Partial | Drop-down + selection; autocomplete partial; DrawMode (OwnerDrawFixed/Variable) + DrawItem + MeasureItem implemented |
 | Lists | `ListControl` (base) | Partial | DataSource, DisplayMember, ValueMember wired |
 | Collections | `TreeView` | Good | Nodes, expand/collapse, LabelEdit, ToolTipText, BeginUpdate |
 | Collections | `ListView` | Good | Details/List/LargeIcon; keyboard nav; EnsureVisible; BeginUpdate |
-| Display | `PictureBox` | Partial | URL/Image; SizeMode; LoadAsync; LoadCompleted; ErrorImage |
+| Display | `PictureBox` | Partial | URL/Image; SizeMode (Normal/CenterImage/Zoom/StretchImage — all correctly implemented using natural image dimensions from JS); ImageLocation; LoadAsync; LoadCompleted; ErrorImage |
 | Display | `ProgressBar` | Partial | Blocks/continuous/marquee; RightToLeftLayout |
 | Display | `MonthCalendar` | Good | SelectionRange; BoldedDates; keyboard/mouse nav |
 | Common | `DateTimePicker` | Good | Format/CustomFormat; ShowUpDown/ShowCheckBox; calendar |
@@ -59,7 +59,7 @@
 | Data | `BindingSource` | Partial | IList/IBindingList; Filter/Sort/Find; server-backed |
 | Data | `DataTable` | Partial | DataView/DefaultView; DataRowView (ICustomTypeDescriptor); typed RowChanged/RowDeleted/ColumnChanged events; Select(filter, sort); DataSet/DataTableCollection/DataRelation; IListSource; BindingSource wired |
 | Non-visual | `NotifyIcon` | Partial | Canvas system tray; ContextMenuStrip popup; balloon tips |
-| Non-visual | `ToolTip` | Partial | InitialDelay/AutoPopDelay hover timer; balloon + icon title; overlay div in FormRenderer |
+| Non-visual | `ToolTip` | Partial | InitialDelay/AutoPopDelay/ReshowDelay; ShowAlways (form-active gate); balloon + icon title; overlay div in FormRenderer |
 | Non-visual | `ErrorProvider` | Partial | SetError/GetError/Clear; red badge overlays positioned right of each control; hover title shows message |
 | Non-visual | `Clipboard` | Good | SetText/GetText/Async; `navigator.clipboard` bridge; local-cache fallback |
 | Non-visual | `Screen` | Partial | PrimaryScreen/AllScreens; Bounds/WorkingArea from `window.screen`/`window.inner*` via JS; FromControl/FromPoint/FromRectangle; GetWorkingArea/GetBounds overloads; 1920×1080 fallback before first render |
@@ -117,7 +117,7 @@
 ## Form
 
 ### Implemented
-- Text (title bar), Icon (property; not rendered as favicon)
+- Text (title bar), Icon (property; rendered as browser favicon when form is active)
 - WindowState (Normal / Minimized / Maximized) + WindowStateChanged
 - FormBorderStyle (affects chrome rendering)
 - FormStartPosition (Manual, CenterScreen, CenterParent, WindowsDefaultLocation)
@@ -141,9 +141,11 @@
 - ControlBox, MinimizeBox, MaximizeBox: properties present; chrome rendering simplified
 - AutoScroll, AutoScrollPosition: via ScrollableControl; partial
 
+### Partial
+- MDI: `IsMdiContainer`, `MdiParent`, `MdiChildren`, `ActiveMdiChild`, `ActivateMdiChild()`, `LayoutMdi()` (Cascade/TileHorizontal/TileVertical), `MdiChildActivate` event — all implemented via `MdiClientArea` Blazor component; constrained drag (children cannot leave workspace), 8-direction resize handles, z-index layering (active child on top), full mouse/keyboard event routing to child `Form`/`Control` handlers, child `Invalidate()` wired to canvas re-render via `RequestRender` callback; minimized icon strip; `ArrangeIcons` layout not yet implemented
+
 ### Not implemented
-- MDI (MdiParent, MdiChildren, IsMdiContainer, tile/cascade)
-- OwnedForms collection
+- OwnedForms collection (stub only)
 
 ---
 
@@ -212,12 +214,21 @@
 - DropDownStyle (DropDown, DropDownList, Simple)
 - DroppedDown, MaxDropDownItems, DropDownWidth, DropDownHeight
 - DisplayMember, ValueMember, DataSource
-- DropDown, DropDownClosed, SelectedIndexChanged, TextChanged
+- DropDown, DropDownClosed, SelectedIndexChanged, TextChanged, SelectionChangeCommitted
+- **Editable `DropDown` input** — `OnKeyPress` routes printable characters and Backspace into `_text`; programmatic `Text` setter syncs internal user-text state
+- **`DropDownList` type-ahead** — typing a character selects the first item whose text starts with that character (wraps around)
+- **`AutoCompleteMode`** (`Suggest`, `Append`, `SuggestAppend`, `None`) — fully implemented:
+  - `Append`: best-matching suffix appended after typed text, rendered with blue selection highlight; advancing through suffix on matching keystrokes
+  - `Suggest`: dropdown opens and pre-highlights the first matching item
+  - `SuggestAppend`: both behaviours combined
+  - Enter commits the suffix / highlighted suggestion; Escape reverts to user-typed text; LostFocus commits
+- **`AutoCompleteSource`** (`ListItems` / `CustomSource`) — `CustomSource` reads `AutoCompleteCustomSource`; all other sources fall back to `ListItems`
+- **`FindString(s)` / `FindString(s, startIndex)`** — case-insensitive prefix search through items
+- **`FindStringExact(s)` / `FindStringExact(s, startIndex)`** — case-insensitive exact match through items
+- **`DrawMode`** (`OwnerDrawFixed` / `OwnerDrawVariable`) — `DrawItem` event raised for each drop-down item and for the selected-item face (with `DrawItemState.ComboBoxEdit`); `MeasureItem` raised per-item for `OwnerDrawVariable` to support variable row heights
 
 ### Partial
-- AutoCompleteMode / AutoCompleteSource / AutoCompleteCustomSource: partial
-- DrawMode (OwnerDraw not implemented)
-- FindString(), FindStringExact(): stub
+- AutoCompleteCustomSource population (accepted; content must be filled by caller)
 
 ---
 
@@ -273,11 +284,13 @@
 
 #### Partial
 - In-cell editing: TextBox column only; CheckBox toggle done
-- CellValidating, RowValidating: events present, no built-in UI feedback
+- CellValidating, RowValidating: events fire on selection change; `Cancel = true` blocks move and draws a red inset border on the offending cell; error clears when validation passes
 
 #### Not implemented
-- Frozen rows
 - ComboBox column in-cell dropdown UI
+
+#### Implemented (this session)
+- Frozen rows (`DataGridViewRow.Frozen`): pinned below column header, unaffected by vertical scroll; two-pass paint, hit-testing, scrollbar thumb, and mouse-wheel clamp all account for frozen zone
 
 ---
 
@@ -409,9 +422,10 @@
 - Rendered as an absolutely-positioned `<div>` overlay in `FormRenderer.razor` (pointer-events: none), z-index 99999
 - `ToolTipRegistry` (static) — change-event bus so the renderer re-renders on show/hide transitions
 - `Dispose()` unregisters all hooks and cancels pending timers
+- `ReshowDelay` — when a tooltip was recently dismissed (within `AutoPopDelay` ms), the next hover uses `ReshowDelay` instead of the full `InitialDelay`
+- `ShowAlways` — when `false` (default) tooltips are suppressed if the control's parent form is not the active form; when `true` tooltips always show regardless of form focus
 
 #### Not implemented
-- `ShowAlways` (currently no distinction between focused/unfocused forms)
 - System-level OS tooltip for controls outside the canvas (e.g. `NotifyIcon` text uses its own tooltip)
 - Per-control `AutoPopDelay` override (global setting only)
 
@@ -607,7 +621,7 @@ These gaps are architectural — they require OS integration unavailable in a br
 - No actual system tray — canvas tray is a visual simulation inside the page
 - Clipboard JS bridge implemented: `Clipboard.SetText`/`GetText`/`SetTextAsync`/`GetTextAsync` use `navigator.clipboard` with local-cache fallback; `clipboard-read` permission required for cross-app paste (auto-granted on localhost)
 - `Screen`: one virtual browser screen; `PrimaryScreen.Bounds` = `window.screen` dimensions; `WorkingArea` = `window.innerWidth/Height`; no multi-monitor support
-- No MDI (Multiple Document Interface)
+- MDI: constrained drag/resize, z-index, mouse/keyboard routing, and child invalidation re-render all implemented (see `Form` section); `ArrangeIcons` layout not yet implemented
 - No `PrintDocument` / print preview (no printer access from WASM)
 - `DoDragDrop` return value is async — the IL translator patches call-sites automatically (see above)
 - `WebBrowser` / `WebView2`: cross-origin `Document` DOM access blocked by browser sandbox; `GoBack`/`GoForward` only work for same-origin history entries

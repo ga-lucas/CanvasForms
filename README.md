@@ -241,7 +241,7 @@ Controls below have **no source file** in the repo yet. Everything else either h
 - `HelpProvider`
 - `WebBrowser` / WebView2
 - `Chart`
-- MDI (`MdiClient`, MDI Forms)
+- MDI (`MdiClient`, MDI Forms) — initial implementation done; keyboard routing + `ArrangeIcons` pending
 - `Clipboard` (JS bridge needed)
 
 Controls live in `WebForms.Canvas/Forms/...` (project: `Canvas.Windows.Forms`).
@@ -256,7 +256,8 @@ Status legend:
 | Area | Control | Status | Notes |
 |------|---------|--------|-------|
 | Windowing | `Form` | ⚠️ Partial | Window chrome, move/resize, min/max/close are implemented. |
-| Core | `Control` | ⚠️ Partial | API surface is prioritized (see tests); many members are compatibility-oriented in a canvas environment. |
+| Core | `Control` | ⚠️ Partial | API surface is prioritized (see tests); many members are compatibility-oriented in a canvas environment. `Validate()` fires `Validating`/`Validated`; wired into `Focus()` focus-leave path. |
+| Core | `ContainerControl` | ⚠️ Partial | `ValidateChildren()` / `ValidateChildren(ValidationConstraints)` walk control tree; `Validate()` blocks focus transfer if cancelled. |
 | Text | `Label` | ⚠️ Partial | Basic multi-line + alignment, approximate measurement. |
 | Text | `LinkLabel` | ⚠️ Partial | Click/visited + optional browser navigation via `LinkUrl`. |
 | Text | `TextBox` / `TextBoxBase` | ⚠️ Partial | Basic editing, selection, shortcuts; autocomplete support is evolving. |
@@ -268,10 +269,10 @@ Status legend:
 | Lists | `ListControl` | ⚠️ Partial | Base type for list-like controls. |
 | Lists | `ListBox` | ⚠️ Partial | Selection + basic navigation; missing advanced modes. |
 | Lists | `CheckedListBox` | ⚠️ Partial | Basic checked item behavior. |
-| Lists | `ComboBox` | ⚠️ Partial | Drop-down + selection; autocomplete support is partial. |
+| Lists | `ComboBox` | ⚠️ Partial | Editable DropDown input + DropDownList type-ahead; `AutoCompleteMode` (Suggest/Append/SuggestAppend); `FindString`/`FindStringExact`; OwnerDraw not implemented. |
 | Collections | `TreeView` | ⚠️ Partial | Nodes + expand/collapse + selection. |
 | Collections | `ListView` | ⚠️ Partial | Details view + columns/items; feature coverage still growing. |
-| Display | `PictureBox` | ⚠️ Partial | URL-based image loading (see `WebForms.Canvas/Docs/PictureBox.md`). |
+| Display | `PictureBox` | ⚠️ Partial | URL-based image loading; `SizeMode` (Normal/CenterImage/Zoom/StretchImage) correctly implemented using natural image dimensions from browser; `ImageLocation` alias; `LoadAsync`; `LoadCompleted`. |
 | Display | `ProgressBar` | ⚠️ Partial | Blocks/continuous/marquee-style rendering (simplified). |
 | Display | `MonthCalendar` | ⚠️ Partial | Single-month view + basic keyboard/mouse navigation. |
 | Common | `DateTimePicker` | ⚠️ Partial | Simplified text rendering + drop-down calendar. |
@@ -296,7 +297,7 @@ Status legend:
 | Dialogs | `FolderBrowserDialog` | ⚠️ Partial | `SelectedPath`, `Description`, `ShowNewFolderButton`; host FS aware. |
 | Dialogs | `ColorDialog` | ⚠️ Partial | Swatch palette + Hex/RGB/HSV inputs. |
 | Dialogs | `FontDialog` | ⚠️ Partial | Family/style/size lists; `ShowEffects`, `ShowColor`, `Apply` event. |
-| Data | `DataGridView` | ⚠️ Partial | `IList`/`BindingSource`/`DataTable` binding; auto-column gen; sort; frozen columns; clipboard copy (Ctrl+C); multi-column sort (Ctrl+click header). |
+| Data | `DataGridView` | ⚠️ Partial | `IList`/`BindingSource`/`DataTable` binding; auto-column gen; sort; frozen columns; **frozen rows**; **CellValidating/RowValidating** (Cancel blocks move + red border feedback); clipboard copy (Ctrl+C); multi-column sort (Ctrl+click header). |
 | Data | `DataTable` | ⚠️ Partial | DataView/DefaultView; DataRowView; typed RowChanged/ColumnChanged events; Select(filter, sort); DataSet/DataRelation; IListSource; BindingSource wired. |
 | Data | `BindingSource` | ⚠️ Partial | `IList`/`IBindingList`/`DataTable`/`DataSet` wrapper; `Current`/`Position` navigation; server-backed via `CanvasDataService`. |
 | Non-visual | `ToolTip` | 🧩 Stub/Compatibility | API present; rendering may be incomplete. |
@@ -382,7 +383,7 @@ Items are ordered by estimated prevalence in designer-generated / translated Win
 | ✅ | `RadioButton` | Mutual exclusion within parent |
 | ✅ | `TextBox` / `TextBoxBase` | Editing, selection, shortcuts, redo, word-delete, placeholder, autocomplete |
 | ✅ | `Label` | Multi-line, alignment, UseMnemonic, AutoEllipsis, AutoSize, BorderStyle, FlatStyle |
-| ⚠️ | `ComboBox` | Drop-down + selection; autocomplete partial |
+| ⚠️ | `ComboBox` | Editable DropDown input; DropDownList type-ahead; AutoCompleteMode (Suggest/Append/SuggestAppend); FindString/FindStringExact |
 | ✅ | `ListBox` | Selection + navigation; owner-draw, MeasureItem, ItemHeight, IntegralHeight, double-click |
 | ⚠️ | `Panel` / `ScrollableControl` | Child painting, input routing, scroll offset |
 | ⚠️ | `GroupBox` | Border/caption + child routing |
@@ -402,7 +403,7 @@ Items are ordered by estimated prevalence in designer-generated / translated Win
 | ✅ | `ListView` | Details/List/LargeIcon views; keyboard nav; EnsureVisible; BeginUpdate/EndUpdate |
 | ⚠️ | `OpenFileDialog` | Host FS + browser upload |
 | ⚠️ | `ToolTip` | InitialDelay/AutoPopDelay hover timer; balloon + icon title; canvas overlay div |
-| ⚠️ | **`DataGridView`** | In-process `DataSource` binding (IList, BindingSource, DataTable); auto-column gen; virtualised scroll; row selection; single/multi-column sort (Ctrl+click header, ▲1 ▲2 indicators); frozen columns (pin columns to left, unaffected by horizontal scroll); Ctrl+C clipboard export (tab-separated, respects `ClipboardCopyMode`); column types: TextBox/CheckBox/Button/ComboBox/Image/Link |
+| ⚠️ | **`DataGridView`** | In-process `DataSource` binding (IList, BindingSource, DataTable); auto-column gen; virtualised scroll; row selection; single/multi-column sort (Ctrl+click header, ▲1 ▲2 indicators); frozen columns (pin columns to left, unaffected by horizontal scroll); **frozen rows** (`DataGridViewRow.Frozen`, pinned below header, unaffected by vertical scroll); **`CellValidating` / `RowValidating`** — fire on selection change; `Cancel = true` blocks move and draws red inset border on the failing cell; clears when validation passes; Ctrl+C clipboard export (tab-separated, respects `ClipboardCopyMode`); column types: TextBox/CheckBox/Button/ComboBox/Image/Link |
 | ✅ | `Timer` | `PeriodicTimer`-based async loop; `Interval`, `Enabled`, `Start()`, `Stop()`, `Tick`, `Tag`, `IContainer` ctor; fires on captured `SynchronizationContext` |
 | ⚠️ | **`ErrorProvider`** | SetError/GetError/Clear; red badge overlays; hover title tooltip; BlinkRate/BlinkStyle; ContainerControl |
 | ⚠️ | `SaveFileDialog` | Inherits full FileDialog UI; `CreatePrompt`, `OverwritePrompt`, `OpenFile()` |
@@ -449,7 +450,7 @@ Items are ordered by estimated prevalence in designer-generated / translated Win
 | ⚠️ | **`Screen`** | `PrimaryScreen`/`AllScreens`; `Bounds` from `window.screen`; `WorkingArea` from `window.innerWidth/Height`; `FromControl`/`FromPoint`/`GetWorkingArea`/`GetBounds`; JS interop via `getScreenInfo`; 1920×1080 fallback; no multi-monitor |
 | 🔲 | **`Clipboard`** | Cut/Copy/Paste; requires JS bridge |
 | ⚠️ | **`WebBrowser` / WebView2** | iframe overlay; Navigate, GoBack/Forward, Stop, Refresh, DocumentText, ExecuteScriptAsync, events; cross-origin DOM access blocked by browser sandbox |
-| 🔲 | **MDI (`MdiClient`, MDI Forms)** | MDI window management; enterprise apps |
+| ⚠️ | **MDI (`MdiClient`, MDI Forms)** | `IsMdiContainer`, `MdiParent`, `MdiChildren`, `ActiveMdiChild`, `ActivateMdiChild`, `LayoutMdi` (Cascade/TileH/TileV), `MdiChildActivate`; `MdiClientArea` Blazor component renders child windows with title bar, min/max/restore/close, and minimize strip; keyboard routing inside children and `ArrangeIcons` pending |
 | ✅ | **`DataGridViewColumn` types** | TextBox/CheckBox/ComboBox/Button/Image/Link column variants; `DataGridViewCellStyle`; `DataGridViewRow`/`DataGridViewCell` model |
 | ✅ | **`CanvasDataService`** | Server-backed ADO.NET provider; `ICanvasDataService.Fill(DataTable, sql)`; SQLite default; ambient `CanvasDataService.Current` accessor for native and translated apps |
 

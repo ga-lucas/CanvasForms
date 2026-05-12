@@ -118,7 +118,8 @@ public class WelcomeForm : Form
         y += rh;
 
         // Row 6
-        Btn("WebBrowser & NotifyIcon", lx, y).Click += (s, e) => Launch<DemoWebNotifyForm>();
+        Btn("WebBrowser & NotifyIcon", lx,   y).Click += (s, e) => Launch<DemoWebNotifyForm>();
+        Btn("MDI Demo",                col2, y).Click += (s, e) => Launch<MdiDemoForm>();
         y += rh;
 
         // ── Links ────────────────────────────────────────────────────────

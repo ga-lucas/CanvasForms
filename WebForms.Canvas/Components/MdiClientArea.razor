@@ -1,0 +1,386 @@
+@using Forms = System.Windows.Forms
+@using Canvas.Windows.Forms.Drawing
+@using Canvas.Windows.Forms.Services
+@using BlazorMouseEventArgs = Microsoft.AspNetCore.Components.Web.MouseEventArgs
+@inject IJSRuntime JSRuntime
+
+@if (MdiParent != null && MdiParent.IsMdiContainer)
+{
+    var workW = MdiParent.ClientWidth  - BorderWidth * 2;
+    var workH = MdiParent.ClientHeight - BorderWidth * 2;
+
+    <div @ref="_workspaceRef"
+         style="position: absolute;
+                left: @(MdiParent.Left + BorderWidth)px;
+                top: @(MdiParent.Top + TitleBarHeight + BorderWidth)px;
+                width: @(workW)px;
+                height: @(workH)px;
+                background: #848284;
+                overflow: hidden;
+                box-shadow: inset 1px 1px 4px rgba(0,0,0,0.4);
+                z-index: @(MdiParent.ZIndex + 1);
+                cursor: @_workspaceCursor;"
+         @onmousemove="OnWorkspaceMouseMove"
+         @onmouseup="OnWorkspaceMouseUp"
+         @onmouseleave="OnWorkspaceMouseUp">
+
+        @foreach (var child in MdiParent.MdiChildren)
+        {
+            if (!child.Visible) { continue; }
+            var isActive  = child == MdiParent.ActiveMdiChild;
+            var isMin     = child.WindowState == Forms.FormWindowState.Minimized;
+            var isMax     = child.WindowState == Forms.FormWindowState.Maximized;
+            var canvasId  = "mdi-child-" + child.GetHashCode().ToString();
+            var childW    = isMax ? workW : child.ClientWidth;
+            var childH    = isMax ? workH : MdiTitleBarH + child.ClientHeight;
+            var canvasH   = isMax ? workH - MdiTitleBarH : child.ClientHeight;
+            var childLeft = isMax ? 0 : child.Left;
+            var childTop  = isMax ? 0 : child.Top;
+            var zIdx      = isActive ? 200 : child.ZIndex + 10;
+
+            @if (!isMin)
+            {
+                <div @key="child"
+                     style="position:absolute; left:@(childLeft)px; top:@(childTop)px; width:@(childW)px; height:@(childH)px; z-index:@zIdx; box-sizing:border-box; border:@(isActive ? "2px solid #000080" : "2px solid #808080"); box-shadow:@(isActive ? "2px 2px 8px rgba(0,0,0,0.6)" : "1px 1px 3px rgba(0,0,0,0.3)");">
+
+                    <div style="position:absolute; top:0; left:0; right:0; height:@(MdiTitleBarH)px; background:@(isActive ? "linear-gradient(180deg,#000080,#1084d0)" : "linear-gradient(180deg,#7b7b7b,#a0a0a0)"); color:white; font:bold 11px Segoe UI,sans-serif; display:flex; align-items:center; padding:0 2px; cursor:@(isMax ? "default" : "move"); user-select:none;"
+                         @onmousedown="(e) => OnTitleBarMouseDown(e, child)"
+                         @ondblclick="(e) => OnTitleBarDoubleClick(e, child)">
+                        <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:0 4px;">@child.Text</span>
+                        <span style="@MdiBtnStyle" title="Minimize"  @onclick:stopPropagation="true" @onclick="() => MinimizeChild(child)">-</span>
+                        @if (isMax) {
+                            <span style="@MdiBtnStyle" title="Restore"   @onclick:stopPropagation="true" @onclick="() => RestoreChild(child)">o</span>
+                        } else {
+                            <span style="@MdiBtnStyle" title="Maximize"  @onclick:stopPropagation="true" @onclick="() => MaximizeChild(child)">+</span>
+                        }
+                        <span style="@MdiBtnStyle" title="Close"     @onclick:stopPropagation="true" @onclick="() => CloseChild(child)">x</span>
+                    </div>
+
+                    <canvas id="@canvasId"
+                            width="@childW"
+                            height="@canvasH"
+                            style="position:absolute; top:@(MdiTitleBarH)px; left:0; display:block; outline:none;"
+                            tabindex="0"
+                            @onmousedown="(e) => OnChildCanvasMouseDown(e, child)"
+                            @onmouseup="(e)   => OnChildCanvasMouseUp(e, child)"
+                            @onmousemove="(e) => OnChildCanvasMouseMove(e, child)"
+                            @onclick="(e)     => OnChildCanvasClick(e, child)"
+                            @ondblclick="(e)  => OnChildCanvasDblClick(e, child)"
+                            @onkeydown="(e)   => OnChildKeyDown(e, child)"
+                            @onkeyup="(e)     => OnChildKeyUp(e, child)"
+                            @onkeypress="(e)  => OnChildKeyPress(e, child)" />
+
+                    @if (!isMax && child.AllowResize)
+                    {
+                        <div style="position:absolute; right:0;   top:@(MdiTitleBarH)px; width:@(ResizeH)px;  bottom:@(ResizeH)px;   cursor:ew-resize;    z-index:10;" @onmousedown="(e) => OnResizeHandleMouseDown(e, child, ResizeDir.Right)" />
+                        <div style="position:absolute; bottom:0;  left:@(ResizeH)px;  right:@(ResizeH)px;  height:@(ResizeH)px;   cursor:ns-resize;    z-index:10;" @onmousedown="(e) => OnResizeHandleMouseDown(e, child, ResizeDir.Bottom)" />
+                        <div style="position:absolute; left:0;    top:@(MdiTitleBarH)px; width:@(ResizeH)px;  bottom:@(ResizeH)px;   cursor:ew-resize;    z-index:10;" @onmousedown="(e) => OnResizeHandleMouseDown(e, child, ResizeDir.Left)" />
+                        <div style="position:absolute; right:0;   bottom:0; width:@(ResizeH)px; height:@(ResizeH)px; cursor:nwse-resize; z-index:11;" @onmousedown="(e) => OnResizeHandleMouseDown(e, child, ResizeDir.BottomRight)" />
+                        <div style="position:absolute; left:0;    bottom:0; width:@(ResizeH)px; height:@(ResizeH)px; cursor:nesw-resize; z-index:11;" @onmousedown="(e) => OnResizeHandleMouseDown(e, child, ResizeDir.BottomLeft)" />
+                        <div style="position:absolute; right:0;   top:@(MdiTitleBarH)px; width:@(ResizeH)px; height:@(ResizeH)px; cursor:nesw-resize; z-index:11;" @onmousedown="(e) => OnResizeHandleMouseDown(e, child, ResizeDir.TopRight)" />
+                        <div style="position:absolute; left:0;    top:@(MdiTitleBarH)px; width:@(ResizeH)px; height:@(ResizeH)px; cursor:nwse-resize; z-index:11;" @onmousedown="(e) => OnResizeHandleMouseDown(e, child, ResizeDir.TopLeft)" />
+                    }
+                </div>
+            }
+            else
+            {
+                var iconSlot = GetMinimizedSlot(child);
+                <div @key="child"
+                     style="position:absolute; bottom:0; left:@(iconSlot * 162)px; width:160px; height:24px; background:@(isActive ? "#000080" : "#606060"); color:white; font:11px Segoe UI,sans-serif; display:flex; align-items:center; padding:0 4px; border:1px solid @(isActive ? "#4040c0" : "#909090"); cursor:pointer; z-index:300;"
+                     @onclick="() => RestoreChild(child)" title="@child.Text">
+                    <span style="flex:1; overflow:hidden; text-overflow:ellipsis;">@child.Text</span>
+                    <span style="padding:0 4px;" @onclick:stopPropagation="true" @onclick="() => CloseChild(child)">x</span>
+                </div>
+            }
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public Forms.Form? MdiParent { get; set; }
+    [Parameter] public int TitleBarHeight    { get; set; } = 32;
+    [Parameter] public int BorderWidth       { get; set; } = 2;
+
+    private const int MdiTitleBarH = 22;
+    private const int ResizeH      = 6;
+    private const string MdiBtnStyle = "cursor:pointer;padding:1px 7px;font-size:11px;line-height:1;user-select:none;";
+
+    private ElementReference _workspaceRef;
+
+    private Forms.Form? _dragChild;
+    private double _dragStartX, _dragStartY;
+    private int    _dragChildL,  _dragChildT;
+
+    private enum ResizeDir { None, Left, Right, Top, Bottom, TopLeft, TopRight, BottomLeft, BottomRight }
+    private Forms.Form? _resizeChild;
+    private ResizeDir   _resizeDir;
+    private double _resizeStartX, _resizeStartY;
+    private int    _resizeStartW, _resizeStartH, _resizeStartL, _resizeStartT;
+
+    private bool IsDragging => _dragChild   != null;
+    private bool IsResizing => _resizeChild != null;
+
+    private string _workspaceCursor => _resizeDir switch
+    {
+        ResizeDir.Left  or ResizeDir.Right                => "ew-resize",
+        ResizeDir.Top   or ResizeDir.Bottom               => "ns-resize",
+        ResizeDir.TopLeft or ResizeDir.BottomRight        => "nwse-resize",
+        ResizeDir.TopRight or ResizeDir.BottomLeft        => "nesw-resize",
+        _ when IsDragging                                 => "move",
+        _                                                 => "default"
+    };
+
+    private int GetMinimizedSlot(Forms.Form child)
+    {
+        var list = MdiParent?.MdiChildren
+            .Where(c => c.WindowState == Forms.FormWindowState.Minimized && c.Visible).ToList() ?? [];
+        return list.IndexOf(child);
+    }
+
+    protected override void OnInitialized()
+    {
+        if (MdiParent == null) return;
+        MdiParent.OnMdiChanged = () => InvokeAsync(async () =>
+        {
+            WireChildRenderCallbacks();
+            StateHasChanged();
+            await Task.Yield();
+            await RenderAllChildren();
+        });
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) WireChildRenderCallbacks();
+        await RenderAllChildren();
+    }
+
+    private void WireChildRenderCallbacks()
+    {
+        if (MdiParent == null) return;
+        foreach (var child in MdiParent.MdiChildren) WireChildRender(child);
+    }
+
+    private void WireChildRender(Forms.Form child)
+    {
+        // Ensure the child form has a TextMeasurementService (needed for caret drawing)
+        child.TextMeasurementService ??= new TextMeasurementService(JSRuntime);
+
+        Func<Task> cb = () => InvokeAsync(async () =>
+        {
+            if (child.Visible && child.WindowState != Forms.FormWindowState.Minimized)
+                await RenderChild(child);
+        });
+        child.PropagateRequestRender(cb);
+    }
+
+    private async Task RenderAllChildren()
+    {
+        if (MdiParent == null) return;
+        foreach (var child in MdiParent.MdiChildren)
+        {
+            if (!child.Visible || child.WindowState == Forms.FormWindowState.Minimized) continue;
+            await RenderChild(child);
+        }
+    }
+
+    private async Task RenderChild(Forms.Form child)
+    {
+        try
+        {
+            var workW   = MdiParent!.ClientWidth  - BorderWidth * 2;
+            var workH   = MdiParent!.ClientHeight - BorderWidth * 2;
+            var isMax   = child.WindowState == Forms.FormWindowState.Maximized;
+            var w       = isMax ? workW       : child.ClientWidth;
+            var clientH = isMax ? workH - MdiTitleBarH : child.ClientHeight;
+            clientH     = Math.Max(1, clientH);
+
+            using var g = new Graphics(w, clientH);
+            child.OnPaint(new Forms.PaintEventArgs(g, new Rectangle(0, 0, w, clientH)));
+            var cmds = g.GetCommands().Select(c => c.ToCommand()).ToArray();
+            await JSRuntime.InvokeVoidAsync("renderMdiChildCanvas",
+                "mdi-child-" + child.GetHashCode().ToString(), w, clientH,
+                ((Color)child.BackColor).ToHexString(), cmds);
+        }
+        catch (Exception ex) { Console.WriteLine($"MDI render ({child.Text}): {ex.Message}"); }
+    }
+
+    private void CloseChild(Forms.Form child)
+    {
+        child.Close();
+        MdiParent?.RemoveMdiChild(child);
+        StateHasChanged();
+        _ = RenderAllChildren();
+    }
+
+    private void MinimizeChild(Forms.Form child)
+    { child.WindowState = Forms.FormWindowState.Minimized; StateHasChanged(); }
+
+    private void MaximizeChild(Forms.Form child)
+    {
+        child.WindowState = Forms.FormWindowState.Maximized;
+        MdiParent?.ActivateMdiChild(child);
+        StateHasChanged();
+        _ = RenderAllChildren();
+    }
+
+    private void RestoreChild(Forms.Form child)
+    {
+        child.WindowState = Forms.FormWindowState.Normal;
+        MdiParent?.ActivateMdiChild(child);
+        StateHasChanged();
+        _ = RenderAllChildren();
+    }
+
+    private void ActivateChild(Forms.Form child)
+    {
+        if (MdiParent?.ActiveMdiChild == child) return;
+        MdiParent?.ActivateMdiChild(child);
+        StateHasChanged();
+        _ = RenderAllChildren();
+    }
+
+    private void OnTitleBarMouseDown(BlazorMouseEventArgs e, Forms.Form child)
+    {
+        ActivateChild(child);
+        if (child.WindowState == Forms.FormWindowState.Maximized) return;
+        _dragChild  = child;
+        _dragStartX = e.ClientX;
+        _dragStartY = e.ClientY;
+        _dragChildL = child.Left;
+        _dragChildT = child.Top;
+    }
+
+    private void OnTitleBarDoubleClick(BlazorMouseEventArgs e, Forms.Form child)
+    {
+        if (child.WindowState == Forms.FormWindowState.Maximized) RestoreChild(child);
+        else MaximizeChild(child);
+    }
+
+    private void OnWorkspaceMouseMove(BlazorMouseEventArgs e)
+    {
+        if (MdiParent == null) return;
+        var workW = MdiParent.ClientWidth  - BorderWidth * 2;
+        var workH = MdiParent.ClientHeight - BorderWidth * 2;
+
+        if (IsDragging && _dragChild != null)
+        {
+            var dx   = (int)(e.ClientX - _dragStartX);
+            var dy   = (int)(e.ClientY - _dragStartY);
+            var newL = _dragChildL + dx;
+            var newT = _dragChildT + dy;
+            newL = Math.Clamp(newL, -(_dragChild.Width - 60), workW - 60);
+            newT = Math.Clamp(newT, 0, workH - MdiTitleBarH);
+            _dragChild.Left = newL;
+            _dragChild.Top  = newT;
+            StateHasChanged();
+            return;
+        }
+
+        if (IsResizing && _resizeChild != null)
+        {
+            var dx = (int)(e.ClientX - _resizeStartX);
+            var dy = (int)(e.ClientY - _resizeStartY);
+            ApplyResize(_resizeChild, _resizeDir, dx, dy, workW, workH);
+            StateHasChanged();
+            _ = RenderChild(_resizeChild);
+        }
+    }
+
+    private void OnWorkspaceMouseUp(BlazorMouseEventArgs e)
+    {
+        if (_resizeChild != null) { _resizeChild.PerformLayout(); _ = RenderChild(_resizeChild); }
+        _dragChild   = null;
+        _resizeChild = null;
+        _resizeDir   = ResizeDir.None;
+        StateHasChanged();
+    }
+
+    private void OnResizeHandleMouseDown(BlazorMouseEventArgs e, Forms.Form child, ResizeDir dir)
+    {
+        ActivateChild(child);
+        _resizeChild  = child; _resizeDir    = dir;
+        _resizeStartX = e.ClientX; _resizeStartY = e.ClientY;
+        _resizeStartW = child.Width;  _resizeStartH = child.Height;
+        _resizeStartL = child.Left;   _resizeStartT = child.Top;
+    }
+
+    private void ApplyResize(Forms.Form child, ResizeDir dir, int dx, int dy, int maxW, int maxH)
+    {
+        const int MinW = 120, MinH = MdiTitleBarH + 40;
+        int newL = _resizeStartL, newT = _resizeStartT, newW = _resizeStartW, newH = _resizeStartH;
+
+        switch (dir)
+        {
+            case ResizeDir.Right:       newW = _resizeStartW + dx; break;
+            case ResizeDir.Bottom:      newH = _resizeStartH + dy; break;
+            case ResizeDir.Left:        newW = _resizeStartW - dx; newL = _resizeStartL + (_resizeStartW - Math.Max(MinW, newW)); break;
+            case ResizeDir.Top:         newH = _resizeStartH - dy; newT = _resizeStartT + (_resizeStartH - Math.Max(MinH, newH)); break;
+            case ResizeDir.BottomRight: newW = _resizeStartW + dx; newH = _resizeStartH + dy; break;
+            case ResizeDir.BottomLeft:  newW = _resizeStartW - dx; newL = _resizeStartL + (_resizeStartW - Math.Max(MinW, newW)); newH = _resizeStartH + dy; break;
+            case ResizeDir.TopRight:    newW = _resizeStartW + dx; newH = _resizeStartH - dy; newT = _resizeStartT + (_resizeStartH - Math.Max(MinH, newH)); break;
+            case ResizeDir.TopLeft:     newW = _resizeStartW - dx; newL = _resizeStartL + (_resizeStartW - Math.Max(MinW, newW)); newH = _resizeStartH - dy; newT = _resizeStartT + (_resizeStartH - Math.Max(MinH, newH)); break;
+        }
+
+        newW = Math.Clamp(newW, MinW, maxW); newH = Math.Clamp(newH, MinH, maxH);
+        newL = Math.Clamp(newL, 0, maxW - newW); newT = Math.Clamp(newT, 0, maxH - newH);
+        child.Left = newL; child.Top = newT; child.Width = newW; child.Height = newH;
+    }
+
+    private void OnChildCanvasMouseDown(BlazorMouseEventArgs e, Forms.Form child)
+    { ActivateChild(child); child.OnMouseDown(new Forms.MouseEventArgs(MapBtn(e.Button), 1, (int)e.OffsetX, (int)e.OffsetY)); }
+
+    private void OnChildCanvasMouseUp(BlazorMouseEventArgs e, Forms.Form child)
+        => child.OnMouseUp(new Forms.MouseEventArgs(MapBtn(e.Button), 1, (int)e.OffsetX, (int)e.OffsetY));
+
+    private void OnChildCanvasMouseMove(BlazorMouseEventArgs e, Forms.Form child)
+    {
+        if (IsDragging || IsResizing) return;
+        child.OnMouseMove(new Forms.MouseEventArgs(MapBtn(e.Button), 0, (int)e.OffsetX, (int)e.OffsetY));
+    }
+
+    private void OnChildCanvasClick(BlazorMouseEventArgs e, Forms.Form child)
+    {
+        // OnClick is protected; simulate via a quick down+up pair which fires Click internally.
+        var args = new Forms.MouseEventArgs(MapBtn(e.Button), 1, (int)e.OffsetX, (int)e.OffsetY);
+        child.OnMouseDown(args);
+        child.OnMouseUp(args);
+    }
+
+    private void OnChildCanvasDblClick(BlazorMouseEventArgs e, Forms.Form child)
+    {
+        var args = new Forms.MouseEventArgs(MapBtn(e.Button), 2, (int)e.OffsetX, (int)e.OffsetY);
+        child.OnMouseDown(args);
+        child.OnMouseUp(args);
+    }
+
+    private void OnChildKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e, Forms.Form child)
+        => child.FocusedControl?.OnKeyDown(MapKey(e));
+
+    private void OnChildKeyUp(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e, Forms.Form child)
+        => child.FocusedControl?.OnKeyUp(MapKey(e));
+
+    private void OnChildKeyPress(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e, Forms.Form child)
+    { if (e.Key.Length == 1) child.FocusedControl?.OnKeyPress(new Forms.KeyPressEventArgs(e.Key[0])); }
+
+    private static Forms.MouseButtons MapBtn(long b) => b switch
+    { 0 => Forms.MouseButtons.Left, 1 => Forms.MouseButtons.Middle, 2 => Forms.MouseButtons.Right, _ => Forms.MouseButtons.None };
+
+    private static Forms.KeyEventArgs MapKey(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+        => new Forms.KeyEventArgs(MapKeyCode(e.Key), alt: e.AltKey, control: e.CtrlKey, shift: e.ShiftKey);
+
+    private static Forms.Keys MapKeyCode(string k) => k switch
+    {
+        "Enter" => Forms.Keys.Enter, "Escape" => Forms.Keys.Escape, "Tab" => Forms.Keys.Tab,
+        "Backspace" => Forms.Keys.Back, "Delete" => Forms.Keys.Delete,
+        "ArrowLeft" => Forms.Keys.Left, "ArrowRight" => Forms.Keys.Right,
+        "ArrowUp" => Forms.Keys.Up, "ArrowDown" => Forms.Keys.Down,
+        "Home" => Forms.Keys.Home, "End" => Forms.Keys.End,
+        "PageUp" => Forms.Keys.PageUp, "PageDown" => Forms.Keys.PageDown,
+        "F1" => Forms.Keys.F1, "F2" => Forms.Keys.F2, "F3" => Forms.Keys.F3, "F4" => Forms.Keys.F4,
+        "F5" => Forms.Keys.F5, "F6" => Forms.Keys.F6, "F7" => Forms.Keys.F7, "F8" => Forms.Keys.F8,
+        "F9" => Forms.Keys.F9, "F10" => Forms.Keys.F10, "F11" => Forms.Keys.F11, "F12" => Forms.Keys.F12,
+        _ when k.Length == 1 && char.IsLetter(k[0]) => (Forms.Keys)char.ToUpper(k[0]),
+        _ => Forms.Keys.None
+    };
+}

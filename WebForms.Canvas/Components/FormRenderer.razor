@@ -188,6 +188,14 @@
                     box-sizing: border-box;">
         </div>
     }
+
+    @* ── MDI client area ──────────────────────────────────────────────────────── *@
+    @if (Form != null && Form.IsMdiContainer)
+    {
+        <MdiClientArea MdiParent="@Form"
+                       TitleBarHeight="@TitleBarHeight"
+                       BorderWidth="@BorderWidth" />
+    }
 }
 
 @code {

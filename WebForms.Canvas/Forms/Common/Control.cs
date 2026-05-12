@@ -1216,6 +1216,21 @@ public abstract class Control
         Validating?.Invoke(this, e);
     }
 
+    /// <summary>
+    /// Fires <see cref="Validating"/>; if not cancelled, fires <see cref="Validated"/> and
+    /// returns <c>true</c>.  Returns <c>false</c> if a <see cref="Validating"/> handler sets
+    /// <c>e.Cancel = true</c>.
+    /// </summary>
+    public bool Validate()
+    {
+        if (!CausesValidation) return true;
+        var args = new CancelEventArgs();
+        OnValidating(args);
+        if (args.Cancel) return false;
+        OnValidated(EventArgs.Empty);
+        return true;
+    }
+
     protected virtual void OnLayout(LayoutEventArgs e)
     {
         Layout?.Invoke(this, e);
@@ -1461,6 +1476,10 @@ public abstract class Control
         var currentlyFocused = FindFocusedControl(topLevel);
         if (currentlyFocused != null && currentlyFocused != this)
         {
+            // Fire Validating on the losing control; if cancelled, deny the focus move.
+            if (currentlyFocused.CausesValidation && !currentlyFocused.Validate())
+                return false;
+
             currentlyFocused.Focused = false;
             currentlyFocused.OnLostFocus(EventArgs.Empty);
             currentlyFocused.OnLeave(EventArgs.Empty);
