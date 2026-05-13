@@ -93,6 +93,37 @@ public class Form : ContainerControl
     /// Setting this provides a hint to the canvas chrome; it does not change the control tree.
     /// </summary>
     public MenuStrip? MainMenuStrip { get; set; }
+
+    private MainMenu? _legacyMenu;
+
+    /// <summary>
+    /// Legacy pre-<see cref="MenuStrip"/> main menu.
+    /// Setting this property adds the wrapped <see cref="MenuStrip"/> to the form's Controls
+    /// and assigns <see cref="MainMenuStrip"/>, exactly mirroring WinForms behavior.
+    /// </summary>
+    [Obsolete("Use MainMenuStrip / MenuStrip instead")]
+    public MainMenu? Menu
+    {
+        get => _legacyMenu;
+        set
+        {
+            if (_legacyMenu?.  _menuStrip is { } old)
+                Controls.Remove(old);
+
+            _legacyMenu = value;
+
+            if (value != null)
+            {
+                Controls.Add(value._menuStrip);
+                MainMenuStrip = value._menuStrip;
+            }
+            else
+            {
+                MainMenuStrip = null;
+            }
+        }
+    }
+
     public int ZIndex { get; set; } = 0;
 
     // Window state
@@ -259,6 +290,10 @@ public class Form : ContainerControl
             return; // Close was cancelled
         }
 
+        // Close owned forms first (WinForms behaviour)
+        foreach (var owned in _ownedForms.ToArray())
+            owned.Close(CloseReason.FormOwnerClosing);
+
         // Hide the form
         Visible = false;
 
@@ -325,13 +360,13 @@ public class Form : ContainerControl
     /// <summary>Returns an array of forms that are owned by this form.</summary>
     public Form[] OwnedForms => [.. _ownedForms];
 
-    internal void AddOwnedForm(Form form)
+    public void AddOwnedForm(Form form)
     {
         if (!_ownedForms.Contains(form))
             _ownedForms.Add(form);
     }
 
-    internal void RemoveOwnedForm(Form form) => _ownedForms.Remove(form);
+    public void RemoveOwnedForm(Form form) => _ownedForms.Remove(form);
 
     // ── Dialog support ───────────────────────────────────────────────────────
 

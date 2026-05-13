@@ -357,7 +357,7 @@ public class ControlPropertyFunctionalityTests
         Assert.Null(control.ContextMenuStrip);
 #pragma warning disable CS0618 // Type or member is obsolete
         Assert.Null(control.ContextMenu);
-        control.ContextMenu = new object();
+        control.ContextMenu = new ContextMenu();
         Assert.NotNull(control.ContextMenu);
 #pragma warning restore CS0618
 

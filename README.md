@@ -215,34 +215,51 @@ The following WinForms controls/types currently exist under `WebForms.Canvas/For
 - `DateTimePicker`
 - `MonthCalendar`
 - `NumericUpDown` (`UpDownBase`)
+- `TrackBar`
+- `DomainUpDown`
+- `ScrollBar` (`HScrollBar`, `VScrollBar`)
+- `PropertyGrid`
 
-**Non-visual / helper components (currently stubs/compat)**
+**Menus / toolbars**
+- `MenuStrip`, `ContextMenuStrip`
+- `ToolStrip`, `ToolStripMenuItem`, `ToolStripContainer`
+- `StatusStrip`
+- `MainMenu`, `ContextMenu`, `ToolBar` (legacy wrappers)
+
+**Non-visual / helper components**
 - `ToolTip`
+- `Timer`
+- `ImageList`
+- `ErrorProvider`
+- `NotifyIcon`
+- `BindingSource`, `BindingNavigator`
+- `Clipboard`
+- `Screen`
+
+**Web / browser**
+- `WebBrowser` / WebView2
+
+**Dialogs**
+- `OpenFileDialog`, `SaveFileDialog`, `FolderBrowserDialog`
+- `ColorDialog`, `FontDialog`
+
+**Data**
+- `DataGridView`
+- `DataTable`
+- `CanvasDataService`
 
 ### Not yet implemented (common WinForms controls)
 
 Controls below have **no source file** in the repo yet. Everything else either has at least a stub or partial implementation — check the [Controls roadmap](#controls-roadmap) table for its current status.
 
-**Menus / toolbars (legacy)**
-- `MainMenu`, `ContextMenu` (pre-`MenuStrip` legacy)
-- `ToolBar` (pre-`ToolStrip` legacy)
-
 **Data / inspection**
-- `PropertyGrid`
-- `BindingNavigator`
-
-**Value/input**
 
 **Print**
 - `PrintDialog`, `PrintPreviewDialog`, `PrintDocument`, `PrintPreviewControl`
 
 **Other**
-- `ErrorProvider`
 - `HelpProvider`
-- `WebBrowser` / WebView2
 - `Chart`
-- MDI (`MdiClient`, MDI Forms) — initial implementation done; Ctrl+Tab child cycling + `ArrangeIcons` implemented
-- `Clipboard` (JS bridge needed)
 
 Controls live in `WebForms.Canvas/Forms/...` (project: `Canvas.Windows.Forms`).
 See [`COMPATIBILITY_REVIEW.md`](COMPATIBILITY_REVIEW.md) for a full per-control breakdown of implemented APIs, known gaps, and session notes.
@@ -438,7 +455,7 @@ Items are ordered by estimated prevalence in designer-generated / translated Win
 | 🧩 | `UserControl` | Base present; full composite lifecycle partial |
 | ⚠️ | `ToolStripMenuItem` | Dropdowns, check state, shortcuts, image, enabled |
 | ⚠️ | `ToolStripContainer` / `ToolStripPanel` | Auto-show/hide bands; row layout |
-| 🔲 | **`PropertyGrid`** | Common in tools and settings panels |
+| ⚠️ | **`PropertyGrid`** | Reflection-based two-column property browser; `SelectedObject`/`SelectedObjects`; `PropertySort`; `HelpVisible`; `ToolbarVisible`; inline editing; `SelectedGridItemChanged`; `PropertyValueChanged`; **nested object expansion** (sub-properties up to depth 2); **read-only greying**; **bold non-default values** |
 | ⚠️ | **`TrackBar`** | Slider; Horizontal/Vertical; tick marks; keyboard/mouse; SetRange |
 | ⚠️ | **`HScrollBar` / `VScrollBar`** | Standalone scrollbars; SmallChange/LargeChange; Scroll/ValueChanged events; mouse wheel; WinForms effective-maximum clamping (Maximum − LargeChange + 1) |
 | ⚠️ | **`DomainUpDown`** | String-list up-down; Sorted/Wrap; SelectedItem/SelectedIndex; mouse wheel scrolling; first-letter type-ahead; Home/End keyboard navigation |
@@ -455,11 +472,11 @@ Items are ordered by estimated prevalence in designer-generated / translated Win
 |--------|---------|-------|
 | 🔲 | **`DataGrid`** (legacy) | Older apps use instead of `DataGridView` |
 | ✅ | **`BindingSource`** | IList/IBindingList wrapper; `Current`/`Position`; `Filter`/`Sort`/`Find`; server-backed via `CanvasDataService` |
-| ⚠️ | **`BindingNavigator`** | Record-navigation bar; First/Prev/Next/Last/Add/Delete; bound to `BindingSource.Position`; `PositionItem`/`CountItem` labels |
+| ⚠️ | **`BindingNavigator`** | Record-navigation bar; First/Prev/Next/Last/Add/Delete; bound to `BindingSource.Position`; **editable `PositionItem` textbox** (type 1-based record number + Enter to jump); `CountItem` label |
 | 🔲 | **`StatusBar`** (legacy) | Pre-`StatusStrip`; thin wrapper for translator compat |
-| 🔲 | **`ToolBar`** (legacy) | Pre-`ToolStrip` |
-| 🔲 | **`MainMenu`** (legacy) | Pre-`MenuStrip` |
-| 🔲 | **`ContextMenu`** (legacy) | Pre-`ContextMenuStrip` |
+| ⚠️ | **`ToolBar`** (legacy) | Pre-`ToolStrip`; wraps `ToolStrip`; `ToolBarButton` / `ButtonClick`; `Appearance`, `TextAlign`, `ImageList`, `Wrappable` |
+| ⚠️ | **`MainMenu`** (legacy) | Pre-`MenuStrip`; wraps `MenuStrip`; `MenuItem` collection; `Form.Menu` property wires it into the control tree |
+| ⚠️ | **`ContextMenu`** (legacy) | Pre-`ContextMenuStrip`; wraps `ContextMenuStrip`; `MenuItem` collection; `Popup` event; `Control.ContextMenu` wires to `ContextMenuStrip` |
 | 🔲 | **`Splitter`** (legacy) | Pre-`SplitContainer` |
 | 🔲 | **`PrintPreviewControl`** | Embedded (non-dialog) print preview |
 | ⚠️ | **`Screen`** | `PrimaryScreen`/`AllScreens`; `Bounds` from `window.screen`; `WorkingArea` from `window.innerWidth/Height`; `FromControl`/`FromPoint`/`GetWorkingArea`/`GetBounds`; JS interop via `getScreenInfo`; 1920×1080 fallback; no multi-monitor |

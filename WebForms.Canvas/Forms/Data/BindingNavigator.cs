@@ -13,7 +13,7 @@ public class BindingNavigator : ToolStrip
     // ── Exposed navigation items (match WinForms property names) ─────────────
     public ToolStripButton   MoveFirstItem    { get; } = new("◀◀") { ToolTipText = "Move first",    Name = "bindingNavigatorMoveFirstItem" };
     public ToolStripButton   MovePreviousItem { get; } = new("◀")  { ToolTipText = "Move previous", Name = "bindingNavigatorMovePreviousItem" };
-    public ToolStripLabel    PositionItem     { get; } = new()      { Name = "bindingNavigatorPositionItem",    AutoSize = true };
+    public ToolStripTextBox  PositionItem     { get; } = new()      { Name = "bindingNavigatorPositionItem",    AutoSize = false, Width = 50 };
     public ToolStripLabel    CountItem        { get; } = new()      { Name = "bindingNavigatorCountItem",       AutoSize = true };
     public ToolStripButton   MoveNextItem     { get; } = new("▶")  { ToolTipText = "Move next",     Name = "bindingNavigatorMoveNextItem" };
     public ToolStripButton   MoveLastItem     { get; } = new("▶▶") { ToolTipText = "Move last",     Name = "bindingNavigatorMoveLastItem" };
@@ -36,6 +36,23 @@ public class BindingNavigator : ToolStrip
 
         AddNewItem.Click  += (_, _) => OnAddNew();
         DeleteItem.Click  += (_, _) => OnDeleteCurrent();
+
+        // Allow the user to type a record number and press Enter to navigate.
+        PositionItem.KeyDown += (_, e) =>
+        {
+            if (e.KeyCode == Keys.Enter && _bindingSource != null)
+            {
+                if (int.TryParse(PositionItem.Text, out int idx))
+                {
+                    int zero = idx - 1;  // PositionItem is 1-based like WinForms
+                    if (zero >= 0 && zero < _bindingSource.Count)
+                        _bindingSource.Position = zero;
+                }
+                // Revert to the actual position if input was invalid
+                RefreshState();
+                e.Handled = true;
+            }
+        };
 
         // Build default item layout (matches Visual Studio designer output).
         Items.Add(MoveFirstItem);

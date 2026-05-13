@@ -50,14 +50,18 @@
 | Menus | `StatusStrip / ToolStripStatusLabel` | Partial | Status bar; Spring; BorderSides; SizingGrip |
 | Menus | `ToolStripMenuItem` | Partial | Dropdowns, check state, shortcuts, image, enabled |
 | Menus | `ToolStripContainer / ToolStripPanel` | Partial | Auto-show/hide bands; row layout of child ToolStrips; 3-pass size-from-content layout |
+| Menus (legacy) | `MainMenu` | Partial | Wraps MenuStrip; MenuItem collection; Form.Menu property |
+| Menus (legacy) | `ContextMenu` | Partial | Wraps ContextMenuStrip; MenuItem collection; Popup event; Control.ContextMenu wired |
+| Menus (legacy) | `ToolBar` | Partial | Wraps ToolStrip; ToolBarButton/ButtonClick; Appearance/TextAlign/Wrappable |
 | Dialogs | `OpenFileDialog` | Partial | Host FS + browser upload |
 | Dialogs | `SaveFileDialog` | Partial | CreatePrompt, OverwritePrompt, OpenFile() |
 | Dialogs | `FolderBrowserDialog` | Partial | SelectedPath, Description, ShowNewFolderButton |
 | Dialogs | `ColorDialog` | Partial | Swatch palette + Hex/RGB/HSV inputs |
 | Dialogs | `FontDialog` | Partial | Family/style/size; ShowEffects; ShowColor; Apply event |
 | Data | `DataGridView` | Partial | IList/BindingSource/DataTable binding; auto-col gen; sort; col types; frozen columns; clipboard copy (Ctrl+C); multi-column sort (Ctrl+click header) |
+| Data | `PropertyGrid` | Partial | Reflection-based two-column browser; SelectedObject/SelectedObjects; PropertySort; HelpVisible; ToolbarVisible; inline editing; SelectedGridItemChanged; PropertyValueChanged |
 | Data | `BindingSource` | Partial | IList/IBindingList; Filter/Sort/Find; server-backed |
-| Data | `BindingNavigator` | Partial | ToolStrip-based navigation bar; First/Prev/Next/Last/Add/Delete; position + count labels; bound to BindingSource events |
+| Data | `BindingNavigator` | Partial | ToolStrip-based navigation bar; First/Prev/Next/Last/Add/Delete; **editable PositionItem textbox** (type record number + Enter); count label; bound to BindingSource events |
 | Data | `DataTable` | Partial | DataView/DefaultView; DataRowView (ICustomTypeDescriptor); typed RowChanged/RowDeleted/ColumnChanged events; Select(filter, sort); DataSet/DataTableCollection/DataRelation; IListSource; BindingSource wired |
 | Non-visual | `NotifyIcon` | Partial | Canvas system tray; ContextMenuStrip popup; balloon tips |
 | Non-visual | `ToolTip` | Partial | InitialDelay/AutoPopDelay/ReshowDelay; ShowAlways (form-active gate); balloon + icon title; overlay div in FormRenderer |
@@ -146,7 +150,7 @@
 - MDI: `IsMdiContainer`, `MdiParent`, `MdiChildren`, `ActiveMdiChild`, `ActivateMdiChild()`, `LayoutMdi()` (Cascade/TileHorizontal/TileVertical/ArrangeIcons), `MdiChildActivate` event — all implemented via `MdiClientArea` Blazor component; constrained drag (children cannot leave workspace), 8-direction resize handles, z-index layering (active child on top), full mouse/keyboard event routing to child `Form`/`Control` handlers, child `Invalidate()` wired to canvas re-render via `RequestRender` callback; minimized icon strip; **Ctrl+Tab / Ctrl+Shift+Tab** child cycling in `MdiClientArea.OnChildKeyDown`; **`ArrangeIcons`** arranges minimized icon strips in left-to-right slots along the bottom of the MDI client area
 
 ### Not implemented
-- OwnedForms collection (stub only)
+- ~~OwnedForms collection (stub only)~~ → **Implemented**: `AddOwnedForm(Form)` / `RemoveOwnedForm(Form)` are now `public` (matching WinForms API); closing the owner form now closes all owned forms via `CloseReason.FormOwnerClosing`
 
 ---
 
@@ -320,10 +324,10 @@
 - `AddNewItem` calls `BindingSource.Add(null)` + `MoveLast`; `DeleteItem` calls `BindingSource.RemoveAt(Position)`
 - `OnAddNew()` / `OnDeleteCurrent()` are `protected virtual` — override to customise
 - Buttons auto-enable/disable based on current position (First/Prev disabled at start; Next/Last disabled at end)
+- **`PositionItem` is now a `ToolStripTextBox`** — user can type a 1-based record number and press Enter to jump directly to that record; invalid input reverts to actual position
 
 ### Not implemented
-- `PositionItem` is a read-only label (no in-place text editing to jump to record)
-- No `ToolStripTextBox` position-entry field (common in VS designer output — can be added by replacing `PositionItem`)
+- (Position field is now editable — previous gap closed)
 
 ---
 
@@ -495,6 +499,45 @@
 
 ---
 
+## Legacy Menu / Toolbar Controls
+
+### Partial — implemented for translator compatibility
+
+#### MenuItem
+- Wraps `ToolStripMenuItem`; `Text`, `Enabled`, `Visible`, `Checked`, `Shortcut`, `ShowShortcut`
+- `MenuItems` collection (nested sub-items added to `ToolStripMenuItem.DropDownItems`)
+- `Click`, `Popup`, `Select` events; `PerformClick()`; `RadioCheck`, `OwnerDraw` stubs
+- `Shortcut` legacy enum — values match `Keys` int representation (safe cast)
+
+#### MainMenu
+- Wraps `MenuStrip`; `MenuItems` collection adds to `MenuStrip.Items`
+- `Form.Menu` property: sets `MainMenuStrip`, adds wrapped `MenuStrip` to `Form.Controls`
+- `RightToLeft` forwarded to inner `MenuStrip`
+
+#### ContextMenu
+- Wraps `ContextMenuStrip`; `MenuItems` collection adds to `ContextMenuStrip.Items`
+- `Control.ContextMenu` setter wires `value._strip` to `ContextMenuStrip`
+- `Popup` event raised before `Show(control, pos)` (matches WinForms behavior)
+- `Show(Control, Point)` delegates to `ContextMenuStrip.Show`
+
+#### ToolBarButton
+- Wraps `ToolStripButton`; `Text`, `ToolTipText`, `Enabled`, `Visible`, `Pushed`, `Image`, `ImageIndex`, `Name`, `Tag`
+- `Style` enum: `PushButton`, `ToggleButton`, `Separator` (inserted as `ToolStripSeparator`), `DropDownButton`
+- `DropDownMenu` property (`Menu` interface — accepts `MainMenu` or `ContextMenu`)
+- `Click` event forwarded from inner button
+
+#### ToolBar
+- Extends `Control`, wraps `ToolStrip` internally
+- `Buttons` collection; `Appearance`, `TextAlign`, `ShowToolTips`, `Wrappable`, `ButtonSize`, `ImageSize`, `ImageList`
+- `ButtonClick` event (`ToolBarButtonClickEventArgs.Button`)
+- `OnPaint` syncs inner `ToolStrip` bounds and delegates paint
+
+### Not implemented
+- `DropDownButton` arrow + menu display (stub property only)
+- Owner-draw events (`DrawItem` on `ToolBar`)
+
+---
+
 ## SplitContainer
 
 ### Good
@@ -610,6 +653,64 @@
 #### Implemented (this session)
 - **`TabCount`** property: returns `TabPages.Count` (matches WinForms public API)
 - **`GetTabRect(index)`**: returns the bounding `Rectangle` of the header tab at the given index; builds header rects on demand if stale
+
+---
+
+## PropertyGrid
+
+### Partial — implemented
+
+#### Core
+- `SelectedObject` / `SelectedObjects` — sets the reflected target; rebuilds row list on assignment
+- `PropertySort`: `Alphabetical`, `Categorized`, `CategorizedAlphabetical`, `NoSort`
+- `HelpVisible` — toggles the 56px description panel at the bottom
+- `ToolbarVisible` — toggles the 24px toolbar with categorised/alphabetical sort buttons
+
+#### Reflection / row building
+- Reads all public instance readable properties via `System.Reflection`
+- Respects `[Category]` and `[Description]` attributes from `System.ComponentModel`
+- Groups into collapsible category rows when `PropertySort` is categorized
+- Alphabetical ordering applied within each category when `CategorizedAlphabetical`
+
+#### Rendering (OnPaint)
+- Two-column layout: name column | value column, separated by a draggable splitter
+- Category rows highlighted with distinct background; expand/collapse `+`/`−` box
+- Selected row highlighted with system blue; value text in blue tint for property rows
+- Inline editor overlay (white box + blue border) drawn on the selected value cell while editing
+- Caret rendering inside inline editor
+- Description panel shows property name (bold) and `[Description]` text
+
+#### Interaction
+- Mouse click on row → selects it; click on value column → starts inline edit
+- Click on category expand/collapse box → toggles `Expanded`
+- Splitter drag → adjusts name/value column split
+- Mouse wheel → scrolls the grid
+- Keyboard: `Up`/`Down`/`PageUp`/`PageDown`/`Home`/`End` navigate; `F2`/`Enter` → start edit; `Escape` → cancel; `Left`/`Right` → expand/collapse category; printable chars → start edit immediately
+
+#### Value editing
+- `CommitEdit` converts the text buffer to the property's declared type using `TypeConverter` with numeric/bool/enum fast paths
+- Calls `prop.SetValue` on the owner object; fires `PropertyValueChanged`
+- Conversion failure silently restores the old display value
+- Read-only properties (`CanWrite == false`) are not editable
+
+#### Events
+- `SelectedGridItemChanged` (`SelectedGridItemChangedEventArgs`: `OldSelection`, `NewSelection`)
+- `PropertyValueChanged` (`PropertyValueChangedEventArgs`: `ChangedItem`, `OldValue`)
+
+#### Public API
+- `Refresh()` — rebuilds and repaints
+- `CollapseAllGridItems()` / `ExpandAllGridItems()`
+- `SelectedGridItem` — get/set; fires `SelectedGridItemChanged`
+- `GridItem`: `Label`, `Value`, `PropertyInfo`, `IsCategory`, `Category`, `Description`, `Expandable`, `Expanded`, `Children`, `Parent`, `IsReadOnly`, `IsNonDefault`, `Depth`
+- `GridItemType` enum: `Property`, `Category`, `ArrayValue`, `Root`
+- `PropertySort` enum: `NoSort`, `Alphabetical`, `Categorized`, `CategorizedAlphabetical`
+- **Read-only property greying** — properties with no public setter or `[ReadOnly(true)]` render with grey name text
+- **Bold non-default values** — property names rendered bold when value differs from `[DefaultValue]` attribute (or from `default(T)` for value types)
+- **Nested object expansion** — complex-type property values show a [+]/[−] expand box; sub-properties render as indented child rows (up to depth 2); toggled on click; `CollapseAllGridItems`/`ExpandAllGridItems` recurse into sub-items
+
+### Not implemented
+- `UITypeEditor` drop-down / modal editors (colour picker, enum drop-down, etc.)
+- Custom `TypeConverter` descriptions in the drop-down
 
 ---
 

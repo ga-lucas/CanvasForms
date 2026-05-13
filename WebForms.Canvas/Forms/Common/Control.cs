@@ -524,9 +524,21 @@ public abstract class Control
         }
     }
 
-    // Context menus (obsolete/stub)
+    // Context menus
+    private ContextMenu? _legacyContextMenu;
+
+    /// <summary>Legacy pre-ContextMenuStrip context menu. Setting this also wires the underlying ContextMenuStrip.</summary>
     [Obsolete("Use ContextMenuStrip instead")]
-    public object? ContextMenu { get; set; }
+    public ContextMenu? ContextMenu
+    {
+        get => _legacyContextMenu;
+        set
+        {
+            _legacyContextMenu = value;
+            ContextMenuStrip   = value?._strip;
+        }
+    }
+
     public ContextMenuStrip? ContextMenuStrip { get; set; }
 
     // Data binding (stubs)
