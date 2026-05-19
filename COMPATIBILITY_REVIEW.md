@@ -12,22 +12,22 @@
 | Core | `Control` (base) | Partial | Some render-side APIs are browser-constrained by design; drag-drop wired via HTML5 events |
 | Core | `ContainerControl` | Partial | `ActiveControl` wired; `Validate()` fires Validating/Validated; `ValidateChildren()`/`ValidateChildren(ValidationConstraints)` walk full tree; `AutoValidate` respected in focus path |
 | Core | `ScrollableControl` | Partial | Auto-scroll sizing; no physical scrollbar chrome |
-| Core | `UserControl` | Stub | Base lifecycle present; composite paint partial |
-| Windowing | `Form` | Partial | Chrome, move/resize done; Icon → browser favicon + Text → browser tab title when active; MDI support: IsMdiContainer, MdiParent, MdiChildren, ActiveMdiChild, ActivateMdiChild, LayoutMdi (Cascade/TileH/TileV), MdiChildActivate event, constrained drag, resize handles (8-dir), z-index management, mouse/keyboard routing to child controls, child Invalidate→re-render wiring; OwnedForms present |
+| Core | `UserControl` | Partial | Load event; AutoSize/AutoSizeMode; BorderStyle painted (None/FixedSingle/Fixed3D); OnCreateControl/CreateControl lifecycle; AutoScaleDimensions designer support |
+| Windowing | `Form` | Partial | Chrome, move/resize done; Icon → browser favicon + Text → browser tab title when active; MDI support: IsMdiContainer, MdiParent, MdiChildren, ActiveMdiChild, ActivateMdiChild, LayoutMdi (Cascade/TileH/TileV), MdiChildActivate event, constrained drag, resize handles (8-dir), z-index management, mouse/keyboard routing to child controls, child Invalidate→re-render wiring; OwnedForms present; `HelpButton`, `ShowInTaskbar`, `TransparencyKey`, `RestoreBounds` added |
 | Text | `Label` | Partial | Multi-line, alignment, AutoEllipsis done; Image/ImageIndex/ImageKey/ImageList rendered with ImageAlign (all 9 alignments); border styles present |
 | Text | `LinkLabel` | Partial | `Links` collection with `Add(start, length, data)` overloads; multi-span hit-testing; per-link `Visited`/`Enabled`/`LinkData`; `LinkLabelLinkClickedEventArgs.Link` carries the clicked span; `LinkUrl` legacy mode preserved; browser nav via JS |
 | Text | `TextBox / TextBoxBase` | Partial | Editing, selection, redo, placeholder, autocomplete done; IME absent |
-| Text | `MaskedTextBox` | Partial | Mask display + per-token input validation; BackSpace/Delete aware; MaskFull/UnmaskedText; provider/culture hooks thin |
-| Text | `RichTextBox` | Partial | RTF parsed into styled runs; bold/italic/underline/colour/font-size rendered per-run; SelectionFont/Color/Bold/Italic/Underline; Find(); LoadFile/SaveFile; HTML clipboard round-trip; ScrollToCaret(); ZoomFactor applied to run font sizes |
+| Text | `MaskedTextBox` | Partial | Mask display + per-token input validation; BackSpace/Delete aware; MaskFull/UnmaskedText/TextMaskFormat/FormattedText; provider/culture hooks thin |
+| Text | `RichTextBox` | Partial | RTF parsed into styled runs; bold/italic/underline/colour/font-size rendered per-run; SelectionFont/Color/Bold/Italic/Underline; Find(); LoadFile/SaveFile; HTML clipboard round-trip; ScrollToCaret(); ZoomFactor applied to run font sizes; `LinkClicked`/`Protected`/`VScroll`/`HScroll` events |
 | Buttons | `Button / ButtonBase` | Good | Hover/pressed/focus/keyboard; gradient + flat rendering; Image on face; FlatAppearance |
 | Buttons | `CheckBox` | Good | Toggle, ThreeState, CheckAlign, Appearance |
 | Buttons | `RadioButton` | Good | Mutual exclusion within parent |
 | Lists | `ListBox` | Good | SelectionMode, owner-draw, ItemHeight, IntegralHeight, double-click |
-| Lists | `CheckedListBox` | Partial | Basic checked-item behavior; CheckOnClick done; mouse wheel + first-letter type-ahead added |
+| Lists | `CheckedListBox` | Partial | Basic checked-item behavior; CheckOnClick done; mouse wheel + first-letter type-ahead added; **ItemChecked event after commit** |
 | Lists | `ComboBox` | Partial | Drop-down + selection; autocomplete partial; DrawMode (OwnerDrawFixed/Variable) + DrawItem + MeasureItem implemented |
-| Lists | `ListControl` (base) | Partial | DataSource, DisplayMember, ValueMember wired |
-| Collections | `TreeView` | Good | Nodes, expand/collapse, LabelEdit, ToolTipText, BeginUpdate |
-| Collections | `ListView` | Good | Details/List/LargeIcon; keyboard nav; EnsureVisible; BeginUpdate |
+| Lists | `ListControl` (base) | Good | DataSource/DisplayMember/ValueMember/SelectedValue fully wired; IBindingList.ListChanged refresh |
+| Collections | `TreeView` | Good | Nodes, expand/collapse, LabelEdit, ToolTipText, BeginUpdate; CheckBoxes + `AfterCheck`/`BeforeCheck`; Space key toggle |
+| Collections | `ListView` | Good | Details/List/LargeIcon; keyboard nav; EnsureVisible; BeginUpdate; `Groups`/`ShowGroups`; `ListViewGroup`; `ListViewItem.Group` |
 | Display | `PictureBox` | Partial | URL/Image; SizeMode (Normal/CenterImage/Zoom/StretchImage — all correctly implemented using natural image dimensions from JS); ImageLocation; LoadAsync; LoadCompleted; ErrorImage |
 | Display | `ProgressBar` | Partial | Blocks/continuous/marquee; RightToLeftLayout; SetRange; ShowPercentage overlay |
 | Display | `MonthCalendar` | Good | SelectionRange; BoldedDates; keyboard/mouse nav |
@@ -44,11 +44,11 @@
 | Containers | `SplitContainer` | Good | Resizable panes; fixed/min-size; double-click reset |
 | Layout | `FlowLayoutPanel` | Good | FlowDirection + wrap/break; SetFlowBreak |
 | Layout | `TableLayoutPanel` | Good | Row/column styles + spans; CellBorderStyle; GetControlFromPosition |
-| Menus | `MenuStrip` | Partial | Top-level menu bar with dropdowns |
-| Menus | `ContextMenuStrip` | Partial | Right-click overlay; Opening/Closing events |
-| Menus | `ToolStrip` | Partial | Toolbar with icons, hover, checked state |
+| Menus | `MenuStrip` | Partial | Top-level menu bar with dropdowns; **`ProcessShortcut(Keys)` dispatches `ShortcutKeys` to matching `ToolStripMenuItem` (including nested dropdowns)** |
+| Menus | `ContextMenuStrip` | Partial | Right-click overlay; Opening/Closing events; **`ProcessShortcut(Keys)` dispatches shortcut keys to menu items** |
+| Menus | `ToolStrip` | Partial | Toolbar with icons, hover, checked state; **ToolStripSplitButton (split face + dropdown); hosted ProgressBar/TextBox/ComboBox rendering** |
 | Menus | `StatusStrip / ToolStripStatusLabel` | Partial | Status bar; Spring; BorderSides; SizingGrip |
-| Menus | `ToolStripMenuItem` | Partial | Dropdowns, check state, shortcuts, image, enabled |
+| Menus | `ToolStripMenuItem` | Partial | Dropdowns, check state, shortcuts, image, enabled; **`ShortcutKeys` now dispatched via `Form.OnKeyDown` → `MenuStrip.ProcessShortcut` / `ContextMenuStrip.ProcessShortcut`** |
 | Menus | `ToolStripContainer / ToolStripPanel` | Partial | Auto-show/hide bands; row layout of child ToolStrips; 3-pass size-from-content layout |
 | Menus (legacy) | `MainMenu` | Partial | Wraps MenuStrip; MenuItem collection; Form.Menu property |
 | Menus (legacy) | `ContextMenu` | Partial | Wraps ContextMenuStrip; MenuItem collection; Popup event; Control.ContextMenu wired |
@@ -58,14 +58,20 @@
 | Dialogs | `FolderBrowserDialog` | Partial | SelectedPath, Description, ShowNewFolderButton |
 | Dialogs | `ColorDialog` | Partial | Swatch palette + Hex/RGB/HSV inputs |
 | Dialogs | `FontDialog` | Partial | Family/style/size; ShowEffects; ShowColor; Apply event |
-| Data | `DataGridView` | Partial | IList/BindingSource/DataTable binding; auto-col gen; sort; col types; frozen columns; clipboard copy (Ctrl+C); multi-column sort (Ctrl+click header) |
+| Dialogs | `PrintDialog` | Stub | API surface; browser cannot print natively; RunDialog returns Cancel |
+| Dialogs | `PageSetupDialog` | Stub | API surface; browser cannot print natively; RunDialog returns Cancel |
+| Menus (legacy) | `StatusBar` | Partial | Panels collection; ShowPanels; SizingGrip; spring layout; OwnerDraw; DrawItem event |
+| Data (legacy) | `DataGrid` | Partial | Subclasses DataGridView; TableStyles/DataGridTableStyle/DataGridColumnStyle; CaptionText/CaptionVisible; DataGridCell HitTest; legacy Expand/Collapse stubs |
+| Data | `DataGridView` | Partial | IList/BindingSource/DataTable binding; auto-col gen; sort; col types; frozen columns; clipboard copy (Ctrl+C); multi-column sort (Ctrl+click header); **DataGridViewComboBoxColumn in-cell dropdown** (double-click or F2); **DataGridViewCheckBoxColumn single-click/Space toggle** (fires CellValueChanged); `RowsRemoved`/`UserAddedRow`/`UserDeletingRow`/`UserDeletedRow`/`DefaultValuesNeeded` events |
 | Data | `PropertyGrid` | Partial | Reflection-based two-column browser; SelectedObject/SelectedObjects; PropertySort; HelpVisible; ToolbarVisible; inline editing; SelectedGridItemChanged; PropertyValueChanged |
 | Data | `BindingSource` | Partial | IList/IBindingList; Filter/Sort/Find; server-backed |
 | Data | `BindingNavigator` | Partial | ToolStrip-based navigation bar; First/Prev/Next/Last/Add/Delete; **editable PositionItem textbox** (type record number + Enter); count label; bound to BindingSource events |
 | Data | `DataTable` | Partial | DataView/DefaultView; DataRowView (ICustomTypeDescriptor); typed RowChanged/RowDeleted/ColumnChanged events; Select(filter, sort); DataSet/DataTableCollection/DataRelation; IListSource; BindingSource wired |
-| Non-visual | `NotifyIcon` | Partial | Canvas system tray; ContextMenuStrip popup; balloon tips |
+| Non-visual | `NotifyIcon` | Partial | Canvas system tray; ContextMenuStrip popup; balloon tips; **MouseDown/MouseUp/MouseMove events added** |
 | Non-visual | `ToolTip` | Partial | InitialDelay/AutoPopDelay/ReshowDelay; ShowAlways (form-active gate); balloon + icon title; overlay div in FormRenderer |
 | Non-visual | `ErrorProvider` | Partial | SetError/GetError/Clear; red badge overlays positioned right of each control; hover title shows message |
+| Non-visual | `HelpProvider` | Partial | Per-control HelpString/HelpKeyword/HelpNavigator/ShowHelp; F1 → browser tab (URL) or JS alert (text); `Help.ShowHelp(...)` static overloads |
+| Common (legacy) | `Splitter` | Partial | Docking drag-to-resize (pre-SplitContainer); MinSize/MinExtra; SplitterMoving/SplitterMoved events; cursor follows dock side |
 | Non-visual | `Clipboard` | Good | SetText/GetText/Async; `navigator.clipboard` bridge; local-cache fallback |
 | Non-visual | `Screen` | Partial | PrimaryScreen/AllScreens; Bounds/WorkingArea from `window.screen`/`window.inner*` via JS; FromControl/FromPoint/FromRectangle; GetWorkingArea/GetBounds overloads; 1920×1080 fallback before first render |
 | Graphics | `Graphics` / drawing primitives | Good | Lines, rects, ellipses, arcs, beziers, polygons, round-rects, gradients, paths, dash styles |
@@ -77,6 +83,7 @@
 ### Implemented
 - Name, Text, Tag, Site
 - Left, Top, Width, Height, Location, Size, Bounds, ClientSize, ClientRectangle
+- **DisplayRectangle** — returns Padding-inset client rectangle; `ScrollableControl` override also accounts for Padding and AutoScrollPosition
 - BackColor, ForeColor (System.Drawing.Color)
 - Visible, Enabled, Focused, ContainsFocus
 - Dock, Anchor
@@ -88,7 +95,8 @@
 - MinimumSize, MaximumSize, PreferredSize, GetPreferredSize()
 - AllowDrop (property; no actual drag-drop in canvas)
 - RightToLeft (enum), UseWaitCursor
-- InvokeRequired (always false in WASM), Invoke(), BeginInvoke()
+- InvokeRequired (always false in WASM), Invoke(Delegate), Invoke(Action), Invoke\<T\>(Func\<T\>), BeginInvoke(Delegate), BeginInvoke(Action), EndInvoke() — **BeginInvoke posts via SynchronizationContext when available (Blazor Server); falls back to synchronous execution in WASM**
+- **Padding is now respected in PerformLayout**: `clientRect` is inset by container Padding before docking/anchoring, so docked children start inside the padding zone (WinForms parity)
 - PointToScreen(), PointToClient(), RectangleToScreen(), RectangleToClient()
 - FindForm(), GetContainerControl()
 - SetBounds(), Scale()
@@ -166,7 +174,7 @@
 - Keyboard activation (Space/Enter)
 - **Image** property rendered on button face; position controlled by `ImageAlign` and `TextImageRelation`
 - **FlatAppearance** — `MouseOverBackColor`, `MouseDownBackColor`, `BorderColor`, `BorderSize`, `CheckedBackColor` all honoured in Flat/Popup rendering
-- ImageIndex, ImageKey, ImageList stubs (accepted; rendered via ImageList when set; TextImageRelation layout TBD)
+- **ImageIndex, ImageKey, ImageList** — `EffectiveImage` resolves the image at paint time (WinForms precedence: `Image` > `ImageKey` > `ImageIndex`); honours `ImageList.ImageSize`; all `TextImageRelation` layout modes (Overlay/ImageBeforeText/TextBeforeImage/ImageAboveText/TextAboveImage) work for ImageList-sourced images as well as direct `Image`
 
 ---
 
@@ -209,6 +217,7 @@
 - FindString(), FindStringExact()
 - GetItemRectangle(), GetItemText()
 - TopIndex, EnsureVisible()
+- **DataSource binding** — `IList<T>`, `IEnumerable`, `BindingSource`; `DisplayMember`/`ValueMember` resolve via reflection; `SelectedValue` get/set; `IBindingList.ListChanged` triggers automatic repopulation; selection restored by value after refresh
 
 ---
 
@@ -288,14 +297,15 @@
 - AutoResizeColumns()
 
 #### Partial
-- In-cell editing: TextBox column only; CheckBox toggle done
+- In-cell editing: TextBox column only; **CheckBox single-click and Space-key toggle implemented** (fires `CellValueChanged`)
 - CellValidating, RowValidating: events fire on selection change; `Cancel = true` blocks move and draws a red inset border on the offending cell; error clears when validation passes
-
-#### Not implemented
-- ComboBox column in-cell dropdown UI
 
 #### Implemented (this session)
 - Frozen rows (`DataGridViewRow.Frozen`): pinned below column header, unaffected by vertical scroll; two-pass paint, hit-testing, scrollbar thumb, and mouse-wheel clamp all account for frozen zone
+- **DataGridViewComboBoxColumn in-cell dropdown**: dropdown arrow rendered on cell right edge; double-click or F2 on a selected cell opens canvas-painted dropdown overlay; Up/Down arrows navigate items; Enter commits, Escape cancels; hover highlight; `DataSource` (IEnumerable) and `Items` both supported
+- **DataGridViewCheckBoxColumn toggle**: single mouse-click on a CheckBox cell or Space bar when focused toggles the boolean value and fires `CellValueChanged` (matches WinForms single-click-commit behaviour)
+- **Column resize by drag**: mouse-down on a column boundary in the header area (within 5 px) starts a drag; `OnMouseMove` updates `Column.Width` live; `OnMouseUp` commits; `SizeWE` cursor shown on hover; respects `AllowUserToResizeColumns` and per-column `Resizable` flag
+- **Inline TextBox cell editing**: `BeginEdit(row, col)` / `EndEdit(commit)` / `CancelEdit()` API; F2 or keystroke-starts-edit (respects `EditMode`); Enter commits, Escape cancels; active edit draws white fill + blue focus border + caret overlay; `CellBeginEdit` / `CellEndEdit` events fired; CheckBox and ComboBox columns are excluded
 
 ---
 
@@ -399,7 +409,7 @@
 
 ### Partial
 - Value, Minimum, Maximum, Increment
-- DecimalPlaces, ThousandsSeparator, Hexadecimal
+- DecimalPlaces, ThousandsSeparator, Hexadecimal (display + **A–F keyboard input in hex mode; hex string parsing in Text setter**)
 - TextAlign, ReadOnly, InterceptArrowKeys
 - Direct keyboard entry with buffer; Enter to commit
 - UpButton(), DownButton()
@@ -414,6 +424,7 @@
 - **PageUp / PageDown**: large-step navigation by `Increment × 10`; commits any active typing buffer first
 - **`Text` property**: string get/set wrapper around `Value` for designer compatibility
 - **`OnPaint` selection highlight**: semi-transparent blue overlay drawn over the text area when all-selected
+- **Hexadecimal keyboard input**: `OnKeyPress` now accepts `A`–`F` / `a`–`f` when `Hexadecimal = true`; `CommitTypingBuffer` and the `Text` setter both parse via `NumberStyles.HexNumber`; decimal point and sign characters are blocked in hex mode
 
 ---
 
@@ -466,10 +477,10 @@
 - `Dispose()` unregisters all hooks and cancels pending timers
 - `ReshowDelay` — when a tooltip was recently dismissed (within `AutoPopDelay` ms), the next hover uses `ReshowDelay` instead of the full `InitialDelay`
 - `ShowAlways` — when `false` (default) tooltips are suppressed if the control's parent form is not the active form; when `true` tooltips always show regardless of form focus
+- **Per-control `AutoPopDelay` override** — `SetToolTip(control, caption, autoPopDelay)` overload stores a per-registration pop-delay; `OnControlMouseEnter` uses the per-control value when set (≥ 0), otherwise falls back to global `AutoPopDelay`
 
 #### Not implemented
 - System-level OS tooltip for controls outside the canvas (e.g. `NotifyIcon` text uses its own tooltip)
-- Per-control `AutoPopDelay` override (global setting only)
 
 ---
 
@@ -506,7 +517,12 @@
 #### MenuItem
 - Wraps `ToolStripMenuItem`; `Text`, `Enabled`, `Visible`, `Checked`, `Shortcut`, `ShowShortcut`
 - `MenuItems` collection (nested sub-items added to `ToolStripMenuItem.DropDownItems`)
-- `Click`, `Popup`, `Select` events; `PerformClick()`; `RadioCheck`, `OwnerDraw` stubs
+- **`Click`** event — forwarded from `ToolStripMenuItem.Click`
+- **`Popup`** event — wired to `ToolStripMenuItem.DropDownOpening` (fires when sub-menu is about to open)
+- **`Select`** event — wired to `ToolStripMenuItem.MouseEnter` (fires when item is highlighted)
+- **`PerformClick()`** — delegates to `ToolStripMenuItem.PerformClick()`
+- **`RadioCheck`** — when `true` and the item is `Checked`, all sibling items with `RadioCheck = true` in the same collection are automatically unchecked (via `IMenuItemOwner` back-reference)
+- `OwnerDraw` — accepted (stub; no custom draw)
 - `Shortcut` legacy enum — values match `Keys` int representation (safe cast)
 
 #### MainMenu
@@ -521,20 +537,26 @@
 - `Show(Control, Point)` delegates to `ContextMenuStrip.Show`
 
 #### ToolBarButton
-- Wraps `ToolStripButton`; `Text`, `ToolTipText`, `Enabled`, `Visible`, `Pushed`, `Image`, `ImageIndex`, `Name`, `Tag`
-- `Style` enum: `PushButton`, `ToggleButton`, `Separator` (inserted as `ToolStripSeparator`), `DropDownButton`
-- `DropDownMenu` property (`Menu` interface — accepts `MainMenu` or `ContextMenu`)
-- `Click` event forwarded from inner button
+- Holds both `_inner` (`ToolStripButton`) and `_innerDrop` (`ToolStripDropDownButton`); `ActiveItem` selects the correct one for the current `Style`
+- `Text`, `ToolTipText`, `Enabled`, `Visible`, `Pushed`, `Image`, `ImageIndex`, `Name`, `Tag` — synced to both inner items
+- `Style` enum: `PushButton`, `ToggleButton`, `Separator` (inserted as `ToolStripSeparator`), **`DropDownButton`** (uses `_innerDrop`; arrow shown; `SyncDropDownItems()` populates items from `DropDownMenu`)
+- **`DropDownMenu`** property — accepts `ContextMenu` or `MainMenu`; setting it calls `SyncDropDownItems()` to populate `_innerDrop.DropDownItems` from the menu's `MenuItem._inner` items
+- `Click` event forwarded from both inner items
 
 #### ToolBar
 - Extends `Control`, wraps `ToolStrip` internally
 - `Buttons` collection; `Appearance`, `TextAlign`, `ShowToolTips`, `Wrappable`, `ButtonSize`, `ImageSize`, `ImageList`
-- `ButtonClick` event (`ToolBarButtonClickEventArgs.Button`)
+- `ButtonClick` event (`ToolBarButtonClickEventArgs.Button`) — `FindByInner` checks both `_inner` and `_innerDrop`
 - `OnPaint` syncs inner `ToolStrip` bounds and delegates paint
+- **`DrawMode`** (`Normal` / `OwnerDraw`) + **`DrawItem`** event — when `OwnerDraw`, `OnPaint` fills the background and fires `DrawItem` for each visible button with `ToolBarDrawItemEventArgs` (Graphics, Button, Bounds, State)
+
+#### ToolStripDropDownButton / ToolStripSplitButton
+- `DropDownClosed` event now fires reliably via subscription to `ToolStripDropDown.Closed`; `ToolStripDropDown.CloseChain()` raises the new `Closed` event after hiding
+- `ToolStripSplitButton.HideDropDown()` now delegates to `DropDown.Close(Keyboard)` so the closed-event chain fires correctly
 
 ### Not implemented
-- `DropDownButton` arrow + menu display (stub property only)
-- Owner-draw events (`DrawItem` on `ToolBar`)
+- ~~`DropDownButton` arrow + menu display~~ → **Implemented** (see above)
+- ~~Owner-draw events (`DrawItem` on `ToolBar`)~~ → **Implemented** (see above)
 
 ---
 
@@ -708,8 +730,10 @@
 - **Bold non-default values** — property names rendered bold when value differs from `[DefaultValue]` attribute (or from `default(T)` for value types)
 - **Nested object expansion** — complex-type property values show a [+]/[−] expand box; sub-properties render as indented child rows (up to depth 2); toggled on click; `CollapseAllGridItems`/`ExpandAllGridItems` recurse into sub-items
 
+- **Enum / bool inline dropdown** — clicking the dropdown arrow (or pressing Enter/F2) on a selected enum or bool property opens a canvas-painted overlay listing all enum names or `True`/`False`; Up/Down arrows navigate, Enter commits, Escape cancels; Space bar directly toggles a bool property without opening the dropdown
+
 ### Not implemented
-- `UITypeEditor` drop-down / modal editors (colour picker, enum drop-down, etc.)
+- `UITypeEditor` modal editors (colour picker, etc.)
 - Custom `TypeConverter` descriptions in the drop-down
 
 ---

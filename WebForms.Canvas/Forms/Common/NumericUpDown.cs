@@ -93,7 +93,9 @@ public class NumericUpDown : UpDownBase
         get => GetValueText();
         set
         {
-            if (decimal.TryParse(value, out var parsed))
+            if (_hexadecimal && long.TryParse(value, System.Globalization.NumberStyles.HexNumber, null, out var hexVal))
+                Value = hexVal;
+            else if (decimal.TryParse(value, out var parsed))
                 Value = parsed;
         }
     }
@@ -127,8 +129,11 @@ public class NumericUpDown : UpDownBase
             _typingBuffer = string.Empty;
             _allSelected = false;
         }
-        else if (char.IsDigit(c) || (c == '-' && (_typingBuffer.Length == 0 || _allSelected) && _minimum < 0)
-                 || (c == '.' && _decimalPlaces > 0 && !_typingBuffer.Contains('.')))
+        else if ((_hexadecimal && IsHexDigit(c))
+                 || (!_hexadecimal && (
+                     char.IsDigit(c)
+                     || (c == '-' && (_typingBuffer.Length == 0 || _allSelected) && _minimum < 0)
+                     || (c == '.' && _decimalPlaces > 0 && !_typingBuffer.Contains('.')))))
         {
             if (_allSelected)
             {
@@ -208,10 +213,21 @@ public class NumericUpDown : UpDownBase
         base.OnLostFocus(e);
     }
 
+    private static bool IsHexDigit(char c) =>
+        char.IsDigit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+
     private void CommitTypingBuffer()
     {
-        if (!string.IsNullOrEmpty(_typingBuffer) && decimal.TryParse(_typingBuffer, out var parsed))
+        if (string.IsNullOrEmpty(_typingBuffer)) return;
+        if (_hexadecimal)
+        {
+            if (long.TryParse(_typingBuffer, System.Globalization.NumberStyles.HexNumber, null, out var hexVal))
+                Value = hexVal;
+        }
+        else if (decimal.TryParse(_typingBuffer, out var parsed))
+        {
             Value = parsed;
+        }
     }
 
     // ── Display ───────────────────────────────────────────────────────────────

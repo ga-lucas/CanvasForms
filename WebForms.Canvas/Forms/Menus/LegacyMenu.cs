@@ -2,6 +2,12 @@ using System.ComponentModel;
 
 namespace System.Windows.Forms;
 
+/// <summary>Internal interface so MenuItem can reach its siblings for RadioCheck.</summary>
+internal interface IMenuItemOwner
+{
+    IEnumerable<MenuItem> GetItems();
+}
+
 // ── MenuItem ──────────────────────────────────────────────────────────────────
 /// <summary>
 /// Legacy pre-<see cref="MenuStrip"/> menu item.
@@ -12,6 +18,10 @@ public class MenuItem : System.ComponentModel.Component
 {
     // Internal bridge to the modern item used for actual rendering.
     internal readonly ToolStripMenuItem _inner;
+
+    // Back-reference to the collection that owns this item (set by MenuItemCollection/MainMenuItemCollection).
+    // Used by RadioCheck to uncheck siblings.
+    internal IMenuItemOwner? _ownerCollection;
 
     // ── Sub-items ─────────────────────────────────────────────────────────────
 
@@ -27,7 +37,11 @@ public class MenuItem : System.ComponentModel.Component
     public MenuItem(string text)
     {
         _inner = new ToolStripMenuItem(text);
-        _inner.Click += (s, e) => Click?.Invoke(this, e);
+        _inner.Click         += (s, e) => Click?.Invoke(this, e);
+        // Popup fires when the sub-menu is about to open (DropDownOpening is the ToolStrip equivalent).
+        _inner.DropDownOpening += (s, e) => Popup?.Invoke(this, e);
+        // Select fires when the item is highlighted (mouse enter on the ToolStrip item).
+        _inner.MouseEnter    += (s, e) => Select?.Invoke(this, e);
     }
 
     public MenuItem(string text, EventHandler onClick) : this(text)
@@ -63,7 +77,19 @@ public class MenuItem : System.ComponentModel.Component
     public bool Checked
     {
         get => _inner.Checked;
-        set => _inner.Checked = value;
+        set
+        {
+            _inner.Checked = value;
+            // WinForms RadioCheck: when this item becomes checked, uncheck siblings in the same collection.
+            if (value && RadioCheck && _ownerCollection != null)
+            {
+                foreach (var sibling in _ownerCollection.GetItems())
+                {
+                    if (sibling != this && sibling.RadioCheck)
+                        sibling._inner.Checked = false;
+                }
+            }
+        }
     }
 
     public bool RadioCheck { get; set; }
@@ -105,7 +131,7 @@ public class MenuItem : System.ComponentModel.Component
 
     // ── MenuItemCollection ────────────────────────────────────────────────────
 
-    public sealed class MenuItemCollection : IEnumerable<MenuItem>
+    public sealed class MenuItemCollection : IEnumerable<MenuItem>, IMenuItemOwner
     {
         private readonly MenuItem _owner;
         private readonly List<MenuItem> _items = new();
@@ -118,10 +144,13 @@ public class MenuItem : System.ComponentModel.Component
 
         public void Add(MenuItem item)
         {
-            item.Index = _items.Count;
+            item.Index            = _items.Count;
+            item._ownerCollection = this;
             _items.Add(item);
             _owner._inner.DropDownItems.Add(item._inner);
         }
+
+        public IEnumerable<MenuItem> GetItems() => _items;
 
         public void AddRange(MenuItem[] items)
         {
@@ -236,7 +265,7 @@ public class MainMenu : System.ComponentModel.Component, Menu
 
     // ── MainMenuItemCollection ────────────────────────────────────────────────
 
-    public sealed class MainMenuItemCollection : IEnumerable<MenuItem>
+    public sealed class MainMenuItemCollection : IEnumerable<MenuItem>, IMenuItemOwner
     {
         private readonly MainMenu _owner;
         private readonly List<MenuItem> _items = new();
@@ -248,10 +277,13 @@ public class MainMenu : System.ComponentModel.Component, Menu
 
         public void Add(MenuItem item)
         {
-            item.Index = _items.Count;
+            item.Index            = _items.Count;
+            item._ownerCollection = this;
             _items.Add(item);
             _owner._menuStrip.Items.Add(item._inner);
         }
+
+        public IEnumerable<MenuItem> GetItems() => _items;
 
         public void AddRange(MenuItem[] items)
         {
@@ -324,7 +356,7 @@ public class ContextMenu : System.ComponentModel.Component, Menu
 
     // ── ContextMenuItemCollection ─────────────────────────────────────────────
 
-    public sealed class ContextMenuItemCollection : IEnumerable<MenuItem>
+    public sealed class ContextMenuItemCollection : IEnumerable<MenuItem>, IMenuItemOwner
     {
         private readonly ContextMenu _owner;
         private readonly List<MenuItem> _items = new();
@@ -336,10 +368,13 @@ public class ContextMenu : System.ComponentModel.Component, Menu
 
         public void Add(MenuItem item)
         {
-            item.Index = _items.Count;
+            item.Index            = _items.Count;
+            item._ownerCollection = this;
             _items.Add(item);
             _owner._strip.Items.Add(item._inner);
         }
+
+        public IEnumerable<MenuItem> GetItems() => _items;
 
         public void AddRange(MenuItem[] items)
         {

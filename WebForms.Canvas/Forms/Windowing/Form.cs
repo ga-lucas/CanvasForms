@@ -20,6 +20,34 @@ public class Form : ContainerControl
     public int MaximumWidth { get; set; } = 0; // 0 = no limit
     public int MaximumHeight { get; set; } = 0; // 0 = no limit
 
+    /// <summary>
+    /// Gets or sets the minimum size of the form. Maps to <see cref="MinimumWidth"/> / <see cref="MinimumHeight"/>.
+    /// A zero component means no minimum is applied on that axis (per WinForms semantics).
+    /// </summary>
+    public new System.Drawing.Size MinimumSize
+    {
+        get => new System.Drawing.Size(MinimumWidth, MinimumHeight);
+        set
+        {
+            MinimumWidth  = value.Width  > 0 ? value.Width  : 0;
+            MinimumHeight = value.Height > 0 ? value.Height : 0;
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets the maximum size of the form. Maps to <see cref="MaximumWidth"/> / <see cref="MaximumHeight"/>.
+    /// A zero component means no maximum is enforced on that axis (per WinForms semantics).
+    /// </summary>
+    public new System.Drawing.Size MaximumSize
+    {
+        get => new System.Drawing.Size(MaximumWidth, MaximumHeight);
+        set
+        {
+            MaximumWidth  = value.Width;
+            MaximumHeight = value.Height;
+        }
+    }
+
     // ── Chrome / appearance ──────────────────────────────────────────────────
 
     private FormBorderStyle _formBorderStyle = FormBorderStyle.Sizable;
@@ -49,6 +77,12 @@ public class Form : ContainerControl
     /// <summary>Gets or sets whether the control box (icon + sys-menu + close button) is shown.</summary>
     public bool ControlBox { get; set; } = true;
 
+    /// <summary>Gets or sets whether a Help button (?) is shown in the title bar.</summary>
+    public bool HelpButton { get; set; } = false;
+
+    /// <summary>Gets or sets whether the form is shown in the Windows taskbar.</summary>
+    public bool ShowInTaskbar { get; set; } = true;
+
     private bool _topMost;
     /// <summary>
     /// Gets or sets whether the form is always on top of other forms.
@@ -77,6 +111,12 @@ public class Form : ContainerControl
 
     /// <summary>Opacity value exposed to the JS/Blazor renderer (same as <see cref="Opacity"/>).</summary>
     public double FormOpacity => _opacity;
+
+    /// <summary>
+    /// Gets or sets the color treated as transparent for the form window.
+    /// Not supported in the browser environment; stored for compiled-app compatibility.
+    /// </summary>
+    public Color TransparencyKey { get; set; } = Color.Empty;
 
     /// <summary>
     /// Gets or sets the icon for the form. When set, the browser favicon is updated for the active form.
@@ -652,6 +692,15 @@ public class Form : ContainerControl
     {
         Left = x; Top = y; Width = width; Height = height;
     }
+
+    /// <summary>
+    /// Gets the bounds of the form in its normal (non-maximized/minimized) state.
+    /// Returns current Bounds when not maximized/minimized.
+    /// </summary>
+    public System.Drawing.Rectangle RestoreBounds =>
+        _windowState == FormWindowState.Normal
+            ? Bounds
+            : new System.Drawing.Rectangle(Left, Top, Width, Height);
 
     /// <summary>
     /// Centers the form on the screen using the supplied desktop dimensions.
@@ -1505,6 +1554,25 @@ public class Form : ContainerControl
         else if (!e.Handled)
         {
             base.OnKeyDown(e);
+        }
+
+        // ── ToolStripMenuItem shortcut key dispatch ─────────────────────────
+        // Walk the MainMenuStrip (and any ContextMenuStrip on the focused control)
+        // to fire the first matching ShortcutKeys handler.
+        if (!e.Handled && e.KeyCode != Keys.None)
+        {
+            Keys shortcutKeys = e.KeyCode
+                | (e.Control ? Keys.Control : Keys.None)
+                | (e.Shift   ? Keys.Shift   : Keys.None)
+                | (e.Alt     ? Keys.Alt     : Keys.None);
+            if (MainMenuStrip?.ProcessShortcut(shortcutKeys) == true)
+            {
+                e.Handled = true;
+            }
+            else if (!e.Handled && FocusedControl?.ContextMenuStrip?.ProcessShortcut(shortcutKeys) == true)
+            {
+                e.Handled = true;
+            }
         }
     }
 

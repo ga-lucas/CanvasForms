@@ -1,6 +1,7 @@
 using Canvas.Windows.Forms.Drawing;
 using System.Linq;
 using System.Windows.Forms;
+using Xunit;
 
 namespace Canvas.Windows.Forms.Tests;
 
@@ -114,7 +115,7 @@ public class LabelRenderingTests
 
         var text = Assert.Single(g.GetCommands().OfType<DrawStringCommand>());
 
-        // textWidth = 2 * charWidth(7) = 14 => (100 - 14) / 2 = 43  (charWidth = round(Font.Size * 0.6) = round(12*0.6) = 7)
+        // textWidth = 2 * charWidth(7) = 14 => (100 - 14) / 2 = 43
         Assert.Equal(43, text.X);
         Assert.Equal(2, text.Y);
     }
@@ -184,6 +185,6 @@ public class LabelRenderingTests
 
         Assert.Equal("B", texts[1].Text);
         Assert.Equal(0, texts[1].X);
-        Assert.Equal(2 + 14, texts[1].Y);  // 2 (baseline offset) + charHeight (Font.Height = 14)
+        Assert.Equal(2 + 14, texts[1].Y); // 2 (baseline offset) + charHeight (Font.Height = 14)
     }
 }

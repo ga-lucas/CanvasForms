@@ -100,6 +100,12 @@ public class PropertyGrid : Control
     private bool              _splitterDragging;
     private int               _splitterDragStart;
 
+    // ── Dropdown editor state (enum / bool) ───────────────────────────────────
+    private bool              _dropDownOpen;
+    private string[]          _dropDownItems    = Array.Empty<string>();
+    private int               _dropDownSelected = -1;
+    private int               _dropDownRow;     // flat row index of the cell being edited
+
     private List<GridItem>    _flatRows         = new();
     private List<GridItem>    _roots            = new();
 
@@ -486,7 +492,7 @@ public class PropertyGrid : Control
 
                 if (_editing && isSel)
                 {
-                    // Inline editor
+                    // Inline text editor
                     using var edBrush = new SolidBrush(Drawing.Color.White);
                     g.FillRectangle(edBrush, _splitterX + 1, rowY + 1, Width - _splitterX - 2, RowHeight - 2);
                     using var edPen = new Pen(ColSelBg);
@@ -504,6 +510,50 @@ public class PropertyGrid : Control
                     var valColor = isSel ? ColSelFg : ColValueFg;
                     using var valBrush = new SolidBrush(valColor);
                     g.DrawString(valText, "Segoe UI", 11, valBrush, vx, rowY + 3);
+
+                    // Dropdown arrow button for enum / bool (only on selected writable row)
+                    if (isSel && !item.IsReadOnly && IsDropDownType(item.PropertyInfo?.PropertyType))
+                    {
+                        int bx = Width - 18;
+                        int by = rowY + 2;
+                        using var btnBg = new SolidBrush(Drawing.Color.FromArgb(228, 228, 228));
+                        g.FillRectangle(btnBg, bx, by, 16, RowHeight - 4);
+                        using var btnBorder = new Pen(Drawing.Color.FromArgb(160, 160, 160));
+                        g.DrawRectangle(btnBorder, bx, by, 16, RowHeight - 4);
+                        using var arrowBrush = new SolidBrush(Drawing.Color.FromArgb(60, 60, 60));
+                        g.DrawString("v", "Segoe UI", 9, arrowBrush, bx + 4, by + 2);
+                    }
+                }
+
+                // Inline dropdown overlay — drawn on top of following rows
+                if (_dropDownOpen && isSel && _dropDownItems.Length > 0)
+                {
+                    int ddX = _splitterX + 1;
+                    int ddY = rowY + RowHeight;
+                    int ddW = Width - ddX - 1;
+                    int ddH = Math.Min(_dropDownItems.Length, 8) * RowHeight;
+
+                    using var ddBg = new SolidBrush(Drawing.Color.White);
+                    g.FillRectangle(ddBg, ddX, ddY, ddW, ddH);
+                    using var ddBorder = new Pen(Drawing.Color.FromArgb(120, 120, 120));
+                    g.DrawRectangle(ddBorder, ddX, ddY, ddW - 1, ddH - 1);
+
+                    for (int di = 0; di < Math.Min(_dropDownItems.Length, 8); di++)
+                    {
+                        int iy = ddY + di * RowHeight;
+                        if (_dropDownSelected == di)
+                        {
+                            using var selBg = new SolidBrush(ColSelBg);
+                            g.FillRectangle(selBg, ddX + 1, iy + 1, ddW - 2, RowHeight - 2);
+                            using var selFg = new SolidBrush(Drawing.Color.White);
+                            g.DrawString(_dropDownItems[di], "Segoe UI", 11, selFg, ddX + 4, iy + 3);
+                        }
+                        else
+                        {
+                            using var itemFg = new SolidBrush(ForeColor);
+                            g.DrawString(_dropDownItems[di], "Segoe UI", 11, itemFg, ddX + 4, iy + 3);
+                        }
+                    }
                 }
             }
 
@@ -601,10 +651,39 @@ public class PropertyGrid : Control
 
             SelectedGridItem = item;
 
-            // Double-click or value-column click starts editing
+            // Value-column click: open dropdown for enum/bool, or start text edit
             if (!item.IsCategory && e.X > _splitterX)
             {
-                StartEdit(item);
+                var propType = item.PropertyInfo?.PropertyType;
+                if (!item.IsReadOnly && IsDropDownType(propType))
+                {
+                    // Click on the dropdown arrow button OR anywhere in value cell
+                    if (_dropDownOpen && _dropDownRow == flatIdx)
+                    {
+                        // Second click on same row: check if over a dropdown item
+                        int ddY = GridTop + flatIdx * RowHeight - _scrollOffset + RowHeight;
+                        if (e.Y >= ddY)
+                        {
+                            int di = (e.Y - ddY) / RowHeight;
+                            if (di >= 0 && di < _dropDownItems.Length)
+                            {
+                                _dropDownSelected = di;
+                                CommitDropDown();
+                                return;
+                            }
+                        }
+                        CloseDropDown();
+                    }
+                    else
+                    {
+                        OpenDropDown(item, flatIdx);
+                    }
+                }
+                else
+                {
+                    CloseDropDown();
+                    StartEdit(item);
+                }
             }
 
             Invalidate();
@@ -642,6 +721,33 @@ public class PropertyGrid : Control
     protected internal override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
+
+        // Dropdown keyboard navigation
+        if (_dropDownOpen)
+        {
+            switch (e.KeyCode)
+            {
+                case Keys.Escape:
+                    CloseDropDown();
+                    e.Handled = true;
+                    return;
+                case Keys.Enter:
+                    CommitDropDown();
+                    e.Handled = true;
+                    return;
+                case Keys.Up:
+                    if (_dropDownSelected > 0) _dropDownSelected--;
+                    Invalidate();
+                    e.Handled = true;
+                    return;
+                case Keys.Down:
+                    if (_dropDownSelected < _dropDownItems.Length - 1) _dropDownSelected++;
+                    Invalidate();
+                    e.Handled = true;
+                    return;
+            }
+            return;
+        }
 
         if (_editing)
         {
@@ -729,8 +835,27 @@ public class PropertyGrid : Control
             case Keys.Enter:
             case Keys.F2:
                 if (_selectedItem != null && !_selectedItem.IsCategory)
-                    StartEdit(_selectedItem);
+                {
+                    var pt = _selectedItem.PropertyInfo?.PropertyType;
+                    if (!_selectedItem.IsReadOnly && IsDropDownType(pt))
+                    {
+                        int r = _flatRows.IndexOf(_selectedItem);
+                        OpenDropDown(_selectedItem, r);
+                    }
+                    else
+                        StartEdit(_selectedItem);
+                }
                 e.Handled = true;
+                break;
+            case Keys.Space:
+                // Toggle bool inline without opening dropdown
+                if (_selectedItem != null && !_selectedItem.IsCategory
+                    && _selectedItem.PropertyInfo?.PropertyType == typeof(bool)
+                    && !_selectedItem.IsReadOnly)
+                {
+                    ToggleBool(_selectedItem);
+                    e.Handled = true;
+                }
                 break;
             case Keys.Left:
                 if (_selectedItem?.IsCategory == true)
@@ -763,19 +888,96 @@ public class PropertyGrid : Control
             Invalidate();
             e.Handled = true;
         }
-        else if (!_editing && _selectedItem != null && !_selectedItem.IsCategory && !char.IsControl(e.KeyChar))
-        {
-            // Start editing immediately on printable key press
-            StartEdit(_selectedItem, e.KeyChar.ToString());
-            e.Handled = true;
-        }
+        else if (!_editing && !_dropDownOpen && _selectedItem != null && !_selectedItem.IsCategory && !char.IsControl(e.KeyChar))
+            {
+                var pt = _selectedItem.PropertyInfo?.PropertyType;
+                if (!_selectedItem.IsReadOnly && IsDropDownType(pt))
+                {
+                    // For dropdown types, open dropdown instead of text edit
+                    int r = _flatRows.IndexOf(_selectedItem);
+                    OpenDropDown(_selectedItem, r);
+                }
+                else
+                {
+                    // Start editing immediately on printable key press
+                    StartEdit(_selectedItem, e.KeyChar.ToString());
+                }
+                e.Handled = true;
+            }
     }
 
     // ── Editing ───────────────────────────────────────────────────────────────
 
+    // ── Dropdown helpers ──────────────────────────────────────────────────────
+
+    private static bool IsDropDownType(Type? t)
+        => t != null && (t == typeof(bool) || t.IsEnum);
+
+    private void OpenDropDown(GridItem item, int flatRowIdx)
+    {
+        if (item.PropertyInfo?.CanWrite != true) return;
+        CloseDropDown();
+
+        var t = item.PropertyInfo!.PropertyType;
+        _dropDownItems = t == typeof(bool)
+            ? new[] { "True", "False" }
+            : Enum.GetNames(t);
+
+        // Pre-select current value
+        var current = FormatValue(item.Value);
+        _dropDownSelected = Array.FindIndex(_dropDownItems,
+            s => string.Equals(s, current, StringComparison.OrdinalIgnoreCase));
+        if (_dropDownSelected < 0) _dropDownSelected = 0;
+
+        _dropDownRow  = flatRowIdx;
+        _dropDownOpen = true;
+        Invalidate();
+    }
+
+    private void CloseDropDown()
+    {
+        if (!_dropDownOpen) return;
+        _dropDownOpen  = false;
+        _dropDownItems = Array.Empty<string>();
+        Invalidate();
+    }
+
+    private void CommitDropDown()
+    {
+        if (!_dropDownOpen || _dropDownSelected < 0 || _selectedItem == null) return;
+        var chosen  = _dropDownItems[_dropDownSelected];
+        var prop    = _selectedItem.PropertyInfo;
+        if (prop?.CanWrite == true)
+        {
+            var oldValue = _selectedItem.Value;
+            var newValue = ConvertValue(chosen, prop.PropertyType);
+            prop.SetValue(_selectedItem.OwnerObject, newValue);
+            _selectedItem.Value = newValue;
+            PropertyValueChanged?.Invoke(this, new PropertyValueChangedEventArgs(_selectedItem, oldValue));
+        }
+        CloseDropDown();
+        Invalidate();
+    }
+
+    private void ToggleBool(GridItem item)
+    {
+        var prop = item.PropertyInfo;
+        if (prop?.CanWrite != true) return;
+        var current  = item.Value is bool b && b;
+        var newValue = !current;
+        var oldValue = item.Value;
+        prop.SetValue(item.OwnerObject, newValue);
+        item.Value = newValue;
+        PropertyValueChanged?.Invoke(this, new PropertyValueChangedEventArgs(item, oldValue));
+        Invalidate();
+    }
+
+    // ── Text edit helpers ─────────────────────────────────────────────────────
+
     private void StartEdit(GridItem item, string? initialText = null)
     {
         if (item.PropertyInfo?.CanWrite != true) return;
+        CloseDropDown();
         _editing    = true;
         _editBuffer = initialText ?? FormatValue(item.Value);
         _editCaret  = _editBuffer.Length;
@@ -785,7 +987,8 @@ public class PropertyGrid : Control
     private void CommitEdit()
     {
         if (!_editing || _selectedItem == null) return;
-        _editing = false;
+        _editing    = false;
+        _dropDownOpen = false;
 
         var prop = _selectedItem.PropertyInfo;
         if (prop?.CanWrite != true) { Invalidate(); return; }
@@ -809,7 +1012,8 @@ public class PropertyGrid : Control
 
     private void CancelEdit()
     {
-        _editing = false;
+        _editing    = false;
+        CloseDropDown();
         Invalidate();
     }
 

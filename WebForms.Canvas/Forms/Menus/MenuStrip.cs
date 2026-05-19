@@ -242,4 +242,26 @@ public class MenuStrip : ToolStrip
         if (string.IsNullOrEmpty(text)) return 0;
         return text.Length * 7;
     }
+
+    // ── Shortcut key dispatch ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// Recursively walks all <see cref="ToolStripMenuItem"/> items reachable from this
+    /// MenuStrip and fires the first one whose <see cref="ToolStripMenuItem.ShortcutKeys"/>
+    /// matches <paramref name="keys"/>.
+    /// </summary>
+    /// <returns><c>true</c> if a match was found and clicked.</returns>
+    public bool ProcessShortcut(Keys keys)
+    {
+        if (keys == Keys.None) return false;
+        foreach (var item in Items)
+        {
+            if (item is ToolStripMenuItem mi && WalkShortcut(mi, keys))
+                return true;
+        }
+        return false;
+    }
+
+    private static bool WalkShortcut(ToolStripMenuItem item, Keys keys)
+        => ContextMenuStrip.WalkShortcut(item, keys);
 }

@@ -62,7 +62,9 @@ public abstract class ScrollBar : Control
         get => _value;
         set
         {
-            var clamped = Math.Max(_minimum, Math.Min(_maximum, value));
+            // WinForms effective maximum = Maximum - LargeChange + 1
+            int effectiveMax = Math.Max(_minimum, _maximum - _largeChange + 1);
+            var clamped = Math.Max(_minimum, Math.Min(effectiveMax, value));
             if (_value == clamped) return;
             _value = clamped;
             ValueChanged?.Invoke(this, EventArgs.Empty);

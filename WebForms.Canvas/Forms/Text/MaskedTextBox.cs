@@ -62,6 +62,25 @@ public class MaskedTextBox : TextBoxBase
     public bool UseSystemPasswordChar { get => _useSystemPasswordChar; set { _useSystemPasswordChar = value; Invalidate(); } }
 
     /// <summary>
+    /// When true, only ASCII characters are accepted as input.
+    /// Non-ASCII characters are rejected and <see cref="MaskInputRejected"/> is raised.
+    /// </summary>
+    public bool AsciiOnly { get; set; } = false;
+
+    /// <summary>
+    /// Gets or sets the data type used to validate the value of the masked text box.
+    /// When non-null, <see cref="TypeValidationCompleted"/> is raised on Validating
+    /// with the parse result, matching WinForms behaviour.
+    /// </summary>
+    public Type? ValidatingType { get; set; }
+
+    /// <summary>
+    /// Raised when the control has finished validating the current text against
+    /// <see cref="ValidatingType"/>. Equivalent to WinForms <c>MaskedTextBox.TypeValidationCompleted</c>.
+    /// </summary>
+    public event TypeValidationEventHandler? TypeValidationCompleted;
+
+    /// <summary>
     /// Returns true if the current value satisfies the mask
     /// </summary>
     public bool MaskCompleted
@@ -198,6 +217,15 @@ public class MaskedTextBox : TextBoxBase
             return;
         }
 
+        // AsciiOnly: reject non-ASCII characters
+        if (AsciiOnly && c > '\x7F')
+        {
+            e.Handled = true;
+            MaskInputRejected?.Invoke(this, new MaskInputRejectedEventArgs(
+                DisplayCaretToRawIndex(_selectionStart), MaskedTextResultHint.AsciiCharacterExpected));
+            return;
+        }
+
         var editPositions = GetEditPositions();
         // The caret within the raw text (editable-only chars)
         var rawCaret = DisplayCaretToRawIndex(_selectionStart);
@@ -225,6 +253,34 @@ public class MaskedTextBox : TextBoxBase
 
         // Accept — let base insert the raw character into Text
         base.OnKeyPress(e);
+    }
+
+    protected override void OnValidating(CancelEventArgs e)
+    {
+        base.OnValidating(e);
+
+        if (ValidatingType != null)
+        {
+            object? parsedValue = null;
+            bool isValid = false;
+            string message = string.Empty;
+
+            try
+            {
+                parsedValue = Convert.ChangeType(Text, ValidatingType);
+                isValid = true;
+            }
+            catch (Exception ex)
+            {
+                message = ex.Message;
+            }
+
+            var args = new TypeValidationEventArgs(ValidatingType, isValid, parsedValue, message);
+            TypeValidationCompleted?.Invoke(this, args);
+
+            if (args.Cancel)
+                e.Cancel = true;
+        }
     }
 
     protected internal override void OnKeyDown(KeyEventArgs e)
@@ -319,6 +375,62 @@ public class MaskedTextBox : TextBoxBase
     /// without any literal characters from the mask.
     /// </summary>
     public string UnmaskedText => Text;
+
+    private MaskFormat _textMaskFormat = MaskFormat.IncludeLiterals;
+
+    /// <summary>
+    /// Controls how the <see cref="Text"/> property returns its value — whether it
+    /// includes literal characters and/or prompt characters from the mask.
+    /// Matches the WinForms <c>MaskedTextBox.TextMaskFormat</c> property.
+    /// </summary>
+    public MaskFormat TextMaskFormat
+    {
+        get => _textMaskFormat;
+        set { _textMaskFormat = value; Invalidate(); }
+    }
+
+    /// <summary>
+    /// Returns the formatted text according to the current <see cref="TextMaskFormat"/>.
+    /// </summary>
+    public string FormattedText
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(_mask)) return Text;
+            return _textMaskFormat switch
+            {
+                MaskFormat.ExcludePromptAndLiterals => Text, // raw editable chars only
+                MaskFormat.IncludeLiterals           => BuildFormattedText(includePrompts: false),
+                MaskFormat.IncludePrompt             => Text, // prompts without literals is unusual; raw
+                MaskFormat.IncludePromptAndLiterals  => GetDisplayText(),
+                _                                    => Text
+            };
+        }
+    }
+
+    private string BuildFormattedText(bool includePrompts)
+    {
+        var result = new System.Text.StringBuilder();
+        int dataIdx = 0;
+        string rawText = Text;
+        for (int i = 0; i < _mask.Length; i++)
+        {
+            char m = _mask[i];
+            if (IsEditToken(m))
+            {
+                if (dataIdx < rawText.Length)
+                    result.Append(rawText[dataIdx++]);
+                else if (includePrompts)
+                    result.Append(_promptChar);
+                // else skip (ExcludePromptAndLiterals variant with literals)
+            }
+            else
+            {
+                result.Append(m); // literal
+            }
+        }
+        return result.ToString();
+    }
 }
 
 public enum MaskFormat { ExcludePromptAndLiterals, IncludeLiterals, IncludePrompt, IncludePromptAndLiterals }
@@ -338,4 +450,39 @@ public enum MaskedTextResultHint
     AsciiCharacterExpected = -2, AlphanumericCharacterExpected = -3, DigitExpected = -4,
     LetterExpected = -5, SignedDigitExpected = -6, InvalidInput = -51, PromptCharNotAllowed = -52,
     UnavailableEditPosition = -53, PositionOutOfRange = -54
+}
+
+public delegate void TypeValidationEventHandler(object? sender, TypeValidationEventArgs e);
+
+/// <summary>
+/// Provides data for the <see cref="MaskedTextBox.TypeValidationCompleted"/> event.
+/// Matches the WinForms <c>TypeValidationEventArgs</c> signature.
+/// </summary>
+public class TypeValidationEventArgs : EventArgs
+{
+    public TypeValidationEventArgs(Type returnType, bool isValidInput, object? returnValue, string message)
+    {
+        ReturnType   = returnType;
+        IsValidInput = isValidInput;
+        ReturnValue  = returnValue;
+        Message      = message;
+    }
+
+    /// <summary>The type that the control attempted to validate against.</summary>
+    public Type ReturnType { get; }
+
+    /// <summary>True if the text successfully converted to <see cref="ReturnType"/>.</summary>
+    public bool IsValidInput { get; }
+
+    /// <summary>The converted value when <see cref="IsValidInput"/> is true; otherwise null.</summary>
+    public object? ReturnValue { get; }
+
+    /// <summary>Describes the failure when <see cref="IsValidInput"/> is false.</summary>
+    public string Message { get; }
+
+    /// <summary>
+    /// Set to true in the event handler to cancel the Validating event
+    /// (prevent focus leaving the control on validation failure).
+    /// </summary>
+    public bool Cancel { get; set; }
 }

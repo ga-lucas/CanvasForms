@@ -17,6 +17,10 @@ public class DataGridView : ScrollableControl
     private const int RowHeaderWidth = 40;
     private const int ScrollBarW = 17;
 
+    // ── Layout constants (ComboBox dropdown) ─────────────────────
+    private const int ComboCellArrowW = 17;
+    private const int ComboDropItemH  = 20;
+
     // ── State ────────────────────────────────────────────────────
     private object? _dataSource;
     private string _dataMember = string.Empty;
@@ -28,6 +32,28 @@ public class DataGridView : ScrollableControl
     private int _hoveredRow = -1;
     private (int row, int col)? _invalidCell = null;  // cell failing CellValidating/RowValidating
     private bool _autoGenerateColumns = true;
+
+    // ── ComboBox in-cell dropdown state ──────────────────────────
+    private bool _comboOpen     = false;
+    private int  _comboRow      = -1;
+    private int  _comboCol      = -1;
+    private int  _comboHoverIdx = -1;  // hovered item index in open dropdown
+    private int  _comboCellX    = 0;   // screen x of the cell left edge
+    private int  _comboCellY    = 0;   // screen y of the cell bottom edge (dropdown opens downward)
+
+    // ── Column resize state ───────────────────────────────────────
+    private const int ResizeHandleW = 5;   // pixels either side of a column boundary
+    private bool _resizingCol     = false;
+    private int  _resizeColIndex  = -1;    // column whose right edge is being dragged
+    private int  _resizeStartX    = 0;     // mouse X when drag started
+    private int  _resizeStartW    = 0;     // column width when drag started
+
+    // ── Inline TextBox cell editing state ────────────────────────
+    private bool   _editing        = false;
+    private int    _editRow        = -1;
+    private int    _editCol        = -1;
+    private string _editText       = string.Empty;
+    private int    _editCursorPos  = 0;    // caret position inside _editText
     private readonly List<object?[]> _boundRows = new();
     private SortOrder _sortOrder = SortOrder.None;
     private int _sortColIndex = -1;
@@ -52,11 +78,23 @@ public class DataGridView : ScrollableControl
     public event EventHandler<DataGridViewRowEventArgs>? RowLeave;
     public event EventHandler<DataGridViewColumnEventArgs>? ColumnAdded;
     public event EventHandler<DataGridViewRowEventArgs>? RowsAdded;
+    public event EventHandler<DataGridViewRowEventArgs>? RowsRemoved;
+    public event EventHandler<DataGridViewRowEventArgs>? UserAddedRow;
+    public event EventHandler<DataGridViewRowCancelEventArgs>? UserDeletingRow;
+    public event EventHandler<DataGridViewRowEventArgs>? UserDeletedRow;
+    public event EventHandler<DataGridViewRowEventArgs>? DefaultValuesNeeded;
     public event EventHandler? SelectionChanged;
     public event EventHandler<DataGridViewCellCancelEventArgs>? CellValidating;
     public event EventHandler<DataGridViewCellCancelEventArgs>? RowValidating;
     public event EventHandler<DataGridViewDataErrorEventArgs>? DataError;
     public event DataGridViewSortCompareEventHandler? SortCompare;
+    public event EventHandler<DataGridViewCellEventArgs>? CellBeginEdit;
+    public event EventHandler<DataGridViewCellEventArgs>? CellEndEdit;
+    /// <summary>
+    /// Raised for each cell before it is rendered. Allows customising the display value,
+    /// cell style colours, and font — matching WinForms <c>DataGridView.CellFormatting</c>.
+    /// </summary>
+    public event EventHandler<DataGridViewCellFormattingEventArgs>? CellFormatting;
 #pragma warning restore CS0067
     public event EventHandler<DataGridViewColumnEventArgs>? ColumnHeaderMouseClick;
 
@@ -119,6 +157,49 @@ public class DataGridView : ScrollableControl
         BackColor = Color.White;
         ForeColor = Color.Black;
     }
+
+    // ── Inline cell editing API ──────────────────────────────────
+
+    /// <summary>Begins editing the cell at (rowIndex, colIndex) — WinForms compatible.</summary>
+    public void BeginEdit(int rowIndex, int colIndex)
+    {
+        if (ReadOnly) return;
+        if (colIndex < 0 || colIndex >= Columns.Count) return;
+        var col = Columns[colIndex];
+        if (col.ReadOnly || col is DataGridViewCheckBoxColumn || col is DataGridViewComboBoxColumn) return;
+        if (_editing && _editRow == rowIndex && _editCol == colIndex) return;
+
+        EndEdit(commit: true);
+
+        _editing       = true;
+        _editRow       = rowIndex;
+        _editCol       = colIndex;
+        _editText      = GetCellText(rowIndex, colIndex);
+        _editCursorPos = _editText.Length;
+        CellBeginEdit?.Invoke(this, new DataGridViewCellEventArgs(colIndex, rowIndex));
+        Invalidate();
+    }
+
+    /// <summary>
+    /// Commits (or cancels) the current edit and fires <see cref="CellEndEdit"/>.
+    /// </summary>
+    public void EndEdit(bool commit = true)
+    {
+        if (!_editing) return;
+        int row = _editRow, col = _editCol;
+        if (commit)
+            SetCellValue(row, col, _editText);
+        _editing       = false;
+        _editRow       = -1;
+        _editCol       = -1;
+        _editText      = string.Empty;
+        _editCursorPos = 0;
+        CellEndEdit?.Invoke(this, new DataGridViewCellEventArgs(col, row));
+        Invalidate();
+    }
+
+    /// <summary>Cancels the current edit without saving changes.</summary>
+    public void CancelEdit() => EndEdit(commit: false);
 
     // ── Data binding ────────────────────────────────────────────
 
@@ -394,8 +475,26 @@ public class DataGridView : ScrollableControl
 
         string text = GetCellText(ri, ci);
         Color textColor = (rowSelected || cellSelected) && Focused ? Color.White : ForeColor;
+        Font cellFont = Font;
+
+        // ── CellFormatting ────────────────────────────────────────────────────
+        if (CellFormatting != null && !(col is DataGridViewCheckBoxColumn))
+        {
+            var rawValue = ri < _boundRows.Count && ci < _boundRows[ri].Length ? _boundRows[ri][ci] : null;
+            var fmtArgs = new DataGridViewCellFormattingEventArgs(ci, ri, rawValue, typeof(string), DefaultCellStyle);
+            CellFormatting.Invoke(this, fmtArgs);
+            if (fmtArgs.FormattingApplied)
+            {
+                text = fmtArgs.Value?.ToString() ?? string.Empty;
+                if (fmtArgs.CellStyle.ForeColor != Color.Empty)
+                    textColor = fmtArgs.CellStyle.ForeColor;
+                if (fmtArgs.CellStyle.Font != null)
+                    cellFont = fmtArgs.CellStyle.Font;
+            }
+        }
+
         using var textBrush = new SolidBrush(textColor);
-        g.DrawString(text, Font, textBrush, Math.Max(cx, clipLeft) + 3, ry + (rowH - Font.Height) / 2);
+        g.DrawString(text, cellFont, textBrush, Math.Max(cx, clipLeft) + 3, ry + (rowH - Font.Height) / 2);
 
         if (col is DataGridViewCheckBoxColumn)
         {
@@ -409,6 +508,26 @@ public class DataGridView : ScrollableControl
                 using var checkPen = new Pen(Color.FromArgb(0, 120, 215), 2);
                 g.DrawLine(checkPen, cbX + 2, cbY + cbSize / 2, cbX + 5, cbY + cbSize - 3);
                 g.DrawLine(checkPen, cbX + 5, cbY + cbSize - 3, cbX + cbSize - 2, cbY + 2);
+            }
+        }
+
+        // ComboBox column: draw dropdown arrow button on the right side of the cell
+        if (col is DataGridViewComboBoxColumn)
+        {
+            int arrowX = Math.Min(right, clipRight) - ComboCellArrowW;
+            if (arrowX > Math.Max(cx, clipLeft))
+            {
+                using var arrowBg = new SolidBrush(Color.FromArgb(220, 220, 220));
+                g.FillRectangle(arrowBg, arrowX, ry, ComboCellArrowW, rowH);
+                using var arrowPen = new Pen(Color.FromArgb(150, 150, 150));
+                g.DrawLine(arrowPen, arrowX, ry, arrowX, ry + rowH);
+                // ▼ triangle
+                int ax = arrowX + ComboCellArrowW / 2;
+                int ay = ry + rowH / 2 - 2;
+                using var triPen = new Pen(Color.FromArgb(80, 80, 80), 1);
+                g.DrawLine(triPen, ax - 4, ay, ax + 4, ay);
+                g.DrawLine(triPen, ax - 4, ay, ax, ay + 4);
+                g.DrawLine(triPen, ax + 4, ay, ax, ay + 4);
             }
         }
 
@@ -603,6 +722,64 @@ public class DataGridView : ScrollableControl
             g.DrawLine(frozenRowPen, x0 + rowHdrW, scrollOriginY, x0 + rowHdrW + clientW, scrollOriginY);
         }
 
+        // ── Inline TextBox cell edit overlay ─────────────────────
+        if (_editing && _editRow >= 0 && _editCol >= 0 && _editCol < Columns.Count)
+        {
+            var (editCellX, editCellBottom, editCellW) = GetCellScreenRect(_editRow, _editCol);
+            int editCellTop = editCellBottom - RowHeightDefault;
+            int editCellH   = RowHeightDefault;
+
+            // White fill over the cell
+            using var editBg = new SolidBrush(Color.White);
+            g.FillRectangle(editBg, editCellX, editCellTop, editCellW - 1, editCellH);
+            using var editBorder = new Pen(Color.FromArgb(0, 120, 215), 2);
+            g.DrawRectangle(editBorder, editCellX, editCellTop, editCellW - 1, editCellH - 1);
+
+            // Draw text and caret
+            using var editTextBrush = new SolidBrush(ForeColor);
+            int textX = editCellX + 3;
+            int textY = editCellTop + (editCellH - Font.Height) / 2;
+            g.DrawString(_editText, Font, editTextBrush, textX, textY);
+
+            // Caret — approximate position using average char width
+            string textBeforeCursor = _editText[.._editCursorPos];
+            int avgCharW = Math.Max(1, Font.Height / 2);
+            int caretX = textX + textBeforeCursor.Length * avgCharW;
+            using var caretPen = new Pen(ForeColor);
+            g.DrawLine(caretPen, caretX, textY, caretX, textY + Font.Height);
+        }
+
+        // ── ComboBox in-cell dropdown overlay ────────────────────
+        if (_comboOpen && _comboCol >= 0 && _comboCol < Columns.Count
+            && Columns[_comboCol] is DataGridViewComboBoxColumn comboCol)
+        {
+            var items = GetComboItems(comboCol);
+            int dropH = items.Count * ComboDropItemH + 2;
+            int dropW  = Columns[_comboCol].Width;
+
+            using var dropBg   = new SolidBrush(Color.White);
+            using var dropPen  = new Pen(Color.FromArgb(122, 122, 122));
+            g.FillRectangle(dropBg, _comboCellX, _comboCellY, dropW, dropH);
+            g.DrawRectangle(dropPen, _comboCellX, _comboCellY, dropW - 1, dropH - 1);
+
+            for (int i = 0; i < items.Count; i++)
+            {
+                int iy = _comboCellY + 1 + i * ComboDropItemH;
+                if (i == _comboHoverIdx)
+                {
+                    using var selBrush = new SolidBrush(Color.FromArgb(0, 120, 215));
+                    g.FillRectangle(selBrush, _comboCellX + 1, iy, dropW - 2, ComboDropItemH);
+                    using var selText = new SolidBrush(Color.White);
+                    g.DrawString(items[i].ToString() ?? string.Empty, Font, selText, _comboCellX + 4, iy + 2);
+                }
+                else
+                {
+                    using var itemText = new SolidBrush(ForeColor);
+                    g.DrawString(items[i].ToString() ?? string.Empty, Font, itemText, _comboCellX + 4, iy + 2);
+                }
+            }
+        }
+
         // ── Scrollbars ───────────────────────────────────────────
         if (needScrollV)
         {
@@ -662,9 +839,55 @@ public class DataGridView : ScrollableControl
 
         int mx = e.X - bw, my = e.Y - bw;
 
-        // Column header click
+        // ── If a combo dropdown is open, handle clicks inside it first ──
+        if (_comboOpen && _comboCol >= 0 && _comboCol < Columns.Count
+            && Columns[_comboCol] is DataGridViewComboBoxColumn openComboCol)
+        {
+            var items = GetComboItems(openComboCol);
+            int dropH = items.Count * ComboDropItemH + 2;
+            int dropW  = Columns[_comboCol].Width;
+            int dx = mx + bw, dy = my + bw;  // e.X, e.Y directly
+            if (dx >= _comboCellX && dx < _comboCellX + dropW
+                && dy >= _comboCellY && dy < _comboCellY + dropH)
+            {
+                int clickedItem = (dy - _comboCellY - 1) / ComboDropItemH;
+                CommitComboItem(clickedItem);
+                return;
+            }
+            // Click outside the dropdown → close without commit
+            CloseComboDropdown();
+        }
+
+        // ── Commit any active inline edit on click-away ───────────────────
+        if (_editing && e.Button == MouseButtons.Left)
+        {
+            bool inEditCell = false;
+            if (my >= colHdrH)
+            {
+                int ri2 = GetRowAtY(my - colHdrH + bw);
+                int ci2 = GetColAtX(mx - rowHdrW);
+                inEditCell = ri2 == _editRow && ci2 == _editCol;
+            }
+            if (!inEditCell) EndEdit(commit: true);
+        }
+
+        // ── Column header area ────────────────────────────────────────────
         if (ColumnHeadersVisible && my < colHdrH)
         {
+            // Check for column resize handle first (priority over sort click)
+            if (AllowUserToResizeColumns && e.Button == MouseButtons.Left)
+            {
+                int resizeCol = GetResizeColumnAtX(mx - rowHdrW);
+                if (resizeCol >= 0)
+                {
+                    _resizingCol   = true;
+                    _resizeColIndex = resizeCol;
+                    _resizeStartX  = e.X;
+                    _resizeStartW  = Columns[resizeCol].Width;
+                    return;
+                }
+            }
+
             int ci = GetColAtX(mx - rowHdrW);
             if (ci >= 0)
             {
@@ -704,6 +927,32 @@ public class DataGridView : ScrollableControl
             _selectedCell = (ri, col >= 0 ? col : 0);
             SelectionChanged?.Invoke(this, EventArgs.Empty);
             if (col >= 0) CellClick?.Invoke(this, new DataGridViewCellEventArgs(col, ri));
+
+            // Single-click on a CheckBox column cell toggles the boolean value (WinForms behaviour)
+            if (col >= 0 && col < Columns.Count && Columns[col] is DataGridViewCheckBoxColumn && !ReadOnly)
+            {
+                ToggleCheckBoxCell(ri, col);
+                return;
+            }
+
+            // Double-click on a ComboBox column cell opens the dropdown
+            if (col >= 0 && col < Columns.Count && Columns[col] is DataGridViewComboBoxColumn
+                && e.Clicks >= 2)
+            {
+                OpenComboDropdown(ri, col);
+                return;
+            }
+
+            // Double-click on a text cell begins inline editing (WinForms: EditOnDoubleClick or EditOnKeystrokeOrF2)
+            if (col >= 0 && col < Columns.Count && !ReadOnly
+                && Columns[col] is not DataGridViewCheckBoxColumn
+                && Columns[col] is not DataGridViewComboBoxColumn
+                && (e.Clicks >= 2 || EditMode == DataGridViewEditMode.EditOnEnter))
+            {
+                BeginEdit(ri, col);
+                return;
+            }
+
             Invalidate();
         }
         base.OnMouseDown(e);
@@ -712,12 +961,64 @@ public class DataGridView : ScrollableControl
     protected internal override void OnMouseMove(MouseEventArgs e)
     {
         int bw = BorderStyle == BorderStyle.None ? 0 : 2;
+        int rowHdrW = RowHeadersVisible ? RowHeadersWidth : 0;
         int colHdrH = ColumnHeadersVisible ? ColumnHeadersHeight : 0;
         int my = e.Y - bw;
+
+        // ── Active column resize drag ─────────────────────────────────────
+        if (_resizingCol)
+        {
+            int delta = e.X - _resizeStartX;
+            int newW  = Math.Max(5, _resizeStartW + delta);
+            Columns[_resizeColIndex].Width = newW;
+            Invalidate();
+            return;
+        }
+
+        // Track hover inside open combo dropdown
+        if (_comboOpen && _comboCol >= 0 && _comboCol < Columns.Count
+            && Columns[_comboCol] is DataGridViewComboBoxColumn openComboCol2)
+        {
+            var items2 = GetComboItems(openComboCol2);
+            int dropW2 = Columns[_comboCol].Width;
+            int dx = e.X, dy = e.Y;
+            int newHover = -1;
+            if (dx >= _comboCellX && dx < _comboCellX + dropW2
+                && dy >= _comboCellY && dy < _comboCellY + items2.Count * ComboDropItemH + 2)
+            {
+                newHover = (dy - _comboCellY - 1) / ComboDropItemH;
+                if (newHover < 0 || newHover >= items2.Count) newHover = -1;
+            }
+            if (newHover != _comboHoverIdx) { _comboHoverIdx = newHover; Invalidate(); }
+        }
+
+        // ── Show resize cursor when hovering over a column boundary ───────
+        if (ColumnHeadersVisible && AllowUserToResizeColumns && my < colHdrH)
+        {
+            int mx2 = e.X - bw - rowHdrW;
+            Cursor = GetResizeColumnAtX(mx2) >= 0 ? Cursor.SizeWE : Cursor.Default;
+        }
+        else
+        {
+            Cursor = Cursor.Default;
+        }
+
         if (my < colHdrH) { if (_hoveredRow != -1) { _hoveredRow = -1; Invalidate(); } return; }
         int ri = GetRowAtY(my - colHdrH + bw);
         if (ri != _hoveredRow)
         base.OnMouseMove(e);
+    }
+
+    protected internal override void OnMouseUp(MouseEventArgs e)
+    {
+        if (_resizingCol)
+        {
+            _resizingCol    = false;
+            _resizeColIndex = -1;
+            Cursor = Cursor.Default;
+            Invalidate();
+        }
+        base.OnMouseUp(e);
     }
 
     protected internal override void OnMouseLeave(EventArgs e)
@@ -741,6 +1042,151 @@ public class DataGridView : ScrollableControl
 
     protected internal override void OnKeyDown(KeyEventArgs e)
     {
+        // ── Active inline text edit keyboard handling ─────────────────────
+        if (_editing)
+        {
+            switch (e.KeyCode)
+            {
+                case Keys.Escape:
+                    EndEdit(commit: false);
+                    e.Handled = true;
+                    return;
+                case Keys.Enter:
+                    EndEdit(commit: true);
+                    e.Handled = true;
+                    return;
+                case Keys.Back:
+                    if (_editCursorPos > 0)
+                    {
+                        _editText = _editText.Remove(_editCursorPos - 1, 1);
+                        _editCursorPos--;
+                        Invalidate();
+                    }
+                    e.Handled = true;
+                    return;
+                case Keys.Delete:
+                    if (_editCursorPos < _editText.Length)
+                    {
+                        _editText = _editText.Remove(_editCursorPos, 1);
+                        Invalidate();
+                    }
+                    e.Handled = true;
+                    return;
+                case Keys.Left:
+                    if (_editCursorPos > 0) { _editCursorPos--; Invalidate(); }
+                    e.Handled = true;
+                    return;
+                case Keys.Right:
+                    if (_editCursorPos < _editText.Length) { _editCursorPos++; Invalidate(); }
+                    e.Handled = true;
+                    return;
+                case Keys.Home:
+                    _editCursorPos = 0;
+                    Invalidate();
+                    e.Handled = true;
+                    return;
+                case Keys.End:
+                    _editCursorPos = _editText.Length;
+                    Invalidate();
+                    e.Handled = true;
+                    return;
+            }
+            // Printable key → insert character at cursor
+            char ch = KeysToChar(e);
+            if (ch != '\0')
+            {
+                _editText = _editText.Insert(_editCursorPos, ch.ToString());
+                _editCursorPos++;
+                Invalidate();
+                e.Handled = true;
+                return;
+            }
+        }
+
+        // ComboBox dropdown keyboard navigation
+        if (_comboOpen && _comboCol >= 0 && _comboCol < Columns.Count
+            && Columns[_comboCol] is DataGridViewComboBoxColumn kbComboCol)
+        {
+            var kbItems = GetComboItems(kbComboCol);
+            switch (e.KeyCode)
+            {
+                case Keys.Escape:
+                    CloseComboDropdown();
+                    e.Handled = true;
+                    return;
+                case Keys.Enter:
+                    if (_comboHoverIdx >= 0) CommitComboItem(_comboHoverIdx);
+                    else CloseComboDropdown();
+                    e.Handled = true;
+                    return;
+                case Keys.Up:
+                    _comboHoverIdx = Math.Max(0, _comboHoverIdx <= 0 ? kbItems.Count - 1 : _comboHoverIdx - 1);
+                    Invalidate();
+                    e.Handled = true;
+                    return;
+                case Keys.Down:
+                    _comboHoverIdx = (_comboHoverIdx + 1) % kbItems.Count;
+                    Invalidate();
+                    e.Handled = true;
+                    return;
+            }
+        }
+
+        // F2 opens dropdown on focused ComboBox column cell; begins edit for TextBox cells
+        if (e.KeyCode == Keys.F2 && _selectedCell.row >= 0 && _selectedCell.col >= 0
+            && _selectedCell.col < Columns.Count)
+        {
+            if (!_comboOpen && Columns[_selectedCell.col] is DataGridViewComboBoxColumn)
+            {
+                OpenComboDropdown(_selectedCell.row, _selectedCell.col);
+                e.Handled = true;
+                return;
+            }
+            if (!_editing
+                && Columns[_selectedCell.col] is not DataGridViewCheckBoxColumn
+                && Columns[_selectedCell.col] is not DataGridViewComboBoxColumn
+                && !ReadOnly)
+            {
+                BeginEdit(_selectedCell.row, _selectedCell.col);
+                e.Handled = true;
+                return;
+            }
+        }
+
+        // Keystroke on a text cell starts editing immediately (EditOnKeystrokeOrF2)
+        if (!_editing && !_comboOpen
+            && _selectedCell.row >= 0 && _selectedCell.col >= 0
+            && _selectedCell.col < Columns.Count && !ReadOnly
+            && Columns[_selectedCell.col] is not DataGridViewCheckBoxColumn
+            && Columns[_selectedCell.col] is not DataGridViewComboBoxColumn
+            && (EditMode == DataGridViewEditMode.EditOnKeystroke
+                || EditMode == DataGridViewEditMode.EditOnKeystrokeOrF2))
+        {
+            char startChar = KeysToChar(e);
+            if (startChar != '\0')
+            {
+                BeginEdit(_selectedCell.row, _selectedCell.col);
+                // Replace text with this first character (WinForms: typing replaces cell value)
+                _editText = startChar.ToString();
+                _editCursorPos = 1;
+                Invalidate();
+                e.Handled = true;
+                return;
+            }
+        }
+
+        // Space bar toggles a focused CheckBox column cell (WinForms behaviour)
+        if (e.KeyCode == Keys.Space
+            && _selectedCell.row >= 0 && _selectedCell.col >= 0
+            && _selectedCell.col < Columns.Count
+            && Columns[_selectedCell.col] is DataGridViewCheckBoxColumn
+            && !ReadOnly)
+        {
+            ToggleCheckBoxCell(_selectedCell.row, _selectedCell.col);
+            e.Handled = true;
+            return;
+        }
+
         if (e.KeyCode == Keys.C && e.Control)
         {
             string text = GetClipboardContent();
@@ -749,6 +1195,39 @@ public class DataGridView : ScrollableControl
             e.Handled = true;
         }
         base.OnKeyDown(e);
+    }
+
+    /// <summary>
+    /// Converts a <see cref="Keys"/> value to a printable character, respecting Shift.
+    /// Returns '\0' for non-printable keys.
+    /// </summary>
+    private static char KeysToChar(KeyEventArgs e)
+    {
+        bool shift = e.Shift;
+        int k = (int)e.KeyCode;
+
+        if (k >= (int)Keys.A && k <= (int)Keys.Z)
+            return shift ? (char)k : char.ToLower((char)k);
+
+        if (k >= (int)Keys.D0 && k <= (int)Keys.D9)
+        {
+            char[] shiftedDigits = { ')', '!', '@', '#', '$', '%', '^', '&', '*', '(' };
+            return shift ? shiftedDigits[k - (int)Keys.D0] : (char)('0' + k - (int)Keys.D0);
+        }
+
+        if (k >= (int)Keys.NumPad0 && k <= (int)Keys.NumPad9)
+            return (char)('0' + k - (int)Keys.NumPad0);
+
+        return e.KeyCode switch
+        {
+            Keys.Space    => ' ',
+            Keys.Multiply => '*',
+            Keys.Add      => '+',
+            Keys.Subtract => '-',
+            Keys.Divide   => '/',
+            Keys.Decimal  => '.',
+            _ => '\0'
+        };
     }
 
     /// <summary>
@@ -858,6 +1337,139 @@ public class DataGridView : ScrollableControl
         return -1;
     }
 
+    /// <summary>
+    /// Returns the index of the column whose right edge is within <see cref="ResizeHandleW"/>
+    /// pixels of <paramref name="mouseX"/> (relative to left of column area, rowHdrW removed).
+    /// Returns -1 if no column boundary is close enough, or if the column is not resizable.
+    /// </summary>
+    private int GetResizeColumnAtX(int mouseX)
+    {
+        // Check frozen columns
+        int fcx = 0;
+        for (int ci = 0; ci < Columns.Count; ci++)
+        {
+            var col = Columns[ci];
+            if (!col.Visible || !col.Frozen) continue;
+            int rightEdge = fcx + col.Width;
+            if (Math.Abs(mouseX - rightEdge) <= ResizeHandleW && col.Resizable)
+                return ci;
+            fcx += col.Width;
+        }
+        // Check scrollable columns
+        int scx = fcx - _scrollOffsetX;
+        for (int ci = 0; ci < Columns.Count; ci++)
+        {
+            var col = Columns[ci];
+            if (!col.Visible || col.Frozen) continue;
+            int rightEdge = scx + col.Width;
+            if (Math.Abs(mouseX - rightEdge) <= ResizeHandleW && col.Resizable)
+                return ci;
+            scx += col.Width;
+        }
+        return -1;
+    }
+
+    // ── ComboBox helpers ─────────────────────────────────────────
+
+    private static List<object> GetComboItems(DataGridViewComboBoxColumn col)
+    {
+        if (col.DataSource is System.Collections.IEnumerable ds)
+        {
+            var list = new List<object>();
+            foreach (var item in ds) list.Add(item);
+            return list;
+        }
+        return col.Items.Cast<object>().ToList();
+    }
+
+    /// <summary>
+    /// Returns the pixel X/Y (relative to control top-left) of the named cell's left/bottom edges.
+    /// Used to position the combo dropdown.
+    /// </summary>
+    private (int cellX, int cellBottom, int cellWidth) GetCellScreenRect(int ri, int ci)
+    {
+        int bw = BorderStyle == BorderStyle.None ? 0 : 2;
+        int rowHdrW  = RowHeadersVisible ? RowHeadersWidth : 0;
+        int colHdrH  = ColumnHeadersVisible ? ColumnHeadersHeight : 0;
+        int frozenH  = FrozenRowsHeight();
+        int frozenW  = FrozenColumnsWidth();
+        int scrollOriginX = bw + rowHdrW + frozenW;
+        int scrollOriginY = bw + colHdrH + frozenH;
+
+        // Column X
+        int cx = 0;
+        bool frozen = ci < Columns.Count && Columns[ci].Frozen;
+        if (frozen)
+        {
+            int fx = bw + rowHdrW;
+            for (int c = 0; c < ci; c++)
+                if (Columns[c].Visible && Columns[c].Frozen) fx += Columns[c].Width;
+            cx = fx;
+        }
+        else
+        {
+            int sx = scrollOriginX - _scrollOffsetX;
+            for (int c = 0; c < Columns.Count; c++)
+            {
+                var col = Columns[c];
+                if (!col.Visible || col.Frozen) continue;
+                if (c == ci) { cx = sx; break; }
+                sx += col.Width;
+            }
+        }
+
+        // Row Y
+        int ry;
+        bool rowFrozen = ri < Rows.Count && Rows[ri].Frozen && Rows[ri].Visible;
+        if (rowFrozen)
+        {
+            ry = bw + colHdrH;
+            for (int r = 0; r < ri; r++)
+                if (r < Rows.Count && Rows[r].Frozen && Rows[r].Visible) ry += RowHeightDefault;
+        }
+        else
+        {
+            ry = scrollOriginY - _scrollOffsetY;
+            int scrollable = 0;
+            for (int r = 0; r < GetDisplayRowCount(); r++)
+            {
+                bool rf = r < Rows.Count && Rows[r].Frozen && Rows[r].Visible;
+                if (rf) continue;
+                if (r == ri) break;
+                scrollable++;
+            }
+            ry += scrollable * RowHeightDefault;
+        }
+
+        int colW = ci < Columns.Count ? Columns[ci].Width : 100;
+        return (cx, ry + RowHeightDefault, colW);
+    }
+
+    private void OpenComboDropdown(int ri, int ci)
+    {
+        if (ci >= Columns.Count || Columns[ci] is not DataGridViewComboBoxColumn) return;
+        _comboRow  = ri;
+        _comboCol  = ci;
+        _comboOpen = true;
+        _comboHoverIdx = -1;
+        var (cx, cy, _) = GetCellScreenRect(ri, ci);
+        _comboCellX = cx;
+        _comboCellY = cy;
+        Invalidate();
+    }
+
+    private void CloseComboDropdown() { _comboOpen = false; Invalidate(); }
+
+    private void CommitComboItem(int itemIdx)
+    {
+        if (_comboCol < 0 || _comboCol >= Columns.Count) return;
+        if (Columns[_comboCol] is not DataGridViewComboBoxColumn comboCol) return;
+        var items = GetComboItems(comboCol);
+        if (itemIdx < 0 || itemIdx >= items.Count) return;
+        SetCellValue(_comboRow, _comboCol, items[itemIdx]);
+        CloseComboDropdown();
+    }
+
     // ── Programmatic selection ────────────────────────────────────
 
     public void ClearSelection()
@@ -889,6 +1501,22 @@ public class DataGridView : ScrollableControl
         if (rowIndex < Rows.Count && colIndex < Rows[rowIndex].Cells.Count)
             return Rows[rowIndex].Cells[colIndex].Value;
         return null;
+    }
+
+    /// <summary>
+    /// Toggles the boolean value of a DataGridViewCheckBoxColumn cell and fires CellValueChanged.
+    /// Matches WinForms single-click / Space-key toggle behaviour.
+    /// </summary>
+    private void ToggleCheckBoxCell(int rowIndex, int colIndex)
+    {
+        object? raw = null;
+        if (_boundRows.Count > 0)
+            raw = rowIndex < _boundRows.Count && colIndex < _boundRows[rowIndex].Length ? _boundRows[rowIndex][colIndex] : null;
+        else if (rowIndex < Rows.Count && colIndex < Rows[rowIndex].Cells.Count)
+            raw = Rows[rowIndex].Cells[colIndex].Value;
+
+        bool current = raw is true || (raw is string sv && sv.Equals("true", StringComparison.OrdinalIgnoreCase));
+        SetCellValue(rowIndex, colIndex, !current);
     }
 
     public void SetCellValue(int rowIndex, int colIndex, object? value)
@@ -936,6 +1564,13 @@ public class DataGridViewRowEventArgs : EventArgs
 {
     public DataGridViewRow Row { get; }
     public DataGridViewRowEventArgs(DataGridViewRow row) => Row = row;
+}
+
+public class DataGridViewRowCancelEventArgs : EventArgs
+{
+    public DataGridViewRow Row { get; }
+    public bool Cancel { get; set; }
+    public DataGridViewRowCancelEventArgs(DataGridViewRow row) => Row = row;
 }
 
 public class DataGridViewColumnEventArgs : EventArgs
@@ -993,4 +1628,41 @@ public class DataGridViewCellCancelEventArgs : CancelEventArgs
         ColumnIndex = columnIndex;
         RowIndex = rowIndex;
     }
+}
+
+/// <summary>
+/// Provides data for the <see cref="DataGridView.CellFormatting"/> event.
+/// Matches the WinForms <c>DataGridViewCellFormattingEventArgs</c> surface.
+/// </summary>
+public class DataGridViewCellFormattingEventArgs : DataGridViewCellEventArgs
+{
+    public DataGridViewCellFormattingEventArgs(
+        int columnIndex, int rowIndex,
+        object? value, Type? desiredType,
+        DataGridViewCellStyle cellStyle)
+        : base(columnIndex, rowIndex)
+    {
+        Value        = value;
+        DesiredType  = desiredType;
+        CellStyle    = cellStyle ?? new DataGridViewCellStyle();
+    }
+
+    /// <summary>Gets or sets the cell value to display. Change this to customise the text shown.</summary>
+    public object? Value { get; set; }
+
+    /// <summary>The type that the grid expected for formatting (usually <c>typeof(string)</c>).</summary>
+    public Type? DesiredType { get; }
+
+    /// <summary>
+    /// The effective cell style. Modify <see cref="DataGridViewCellStyle.ForeColor"/> or
+    /// <see cref="DataGridViewCellStyle.Font"/> to override rendering for this cell only.
+    /// </summary>
+    public DataGridViewCellStyle CellStyle { get; }
+
+    /// <summary>
+    /// Set to <c>true</c> in the handler to indicate that the custom formatting was applied
+    /// and the grid should use <see cref="Value"/> and the modified <see cref="CellStyle"/>
+    /// instead of the default formatting.
+    /// </summary>
+    public bool FormattingApplied { get; set; }
 }

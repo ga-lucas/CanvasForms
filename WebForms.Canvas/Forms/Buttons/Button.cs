@@ -41,9 +41,10 @@ public class Button : ButtonBase
         Rectangle textRect  = bounds;
         Rectangle imageRect = Rectangle.Empty;
 
-        if (Image != null)
+        var effectiveImage = EffectiveImage;
+        if (effectiveImage != null)
         {
-            imageRect = _CalcImageRect(bounds);
+            imageRect = _CalcImageRect(bounds, effectiveImage);
 
             if (TextImageRelation == TextImageRelation.ImageBeforeText)
             {
@@ -77,7 +78,7 @@ public class Button : ButtonBase
             }
 
             if (!imageRect.IsEmpty)
-                g.DrawImage(Image, imageRect.X, imageRect.Y, imageRect.Width, imageRect.Height);
+                g.DrawImage(effectiveImage, imageRect.X, imageRect.Y, imageRect.Width, imageRect.Height);
         }
 
         // ── Text ─────────────────────────────────────────────────────────────
@@ -194,10 +195,10 @@ public class Button : ButtonBase
     /// Calculates the image destination rectangle inside the button bounds,
     /// honouring <see cref="ButtonBase.ImageAlign"/>.
     /// </summary>
-    private Rectangle _CalcImageRect(Rectangle bounds)
+    private Rectangle _CalcImageRect(Rectangle bounds, Image img)
     {
-        int imgW = Image!.Width  > 0 ? Image.Width  : 16;
-        int imgH = Image!.Height > 0 ? Image.Height : 16;
+        int imgW = img.Width  > 0 ? img.Width  : 16;
+        int imgH = img.Height > 0 ? img.Height : 16;
 
         int x, y;
         switch (ImageAlign)

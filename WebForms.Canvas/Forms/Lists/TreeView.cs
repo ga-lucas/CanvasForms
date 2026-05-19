@@ -133,6 +133,8 @@ public class TreeView : Control
     public event TreeNodeMouseClickEventHandler? NodeMouseDoubleClick;
     public event NodeLabelEditEventHandler? AfterLabelEdit;
     public event NodeLabelEditEventHandler? BeforeLabelEdit;
+    public event TreeViewEventHandler? AfterCheck;
+    public event TreeViewCancelEventHandler? BeforeCheck;
 #pragma warning restore CS0067
 
     public TreeView()
@@ -308,6 +310,23 @@ public class TreeView : Control
             }
             else
             {
+                // Determine if click landed on the checkbox
+                if (CheckBoxes)
+                {
+                    int depth = node.Level;
+                    int nx = LeftMargin + 2 + depth * Indent_;
+                    int bx = Math.Max(LeftMargin, nx - ExpandBoxSize - ExpandBoxOffset);
+                    int textX = (node.HasChildren && ShowPlusMinus) ? bx + ExpandBoxSize + 2 : nx;
+                    int cbx = textX;
+                    var allVis = new List<(TreeNode n, int d, int yy)>();
+                    CollectVisible(Nodes, 0, 2 - _scrollOffset, allVis);
+                    var entry = allVis.FirstOrDefault(v => v.n == node);
+                    int cby = entry.yy + (ItemHeight - 13) / 2;
+                    if (e.X >= cbx && e.X <= cbx + 13 && e.Y >= cby && e.Y <= cby + 13)
+                    {
+                        ToggleCheckbox(node);
+                    }
+                }
                 SelectedNode = node;
                 NodeMouseClick?.Invoke(this, new TreeNodeMouseClickEventArgs(node, e.Button, e.Clicks, e.X, e.Y));
             }
@@ -339,8 +358,21 @@ public class TreeView : Control
             case Keys.Right:
                 if (_selectedNode.HasChildren && !_selectedNode.IsExpanded) _selectedNode.Expand();
                 e.Handled = true; return;
+            case Keys.Space:
+                if (CheckBoxes) { ToggleCheckbox(_selectedNode); e.Handled = true; return; }
+                break;
         }
         base.OnKeyDown(e);
+    }
+
+    private void ToggleCheckbox(TreeNode node)
+    {
+        var cancelArgs = new TreeViewCancelEventArgs(node, false, TreeViewAction.Unknown);
+        BeforeCheck?.Invoke(this, cancelArgs);
+        if (cancelArgs.Cancel) return;
+        node.Checked = !node.Checked;
+        Invalidate();
+        AfterCheck?.Invoke(this, new TreeViewEventArgs(node, TreeViewAction.Unknown));
     }
 
     private (TreeNode? node, bool onExpander) HitTest(int x, int y)

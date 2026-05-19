@@ -380,6 +380,126 @@ public class ToolStrip : ScrollableControl
     {
         if (!item.Visible) return;
 
+        // ── ToolStripProgressBar ───────────────────────────────────────────────
+        if (item is ToolStripProgressBar tpb)
+        {
+            int pbH = Math.Min(14, bounds.Height - 4);
+            int pbY = bounds.Y + (bounds.Height - pbH) / 2;
+            var pbR = new Rectangle(bounds.X + 2, pbY, bounds.Width - 4, pbH);
+            using var trackBrush = new SolidBrush(CanvasColor.FromArgb(230, 230, 230));
+            using var trackPen   = new Pen(CanvasColor.FromArgb(160, 160, 160));
+            g.FillRectangle(trackBrush, pbR);
+            g.DrawRectangle(trackPen, pbR.X, pbR.Y, pbR.Width - 1, pbR.Height - 1);
+            int range = Math.Max(1, tpb.Maximum - tpb.Minimum);
+            int fillW = (int)((double)(tpb.Value - tpb.Minimum) / range * (pbR.Width - 2));
+            if (fillW > 0)
+            {
+                using var fillBrush = new SolidBrush(CanvasColor.FromArgb(6, 176, 37));
+                g.FillRectangle(fillBrush, new Rectangle(pbR.X + 1, pbR.Y + 1, fillW, pbR.Height - 2));
+            }
+            item.Bounds = bounds;
+            return;
+        }
+
+        // ── ToolStripTextBox ───────────────────────────────────────────────────
+        if (item is ToolStripTextBox ttb)
+        {
+            int tbH = Math.Min(20, bounds.Height - 4);
+            int tbY = bounds.Y + (bounds.Height - tbH) / 2;
+            var tbR = new Rectangle(bounds.X + 2, tbY, bounds.Width - 4, tbH);
+            using var whBrush = new SolidBrush(CanvasColor.White);
+            using var brdPen  = new Pen(CanvasColor.FromArgb(120, 120, 120));
+            g.FillRectangle(whBrush, tbR);
+            g.DrawRectangle(brdPen, tbR.X, tbR.Y, tbR.Width - 1, tbR.Height - 1);
+            g.DrawString(ttb.Text ?? string.Empty, tbR.X + 3, tbR.Y + 3, CanvasColor.Black);
+            item.Bounds = bounds;
+            return;
+        }
+
+        // ── ToolStripComboBox ──────────────────────────────────────────────────
+        if (item is ToolStripComboBox tcb)
+        {
+            int cbH = Math.Min(20, bounds.Height - 4);
+            int cbY = bounds.Y + (bounds.Height - cbH) / 2;
+            var cbR = new Rectangle(bounds.X + 2, cbY, bounds.Width - 4, cbH);
+            using var whBrush = new SolidBrush(CanvasColor.White);
+            using var brdPen  = new Pen(CanvasColor.FromArgb(120, 120, 120));
+            g.FillRectangle(whBrush, cbR);
+            g.DrawRectangle(brdPen, cbR.X, cbR.Y, cbR.Width - 1, cbR.Height - 1);
+            // Arrow button on right
+            int arrW = 14;
+            var arrR = new Rectangle(cbR.Right - arrW, cbR.Y, arrW, cbR.Height);
+            using var arrBrush = new SolidBrush(CanvasColor.FromArgb(220, 220, 220));
+            g.FillRectangle(arrBrush, arrR);
+            g.DrawString(tcb.ComboBox.Text ?? string.Empty, cbR.X + 3, cbR.Y + 3, CanvasColor.Black);
+            using var arrPen = new Pen(CanvasColor.FromArgb(80, 80, 80));
+            int ax = arrR.X + 4, ay = arrR.Y + 5;
+            g.DrawLine(arrPen, ax, ay, ax + 3, ay + 4);
+            g.DrawLine(arrPen, ax + 3, ay + 4, ax + 6, ay);
+            item.Bounds = bounds;
+            return;
+        }
+
+        // ── ToolStripSplitButton ───────────────────────────────────────────────
+        if (item is ToolStripSplitButton tsb)
+        {
+            const int arrowAreaW = 14;
+            int faceW = bounds.Width - arrowAreaW;
+            var faceR = new Rectangle(bounds.X, bounds.Y, faceW, bounds.Height);
+            var arrR2 = new Rectangle(bounds.X + faceW, bounds.Y, arrowAreaW, bounds.Height);
+
+            // Face background
+            CanvasColor faceBg = hovered && item.Enabled
+                ? CanvasColor.FromArgb(0, 120, 215)
+                : CanvasColor.FromArgb(240, 240, 240);
+            using var faceBrush = new SolidBrush(faceBg);
+            g.FillRectangle(faceBrush, faceR);
+
+            // Arrow area background
+            CanvasColor arrBg = CanvasColor.FromArgb(220, 220, 220);
+            using var arrBrush2 = new SolidBrush(arrBg);
+            g.FillRectangle(arrBrush2, arrR2);
+
+            // Divider line
+            using var divPen = new Pen(CanvasColor.FromArgb(160, 160, 160));
+            g.DrawLine(divPen, arrR2.X, arrR2.Y + 2, arrR2.X, arrR2.Bottom - 2);
+
+            // Face content
+            var textColor2 = !item.Enabled
+                ? CanvasColor.FromArgb(160, 160, 160)
+                : hovered ? CanvasColor.White : CanvasColor.FromArgb(30, 30, 30);
+
+            bool showImg2 = tsb.Image is not null && tsb.DisplayStyle != ToolStripItemDisplayStyle.Text;
+            bool showTxt2 = !string.IsNullOrEmpty(tsb.Text) && tsb.DisplayStyle != ToolStripItemDisplayStyle.Image;
+
+            if (showImg2 && showTxt2)
+            {
+                int is2 = Math.Min(faceR.Height - 6, 16);
+                int my2 = faceR.Y + faceR.Height / 2;
+                g.DrawImage(tsb.Image!.Source ?? string.Empty, faceR.X + 4, my2 - is2 / 2, is2, is2);
+                g.DrawString(tsb.Text, faceR.X + is2 + 8, my2 - 6, textColor2);
+            }
+            else if (showImg2)
+            {
+                int is2 = Math.Min(faceR.Height - 6, 16);
+                g.DrawImage(tsb.Image!.Source ?? string.Empty,
+                    faceR.X + (faceR.Width - is2) / 2, faceR.Y + (faceR.Height - is2) / 2, is2, is2);
+            }
+            else if (showTxt2)
+            {
+                g.DrawString(tsb.Text, faceR.X + 6, faceR.Y + (faceR.Height - 12) / 2, textColor2);
+            }
+
+            // Down-arrow in arrow area
+            using var arrowPen2 = new Pen(CanvasColor.FromArgb(80, 80, 80));
+            int ax2 = arrR2.X + 3, ay2 = arrR2.Y + (arrR2.Height - 4) / 2;
+            g.DrawLine(arrowPen2, ax2, ay2, ax2 + 3, ay2 + 4);
+            g.DrawLine(arrowPen2, ax2 + 3, ay2 + 4, ax2 + 6, ay2);
+
+            item.Bounds = bounds;
+            return;
+        }
+
         bool isChecked = item is ToolStripButton btn2 && btn2.Checked;
 
         // Background
@@ -490,9 +610,7 @@ public class ToolStripDropDownButton : ToolStripItem
 
     public event EventHandler? DropDownOpening;
     public event EventHandler? DropDownOpened;
-#pragma warning disable CS0067
     public event EventHandler? DropDownClosed;
-#pragma warning restore CS0067
 
     public ToolStripDropDownButton() { }
     public ToolStripDropDownButton(string text) { Text = text; }
@@ -509,10 +627,157 @@ public class ToolStripDropDownButton : ToolStripItem
         if (HasDropDownItems)
         {
             DropDownOpening?.Invoke(this, EventArgs.Empty);
+            DropDown.Closed += OnDropDownClosed;
             DropDown.IsVisible = true;
             DropDownOpened?.Invoke(this, EventArgs.Empty);
         }
         base.OnClick(e);
+    }
+
+    private void OnDropDownClosed(object? sender, EventArgs e)
+    {
+        DropDown.Closed -= OnDropDownClosed;
+        DropDownClosed?.Invoke(this, EventArgs.Empty);
+    }
+}
+
+// ── ToolStripSplitButton ──────────────────────────────────────────────────────
+/// <summary>
+/// A ToolStrip item that consists of a button face and a separate drop-down arrow.
+/// Clicking the face fires <see cref="ButtonClick"/>; clicking the arrow opens
+/// <see cref="DropDown"/> just like <see cref="ToolStripDropDownButton"/>.
+/// </summary>
+public class ToolStripSplitButton : ToolStripItem
+{
+    private ToolStripDropDown? _dropDown;
+    private ToolStripItem? _defaultItem;
+    private bool _dropDownPressed;
+
+    // ── Drop-down ─────────────────────────────────────────────────────────────
+
+    public ToolStripDropDown DropDown
+        => _dropDown ??= new ToolStripDropDownMenu();
+
+    public ToolStripItemCollection DropDownItems => DropDown.Items;
+
+    public bool HasDropDownItems
+        => _dropDown is { } dd && dd.Items.Count > 0;
+
+    public ToolStripDropDownDirection DropDownDirection { get; set; }
+        = ToolStripDropDownDirection.Default;
+
+    public bool ShowDropDownArrow { get; set; } = true;
+
+    // ── DefaultItem ───────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// The item whose action is invoked when the button face is clicked.
+    /// If <c>null</c>, <see cref="ButtonClick"/> is raised instead.
+    /// </summary>
+    public ToolStripItem? DefaultItem
+    {
+        get => _defaultItem;
+        set => _defaultItem = value;
+    }
+
+    // ── Events ────────────────────────────────────────────────────────────────
+
+    /// <summary>Raised when the button face (not the arrow) is clicked.</summary>
+    public event EventHandler? ButtonClick;
+
+    /// <summary>Raised when the drop-down portion is clicked and opens.</summary>
+    public event EventHandler? ButtonDoubleClick;
+
+    public event EventHandler? DropDownOpening;
+    public event EventHandler? DropDownOpened;
+    public event EventHandler? DropDownClosed;
+    public event EventHandler? DropDownItemClicked;
+
+    // ── Constructors ──────────────────────────────────────────────────────────
+
+    public ToolStripSplitButton() { }
+    public ToolStripSplitButton(string text) { Text = text; }
+    public ToolStripSplitButton(Image? image) { Image = image; }
+    public ToolStripSplitButton(string text, Image? image) { Text = text; Image = image; }
+    public ToolStripSplitButton(string text, Image? image, EventHandler onClick)
+    {
+        Text = text; Image = image; ButtonClick += onClick;
+    }
+    public ToolStripSplitButton(string text, Image? image, EventHandler onClick, string name)
+    {
+        Text = text; Image = image; ButtonClick += onClick; Name = name;
+    }
+    public ToolStripSplitButton(string text, Image? image, params ToolStripItem[] items)
+    {
+        Text = text; Image = image;
+        foreach (var i in items) DropDownItems.Add(i);
+    }
+
+    // ── Click routing ─────────────────────────────────────────────────────────
+
+    protected internal override void OnClick(EventArgs e)
+    {
+        if (_dropDownPressed)
+        {
+            // Arrow area clicked — open drop-down
+            _dropDownPressed = false;
+            if (HasDropDownItems)
+            {
+                DropDownOpening?.Invoke(this, EventArgs.Empty);
+                DropDown.Closed += OnDropDownClosed;
+                DropDown.IsVisible = true;
+                DropDownOpened?.Invoke(this, EventArgs.Empty);
+            }
+        }
+        else
+        {
+            // Button face clicked
+            if (_defaultItem is not null)
+                _defaultItem.PerformClick();
+            else
+                ButtonClick?.Invoke(this, e);
+            base.OnClick(e);
+        }
+    }
+
+    /// <summary>
+    /// Allows the renderer to signal that the drop-down arrow portion was pressed
+    /// before routing the click event.
+    /// </summary>
+    public void SignalDropDownPress() => _dropDownPressed = true;
+
+    /// <summary>Programmatically opens the drop-down.</summary>
+    public void ShowDropDown()
+    {
+        if (HasDropDownItems)
+        {
+            DropDownOpening?.Invoke(this, EventArgs.Empty);
+            DropDown.Closed += OnDropDownClosed;
+            DropDown.IsVisible = true;
+            DropDownOpened?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    /// <summary>Programmatically closes the drop-down.</summary>
+    public void HideDropDown()
+    {
+        if (_dropDown is not null)
+            _dropDown.Close(ToolStripDropDownCloseReason.Keyboard);
+    }
+
+    private void OnDropDownClosed(object? sender, EventArgs e)
+    {
+        DropDown.Closed -= OnDropDownClosed;
+        DropDownClosed?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Performs a button-face click.</summary>
+    public void PerformButtonClick()
+    {
+        if (_defaultItem is not null)
+            _defaultItem.PerformClick();
+        else
+            ButtonClick?.Invoke(this, EventArgs.Empty);
     }
 }
 

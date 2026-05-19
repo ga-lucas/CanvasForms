@@ -134,14 +134,16 @@ public class ScrollableControl : Control
 
             if (!AutoScroll)
             {
-                return new Rectangle(0, 0, Math.Max(0, contentWidth), Math.Max(0, contentHeight));
+                return new Rectangle(Padding.Left, Padding.Top,
+                    Math.Max(0, contentWidth  - Padding.Horizontal),
+                    Math.Max(0, contentHeight - Padding.Vertical));
             }
 
             return new Rectangle(
-                AutoScrollPosition.X,
-                AutoScrollPosition.Y,
-                Math.Max(0, contentWidth),
-                Math.Max(0, contentHeight));
+                AutoScrollPosition.X + Padding.Left,
+                AutoScrollPosition.Y + Padding.Top,
+                Math.Max(0, contentWidth  - Padding.Horizontal),
+                Math.Max(0, contentHeight - Padding.Vertical));
         }
     }
 

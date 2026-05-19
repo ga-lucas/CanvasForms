@@ -12,6 +12,13 @@ public abstract class ListControl : Control
     protected int _hoveredIndex = -1;
     protected ObjectCollection _items;
 
+    private object?  _dataSource;
+    private string   _displayMember = "";
+    private string   _valueMember   = "";
+
+    // Subscribed IBindingList (to unsubscribe on DataSource change)
+    private System.ComponentModel.IBindingList? _subscribedBindingList;
+
     // Scrollbar constants
     protected const int DefaultItemHeight = 16;
 
@@ -23,7 +30,7 @@ public abstract class ListControl : Control
     public ListControl()
     {
         _items = new ObjectCollection(this);
-        SetStyle(ControlStyles.Selectable | ControlStyles.UserPaint, true);
+
         TabStop = true;
     }
 
@@ -71,17 +78,134 @@ public abstract class ListControl : Control
     /// <summary>
     /// Gets or sets the property to display for items
     /// </summary>
-    public string DisplayMember { get; set; } = "";
+    public string DisplayMember
+    {
+        get => _displayMember;
+        set
+        {
+            if (_displayMember != value)
+            {
+                _displayMember = value ?? "";
+                if (_dataSource != null) RefreshItemsFromDataSource();
+                else Invalidate(); // re-render display text
+            }
+        }
+    }
 
     /// <summary>
     /// Gets or sets the property to use as the actual value
     /// </summary>
-    public string ValueMember { get; set; } = "";
+    public string ValueMember
+    {
+        get => _valueMember;
+        set
+        {
+            _valueMember = value ?? "";
+        }
+    }
 
     /// <summary>
-    /// Gets or sets the data source for this control
+    /// Gets or sets the data source for this control.
+    /// Accepts IEnumerable, IBindingList, or BindingSource; populates Items automatically.
     /// </summary>
-    public object? DataSource { get; set; }
+    public object? DataSource
+    {
+        get => _dataSource;
+        set
+        {
+            if (_dataSource == value) return;
+
+            // Unsubscribe from old binding list
+            if (_subscribedBindingList != null)
+            {
+                _subscribedBindingList.ListChanged -= OnBoundListChanged;
+                _subscribedBindingList = null;
+            }
+
+            _dataSource = value;
+
+            // Subscribe to new binding list
+            var bindingList = value as System.ComponentModel.IBindingList;
+            if (bindingList != null)
+            {
+                _subscribedBindingList = bindingList;
+                _subscribedBindingList.ListChanged += OnBoundListChanged;
+            }
+
+            RefreshItemsFromDataSource();
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets the value of the selected item using ValueMember.
+    /// Falls back to the item itself when ValueMember is empty.
+    /// </summary>
+    public object? SelectedValue
+    {
+        get
+        {
+            var item = SelectedItem;
+            if (item == null) return null;
+            if (!string.IsNullOrEmpty(_valueMember))
+            {
+                var prop = item.GetType().GetProperty(_valueMember);
+                if (prop != null) return prop.GetValue(item);
+            }
+            return item;
+        }
+        set
+        {
+            if (value == null) { SelectedIndex = -1; return; }
+            for (int i = 0; i < _items.Count; i++)
+            {
+                var item = _items[i];
+                object? itemVal;
+                if (!string.IsNullOrEmpty(_valueMember))
+                {
+                    var prop = item?.GetType().GetProperty(_valueMember);
+                    itemVal = prop?.GetValue(item);
+                }
+                else
+                {
+                    itemVal = item;
+                }
+                if (Equals(itemVal, value)) { SelectedIndex = i; return; }
+            }
+            SelectedIndex = -1;
+        }
+    }
+
+    // Called by DataSource setter and IBindingList.ListChanged
+    private void OnBoundListChanged(object? sender, System.ComponentModel.ListChangedEventArgs e)
+        => RefreshItemsFromDataSource();
+
+    /// <summary>
+    /// Repopulates Items from the current DataSource (IEnumerable).
+    /// Preserves selected value by ValueMember if possible.
+    /// </summary>
+    protected virtual void RefreshItemsFromDataSource()
+    {
+        var prevValue = SelectedValue; // save before clearing
+
+        _items.Clear();
+        _selectedIndex = -1;
+        _topIndex = 0;
+
+        var source = _dataSource;
+        // BindingSource implements IEnumerable directly — no special unwrapping needed
+
+        if (source is System.Collections.IEnumerable enumerable)
+        {
+            foreach (var item in enumerable)
+                _items.Add(item);
+        }
+
+        // Restore selection by value
+        if (prevValue != null)
+            SelectedValue = prevValue;
+
+        Invalidate();
+    }
 
     /// <summary>
     /// Gets or sets a value indicating whether the control formats the display values of the items.

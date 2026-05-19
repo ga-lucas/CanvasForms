@@ -23,6 +23,32 @@ public abstract class ButtonBase : Control, IButtonControl
     public bool UseVisualStyleBackColor { get; set; } = true;
     public bool AutoEllipsis { get; set; } = false;
 
+    /// <summary>
+    /// Returns the image to draw: resolves <see cref="ImageKey"/> / <see cref="ImageIndex"/>
+    /// from <see cref="ImageList"/> when <see cref="Image"/> is not set directly.
+    /// Mirrors WinForms precedence: explicit Image > ImageKey > ImageIndex.
+    /// </summary>
+    protected Image? EffectiveImage
+    {
+        get
+        {
+            if (Image != null) return Image;
+            if (ImageList == null) return null;
+            string? url = null;
+            if (!string.IsNullOrEmpty(ImageKey))
+                url = ImageList.GetUrl(ImageKey);
+            if (url == null && ImageIndex >= 0)
+                url = ImageList.GetUrl(ImageIndex);
+            if (url == null) return null;
+            return new Image
+            {
+                Source = url,
+                Width  = ImageList.ImageSize.Width,
+                Height = ImageList.ImageSize.Height
+            };
+        }
+    }
+
     private FlatAppearance? _flatAppearance;
     /// <summary>
     /// Provides appearance settings used when <see cref="FlatStyle"/> is

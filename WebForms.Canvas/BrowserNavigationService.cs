@@ -13,6 +13,16 @@ public static class BrowserNavigationService
     /// </summary>
     public static IJSRuntime? JSRuntime { get; set; }
 
+    /// <summary>Shows a browser alert dialog with the given message.</summary>
+    public static void ShowAlert(string? message)
+    {
+        try
+        {
+            JSRuntime?.InvokeVoidAsync("alert", message ?? string.Empty);
+        }
+        catch { /* JS interop may not be available during tests */ }
+    }
+
     /// <summary>
     /// Opens a URL in a new browser window or tab
     /// </summary>

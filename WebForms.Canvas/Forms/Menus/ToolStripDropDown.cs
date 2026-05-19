@@ -346,11 +346,14 @@ public class ToolStripDropDown : ToolStrip
             if (item is ToolStripMenuItem mi && mi.DropDown.IsVisible)
                 mi.DropDown.CloseChain();
         }
+
+        OnClosed(EventArgs.Empty);
     }
 
     // ── Events ─────────────────────────────────────────────────────────────────
 
     public event ToolStripDropDownClosingEventHandler? Closing;
+    public event EventHandler?                         Closed;
     public event EventHandler?                         Opened;
     public event EventHandler?                         Opening;
     public event EventHandler? Scroll; // stub — canvas does not scroll dropdowns
@@ -358,6 +361,7 @@ public class ToolStripDropDown : ToolStrip
     protected virtual void OnClosing(ToolStripDropDownClosingEventArgs e)
         => Closing?.Invoke(this, e);
 
+    protected virtual void OnClosed(EventArgs e)  => Closed?.Invoke(this, e);
     protected virtual void OnOpened(EventArgs e)  => Opened?.Invoke(this, e);
     protected virtual void OnOpening(EventArgs e) => Opening?.Invoke(this, e);
     protected virtual void OnScroll(EventArgs e) => Scroll?.Invoke(this, e);

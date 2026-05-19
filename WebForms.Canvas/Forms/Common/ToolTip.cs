@@ -58,7 +58,8 @@ public static class ToolTipRegistry
 /// </summary>
 public class ToolTip : System.ComponentModel.Component
 {
-    private readonly Dictionary<Control, string> _toolTips = new();
+    // Value: (caption, per-control AutoPopDelay; -1 = use global)
+    private readonly Dictionary<Control, (string Caption, int PopDelay)> _toolTips = new();
     private bool   _active        = true;
     private int    _autoPopDelay  = 5000;
     private int    _initialDelay  = 500;
@@ -84,6 +85,17 @@ public class ToolTip : System.ComponentModel.Component
     public ToolTipIcon ToolTipIcon   { get => _icon;         set => _icon         = value; }
     public string      ToolTipTitle  { get => _title;        set => _title        = value; }
 
+    /// <summary>Background colour of the tooltip window. Accepted; not yet propagated to canvas rendering.</summary>
+    public Color BackColor  { get; set; } = Color.Empty;
+    /// <summary>Foreground (text) colour of the tooltip. Accepted; not yet propagated to canvas rendering.</summary>
+    public Color ForeColor  { get; set; } = Color.Empty;
+    /// <summary>When true, ampersands (&amp;) are stripped from the tooltip text (accepted; always stripped in canvas).</summary>
+    public bool  StripAmpersands { get; set; } = true;
+    /// <summary>When true (default), the tooltip fades in/out. Accepted; no-op in the canvas layer.</summary>
+    public bool  UseFading  { get; set; } = true;
+    /// <summary>When true (default), the tooltip slides in. Accepted; no-op in the canvas layer.</summary>
+    public bool  UseAnimation { get; set; } = true;
+
     // ── Association ───────────────────────────────────────────────────────────
 
     /// <summary>
@@ -93,6 +105,14 @@ public class ToolTip : System.ComponentModel.Component
     /// on first association.
     /// </summary>
     public void SetToolTip(Control control, string caption)
+        => SetToolTip(control, caption, -1);
+
+    /// <summary>
+    /// Associates <paramref name="caption"/> with <paramref name="control"/> and
+    /// overrides <see cref="AutoPopDelay"/> for this specific control.
+    /// Pass <paramref name="autoPopDelay"/> = -1 to use the global setting.
+    /// </summary>
+    public void SetToolTip(Control control, string caption, int autoPopDelay)
     {
         if (control == null) return;
 
@@ -106,7 +126,7 @@ public class ToolTip : System.ComponentModel.Component
         }
         else
         {
-            _toolTips[control] = caption;
+            _toolTips[control] = (caption, autoPopDelay);
             if (!alreadyHooked)
                 HookControl(control);
         }
@@ -114,7 +134,7 @@ public class ToolTip : System.ComponentModel.Component
 
     /// <summary>Returns the tooltip text for a control (empty string if none).</summary>
     public string GetToolTip(Control control)
-        => _toolTips.TryGetValue(control, out var tip) ? tip : string.Empty;
+        => _toolTips.TryGetValue(control, out var entry) ? entry.Caption : string.Empty;
 
     /// <summary>Removes all tooltip associations.</summary>
     public void RemoveAll()
@@ -166,7 +186,8 @@ public class ToolTip : System.ComponentModel.Component
     private void OnControlMouseEnter(object? sender, EventArgs e)
     {
         if (!_active || sender is not Control c) return;
-        if (!_toolTips.TryGetValue(c, out var tip)) return;
+        if (!_toolTips.TryGetValue(c, out var entry)) return;
+        var tip = entry.Caption;
 
         // ShowAlways = false (default): suppress tooltip when the parent form is not active.
         if (!_showAlways)
@@ -183,7 +204,9 @@ public class ToolTip : System.ComponentModel.Component
         // Use ReshowDelay if a tooltip was recently dismissed; otherwise use the full InitialDelay.
         var elapsed = (DateTime.UtcNow - _lastHideTime).TotalMilliseconds;
         var delay    = (elapsed < _autoPopDelay) ? _reshowDelay : _initialDelay;
-        var duration = _autoPopDelay;
+
+        // Per-control AutoPopDelay takes priority over the global setting.
+        var duration = entry.PopDelay >= 0 ? entry.PopDelay : _autoPopDelay;
 
         // Compute position below the control (form-relative)
         var x = GetFormX(c);

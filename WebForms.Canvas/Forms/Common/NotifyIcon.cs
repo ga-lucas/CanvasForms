@@ -18,13 +18,16 @@ public class NotifyIcon : System.ComponentModel.Component
     private string _balloonTipText = string.Empty;
 
     // ── Events ───────────────────────────────────────────────────────────────
-    public event EventHandler?    Click;
+    public event EventHandler?      Click;
     public event MouseEventHandler? MouseClick;
     public event MouseEventHandler? MouseDoubleClick;
-    public event EventHandler?    DoubleClick;
-    public event EventHandler?    BalloonTipClicked;
-    public event EventHandler?    BalloonTipClosed;
-    public event EventHandler?    BalloonTipShown;
+    public event EventHandler?      DoubleClick;
+    public event MouseEventHandler? MouseDown;
+    public event MouseEventHandler? MouseUp;
+    public event MouseEventHandler? MouseMove;
+    public event EventHandler?      BalloonTipClicked;
+    public event EventHandler?      BalloonTipClosed;
+    public event EventHandler?      BalloonTipShown;
 
     // ── Active balloon tip (read by SystemTray.razor) ─────────────────────
     internal BalloonTipInfo? ActiveBalloon { get; private set; }
@@ -85,6 +88,10 @@ public class NotifyIcon : System.ComponentModel.Component
         DoubleClick?.Invoke(this, e);
         MouseDoubleClick?.Invoke(this, e);
     }
+
+    internal void RaiseMouseDown(MouseEventArgs e)     => MouseDown?.Invoke(this, e);
+    internal void RaiseMouseUp(MouseEventArgs e)       => MouseUp?.Invoke(this, e);
+    internal void RaiseMouseMove(MouseEventArgs e)     => MouseMove?.Invoke(this, e);
 
     internal void RaiseBalloonTipClicked() => BalloonTipClicked?.Invoke(this, EventArgs.Empty);
     internal void RaiseBalloonTipClosed()  => BalloonTipClosed?.Invoke(this, EventArgs.Empty);

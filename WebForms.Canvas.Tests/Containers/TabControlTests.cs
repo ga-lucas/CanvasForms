@@ -1,4 +1,5 @@
 using System.Windows.Forms;
+using Xunit;
 
 namespace Canvas.Windows.Forms.Tests;
 

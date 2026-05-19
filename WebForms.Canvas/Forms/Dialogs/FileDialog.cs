@@ -35,6 +35,9 @@ public abstract class FileDialog : CommonDialog
     public bool Multiselect { get; set; }
     public string Title { get; set; } = string.Empty;
     public bool ValidateNames { get; set; } = true;
+    public bool DereferenceLinks { get; set; } = true;
+    public bool SupportMultiDottedExtensions { get; set; } = false;
+    public bool ShowHelp { get; set; } = false;
 
     public bool RestoreDirectory { get; set; }
 

@@ -2,6 +2,19 @@
 namespace System.Windows.Forms;
 
 /// <summary>
+/// Event args for <see cref="RichTextBox.LinkClicked"/>.
+/// </summary>
+public class LinkClickedEventArgs : EventArgs
+{
+    public string LinkText { get; }
+    public int CharIndex { get; }
+    public LinkClickedEventArgs(string linkText) { LinkText = linkText; CharIndex = 0; }
+    public LinkClickedEventArgs(string linkText, int charIndex) { LinkText = linkText; CharIndex = charIndex; }
+}
+
+public delegate void LinkClickedEventHandler(object? sender, LinkClickedEventArgs e);
+
+/// <summary>
 /// Represents a Windows Forms RichTextBox control.
 /// Rendering: when RTF content is present the control parses it into styled runs
 /// and draws each run with its own font/colour so bold, italic, underline, colour
@@ -29,6 +42,10 @@ public class RichTextBox : TextBoxBase
     private Color  _selectionBackColor = Color.Empty;
 
     public event EventHandler? SelectionChanged;
+    public event LinkClickedEventHandler? LinkClicked;
+    public event EventHandler? Protected;
+    public event EventHandler? VScroll;
+    public event EventHandler? HScroll;
 
     public RichTextBox()
     {

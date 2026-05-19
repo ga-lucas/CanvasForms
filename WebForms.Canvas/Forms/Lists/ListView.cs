@@ -24,6 +24,7 @@ public class ListViewItem
     public string ImageKey { get; set; } = string.Empty;
     public Color ForeColor { get; set; } = Color.Transparent;
     public Color BackColor { get; set; } = Color.Transparent;
+    public ListViewGroup? Group { get; set; }
 
     public ListViewSubItemCollection SubItems { get; } = new();
 
@@ -140,6 +141,8 @@ public class ListView : Control
 
     public ListViewItemCollection Items { get; }
     public ColumnHeaderCollection Columns { get; }
+    public ListViewGroupCollection Groups { get; private set; } = null!;
+    public bool ShowGroups { get; set; } = true;
 
     public ListView()
     {
@@ -149,6 +152,7 @@ public class ListView : Control
         SetStyle(ControlStyles.Selectable | ControlStyles.UserPaint, true);
         Items = new ListViewItemCollection(this);
         Columns = new ColumnHeaderCollection(this);
+        Groups = new ListViewGroupCollection(this);
     }
 
     public View View { get => _view; set { _view = value; Invalidate(); } }
@@ -653,4 +657,76 @@ public class SelectedIndexCollection : IList<int>, IReadOnlyList<int>
     public void Insert(int index, int item) => throw new NotSupportedException();
     public bool Remove(int item) => throw new NotSupportedException();
     public void RemoveAt(int index) => throw new NotSupportedException();
+}
+
+// ── ListViewGroup ─────────────────────────────────────────────────────────────
+/// <summary>
+/// Represents a group of items in a <see cref="ListView"/> control.
+/// Matches the WinForms <c>ListViewGroup</c> API surface.
+/// </summary>
+public class ListViewGroup
+{
+    public string Header { get; set; } = string.Empty;
+    public HorizontalAlignment HeaderAlignment { get; set; } = HorizontalAlignment.Left;
+    public string Name { get; set; } = string.Empty;
+    public object? Tag { get; set; }
+    public ListView? ListView { get; internal set; }
+
+    private readonly List<ListViewItem> _items = new();
+    public IList<ListViewItem> Items => _items;
+
+    public ListViewGroup() { }
+    public ListViewGroup(string header) { Header = header; }
+    public ListViewGroup(string header, HorizontalAlignment headerAlignment) { Header = header; HeaderAlignment = headerAlignment; }
+    public ListViewGroup(string key, string header) { Name = key; Header = header; }
+}
+
+// ── ListViewGroupCollection ───────────────────────────────────────────────────
+/// <summary>
+/// Collection of <see cref="ListViewGroup"/> objects owned by a <see cref="ListView"/>.
+/// </summary>
+public class ListViewGroupCollection : IEnumerable<ListViewGroup>
+{
+    private readonly ListView _owner;
+    private readonly List<ListViewGroup> _groups = new();
+
+    public ListViewGroupCollection(ListView owner) => _owner = owner;
+
+    public int Count => _groups.Count;
+    public ListViewGroup this[int index] => _groups[index];
+    public ListViewGroup? this[string key] => _groups.FirstOrDefault(g => g.Name == key);
+
+    public ListViewGroup Add(ListViewGroup group)
+    {
+        group.ListView = _owner;
+        _groups.Add(group);
+        _owner.Invalidate();
+        return group;
+    }
+
+    public ListViewGroup Add(string key, string header)
+    {
+        var group = new ListViewGroup(key, header);
+        return Add(group);
+    }
+
+    public void Remove(ListViewGroup group)
+    {
+        _groups.Remove(group);
+        group.ListView = null;
+        _owner.Invalidate();
+    }
+
+    public void Clear()
+    {
+        foreach (var g in _groups) g.ListView = null;
+        _groups.Clear();
+        _owner.Invalidate();
+    }
+
+    public bool Contains(ListViewGroup group) => _groups.Contains(group);
+    public int IndexOf(ListViewGroup group) => _groups.IndexOf(group);
+
+    public IEnumerator<ListViewGroup> GetEnumerator() => _groups.GetEnumerator();
+    System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
 }

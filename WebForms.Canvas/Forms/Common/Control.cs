@@ -206,7 +206,11 @@ public abstract class Control
         set { Width = value.Width; Height = value.Height; }
     }
 
-    public virtual Rectangle DisplayRectangle => ClientRectangle;
+    public virtual Rectangle DisplayRectangle => new Rectangle(
+        Padding.Left,
+        Padding.Top,
+        Width  - Padding.Horizontal,
+        Height - Padding.Vertical);
 
     /// <summary>
     /// Gets the width available for laying out child controls.
@@ -591,30 +595,62 @@ public abstract class Control
     }
 
     /// <summary>
+    /// Executes the specified action on the thread that owns the control.
+    /// </summary>
+    public void Invoke(Action action) => action();
+
+    /// <summary>
+    /// Executes the specified function on the thread that owns the control and returns the result.
+    /// </summary>
+    public T Invoke<T>(Func<T> func) => func();
+
+    /// <summary>
     /// Executes the specified delegate asynchronously on the thread that owns the control.
-    /// In WASM this executes immediately since everything runs on the same thread.
+    /// Posts via <see cref="SynchronizationContext"/> when available (Blazor Server),
+    /// otherwise executes immediately (WASM single-threaded).
     /// </summary>
     public IAsyncResult BeginInvoke(Delegate method)
     {
-        method.DynamicInvoke();
-        return new CompletedAsyncResult();
+        return BeginInvoke(method, null);
     }
 
     /// <summary>
     /// Executes the specified delegate asynchronously on the thread that owns the control.
-    /// In WASM this executes immediately since everything runs on the same thread.
+    /// Posts via <see cref="SynchronizationContext"/> when available (Blazor Server),
+    /// otherwise executes immediately (WASM single-threaded).
     /// </summary>
     public IAsyncResult BeginInvoke(Delegate method, params object?[]? args)
     {
-        method.DynamicInvoke(args);
-        return new CompletedAsyncResult();
+        var tcs = new TaskCompletionSource<object?>();
+        var ctx = SynchronizationContext.Current;
+        if (ctx != null)
+        {
+            ctx.Post(_ =>
+            {
+                try   { tcs.SetResult(method.DynamicInvoke(args)); }
+                catch (Exception ex) { tcs.SetException(ex); }
+            }, null);
+        }
+        else
+        {
+            try   { tcs.SetResult(method.DynamicInvoke(args)); }
+            catch (Exception ex) { tcs.SetException(ex); }
+        }
+        return new TaskAsyncResult(tcs.Task);
     }
+
+    /// <summary>
+    /// Executes the specified action asynchronously on the thread that owns the control.
+    /// </summary>
+    public IAsyncResult BeginInvoke(Action action) => BeginInvoke((Delegate)action);
 
     /// <summary>
     /// Retrieves the return value of the asynchronous operation.
     /// </summary>
     public object? EndInvoke(IAsyncResult asyncResult)
     {
+        if (asyncResult is TaskAsyncResult tar)
+            return tar.GetResult();
         return null;
     }
 
@@ -625,6 +661,18 @@ public abstract class Control
         public WaitHandle AsyncWaitHandle => new ManualResetEvent(true);
         public object? AsyncState => null;
         public bool CompletedSynchronously => true;
+    }
+
+    // IAsyncResult backed by a Task (used by BeginInvoke with SynchronizationContext)
+    private class TaskAsyncResult : IAsyncResult
+    {
+        private readonly Task<object?> _task;
+        public TaskAsyncResult(Task<object?> task) { _task = task; }
+        public bool IsCompleted => _task.IsCompleted;
+        public WaitHandle AsyncWaitHandle => ((IAsyncResult)_task).AsyncWaitHandle;
+        public object? AsyncState => _task.AsyncState;
+        public bool CompletedSynchronously => _task.IsCompleted;
+        public object? GetResult() => _task.GetAwaiter().GetResult();
     }
 
 
@@ -2412,8 +2460,12 @@ public abstract class Control
             }
         }
 
-        // Available client area for layout
-        var clientRect = new Rectangle(0, 0, layoutWidth, layoutHeight);
+        // Available client area for layout — inset by this container's Padding (WinForms parity)
+        var clientRect = new Rectangle(
+            Padding.Left,
+            Padding.Top,
+            layoutWidth  - Padding.Horizontal,
+            layoutHeight - Padding.Vertical);
 
         // Process docked controls in order: Top, Bottom, Left, Right, then Fill
         var dockedControls = _controls.Where(c => c.Visible && c.Dock != DockStyle.None).ToList();

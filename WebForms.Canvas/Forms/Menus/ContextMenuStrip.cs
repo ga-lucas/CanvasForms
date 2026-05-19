@@ -126,4 +126,40 @@ public class ContextMenuStrip : ToolStripDropDownMenu
         }
         return new Point(x, y);
     }
+
+    // ── Shortcut key dispatch ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// Walks all <see cref="ToolStripMenuItem"/> items in this context menu and fires
+    /// the first one whose <see cref="ToolStripMenuItem.ShortcutKeys"/> matches
+    /// <paramref name="keys"/>.
+    /// </summary>
+    public bool ProcessShortcut(Keys keys)
+    {
+        if (keys == Keys.None) return false;
+        foreach (var item in Items)
+        {
+            if (item is ToolStripMenuItem mi && WalkShortcut(mi, keys))
+                return true;
+        }
+        return false;
+    }
+
+    internal static bool WalkShortcut(ToolStripMenuItem item, Keys keys)
+    {
+        if (item.Enabled && item.Visible && item.ShortcutKeys == keys)
+        {
+            item.OnClick(EventArgs.Empty);
+            return true;
+        }
+        if (item.HasDropDownItems)
+        {
+            foreach (var child in item.DropDownItems)
+            {
+                if (child is ToolStripMenuItem childMi && WalkShortcut(childMi, keys))
+                    return true;
+            }
+        }
+        return false;
+    }
 }

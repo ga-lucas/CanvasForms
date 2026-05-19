@@ -90,9 +90,9 @@ The `Desktop` Blazor component manages open windows — dragging, resizing, mini
 - `Label`, `TextBox`, `TextBoxBase`
 - `ListBox`, `CheckedListBox`, `ComboBox`, `ListControl`
 - `PictureBox`, `DateTimePicker`
-- `Padding`, `Anchor`, `Dock`, layout engine
+- `Padding`, `Anchor`, `Dock`, layout engine — **Padding now insets docking/anchoring `clientRect` and `DisplayRectangle` (WinForms parity)**
 - `FormClosing` / `FormClosed` events with `CloseReason` and cancellation support
-- `Control.Invoke` / `BeginInvoke` shims (no-op — WASM is single-threaded)
+- `Control.Invoke(Delegate)`, `Invoke(Action)`, `Invoke<T>(Func<T>)`, `BeginInvoke` (posts via `SynchronizationContext` on Blazor Server; sync fallback on WASM), `EndInvoke`
 - `PointToScreen` / `PointToClient` / `RectangleToScreen` / `SetBounds`
 
 ### IL Translator
@@ -415,10 +415,10 @@ Items are ordered by estimated prevalence in designer-generated / translated Win
 | ✅ | `TextBox` / `TextBoxBase` | Editing, selection, shortcuts, redo, word-delete, placeholder, autocomplete |
 | ✅ | `Label` | Multi-line, alignment, UseMnemonic, AutoEllipsis, AutoSize, BorderStyle, FlatStyle |
 | ⚠️ | `ComboBox` | Editable DropDown input; DropDownList type-ahead; AutoCompleteMode (Suggest/Append/SuggestAppend); FindString/FindStringExact |
-| ✅ | `ListBox` | Selection + navigation; owner-draw, MeasureItem, ItemHeight, IntegralHeight, double-click |
+| ✅ | `ListBox` | Selection + navigation; owner-draw, MeasureItem, ItemHeight, IntegralHeight, double-click; **DataSource/DisplayMember/ValueMember/SelectedValue binding**; IBindingList change refresh |
 | ⚠️ | `Panel` / `ScrollableControl` | Child painting, input routing, scroll offset; AutoSize + AutoSizeMode |
 | ⚠️ | `GroupBox` | Border/caption + child routing; AutoSize + AutoSizeMode |
-| ⚠️ | `TabControl` | Tab strip + page switching; TabCount; GetTabRect(index); Ctrl+Tab keyboard navigation |
+| ⚠️ | `TabControl` | Tab strip + page switching; TabCount; GetTabRect(index); Ctrl+Tab keyboard navigation; `ShowToolTips`; `RowCount`; `TabPage.ToolTipText` |
 | ⚠️ | `MenuStrip` | Top-level menu bar with dropdowns |
 | ⚠️ | `ContextMenuStrip` | Right-click overlay menus |
 | ⚠️ | `ToolStrip` | Toolbar with icons, hover, checked state |
@@ -430,11 +430,11 @@ Items are ordered by estimated prevalence in designer-generated / translated Win
 | ✅ | `NumericUpDown` | Spinner UI + value clamping; direct-type keyboard entry; TextAlign |
 | ✅ | `PictureBox` | URL/Image; Load/LoadAsync; SizeMode; LoadCompleted/LoadProgressChanged events |
 | ✅ | `ProgressBar` | Blocks/continuous/marquee; animated MarqueeAnimationSpeed; RightToLeftLayout |
-| ✅ | `TreeView` | Nodes, expand/collapse, selection; LabelEdit; ToolTipText; BeginUpdate/EndUpdate |
-| ✅ | `ListView` | Details/List/LargeIcon views; keyboard nav; EnsureVisible; BeginUpdate/EndUpdate |
-| ⚠️ | `OpenFileDialog` | Host FS + browser upload |
-| ⚠️ | `ToolTip` | InitialDelay/AutoPopDelay hover timer; balloon + icon title; canvas overlay div |
-| ⚠️ | **`DataGridView`** | In-process `DataSource` binding (IList, BindingSource, DataTable); auto-column gen; virtualised scroll; row selection; single/multi-column sort (Ctrl+click header, ▲1 ▲2 indicators); frozen columns (pin columns to left, unaffected by horizontal scroll); **frozen rows** (`DataGridViewRow.Frozen`, pinned below header, unaffected by vertical scroll); **`CellValidating` / `RowValidating`** — fire on selection change; `Cancel = true` blocks move and draws red inset border on the failing cell; clears when validation passes; Ctrl+C clipboard export (tab-separated, respects `ClipboardCopyMode`); column types: TextBox/CheckBox/Button/ComboBox/Image/Link |
+| ✅ | `TreeView` | Nodes, expand/collapse, selection; LabelEdit; ToolTipText; BeginUpdate/EndUpdate; CheckBoxes + `AfterCheck`/`BeforeCheck` events; Space-key toggle |
+| ✅ | `ListView` | Details/List/LargeIcon views; keyboard nav; EnsureVisible; BeginUpdate/EndUpdate; `Groups`/`ShowGroups`; `ListViewGroup`/`ListViewGroupCollection`; `ListViewItem.Group` |
+| ⚠️ | `OpenFileDialog` | Host FS + browser upload; `DereferenceLinks`, `SupportMultiDottedExtensions`, `ShowHelp` |
+| ⚠️ | `ToolTip` | InitialDelay/AutoPopDelay hover timer; balloon + icon title; canvas overlay div; **per-control AutoPopDelay override** via `SetToolTip(control, text, delay)` |
+| ⚠️ | **`DataGridView`** | In-process `DataSource` binding (IList, BindingSource, DataTable); auto-column gen; virtualised scroll; row selection; single/multi-column sort (Ctrl+click header, ▲1 ▲2 indicators); frozen columns (pin columns to left, unaffected by horizontal scroll); **frozen rows** (`DataGridViewRow.Frozen`, pinned below header, unaffected by vertical scroll); **`CellValidating` / `RowValidating`** — fire on selection change; `Cancel = true` blocks move and draws red inset border on the failing cell; clears when validation passes; Ctrl+C clipboard export (tab-separated, respects `ClipboardCopyMode`); column types: TextBox/CheckBox/Button/ComboBox/Image/Link; **`DataGridViewComboBoxColumn` in-cell dropdown** — dropdown arrow button, double-click or F2 opens overlay; Up/Down/Enter/Escape keyboard nav; hover highlight; `Items`/`DataSource` supported; `RowsRemoved`, `UserAddedRow`, `UserDeletingRow`, `UserDeletedRow`, `DefaultValuesNeeded` events added |
 | ✅ | `Timer` | `PeriodicTimer`-based async loop; `Interval`, `Enabled`, `Start()`, `Stop()`, `Tick`, `Tag`, `IContainer` ctor; fires on captured `SynchronizationContext` |
 | ⚠️ | **`ErrorProvider`** | SetError/GetError/Clear; red badge overlays; hover title tooltip; BlinkRate/BlinkStyle; ContainerControl |
 | ⚠️ | `SaveFileDialog` | Inherits full FileDialog UI; `CreatePrompt`, `OverwritePrompt`, `OpenFile()` |
@@ -446,39 +446,39 @@ Items are ordered by estimated prevalence in designer-generated / translated Win
 
 | Status | Control | Notes |
 |--------|---------|-------|
-| ⚠️ | `RichTextBox` | RTF parsed into styled runs; bold/italic/underline/colour/font-size; SelectionFont/Color/Bold/Italic/Underline; Find(); LoadFile/SaveFile; HTML clipboard; ScrollToCaret(); ZoomFactor |
+| ⚠️ | `RichTextBox` | RTF parsed into styled runs; bold/italic/underline/colour/font-size; SelectionFont/Color/Bold/Italic/Underline; Find(); LoadFile/SaveFile; HTML clipboard; ScrollToCaret(); ZoomFactor; `LinkClicked`/`Protected`/`VScroll`/`HScroll` events |
 | ⚠️ | `LinkLabel` | Links collection; multi-span hit testing; LinkClicked event; ActiveLinkColor/LinkColor/VisitedLinkColor; LinkBehavior; visited-state tracking |
 | ⚠️ | `MaskedTextBox` | Masked display + per-token input validation; `MaskFull`; `MaskInputRejected`; Backspace/Delete mask-aware |
 | ⚠️ | `CheckedListBox` | Checked item behaviour; ThreeState; ItemCheck/ItemChecked events; keyboard nav (Space/arrows/Home/End/PageUp/PageDown); mouse wheel scrolling; first-letter type-ahead |
 | ✅ | `MonthCalendar` | Single-month view; SelectionRange; BoldedDates; keyboard/mouse nav |
-| ⚠️ | `NotifyIcon` | Canvas system tray in taskbar; ContextMenuStrip popup; balloon tips; Click/DoubleClick |
-| 🧩 | `UserControl` | Base present; full composite lifecycle partial |
+| ⚠️ | `NotifyIcon` | Canvas system tray in taskbar; ContextMenuStrip popup; balloon tips; Click/DoubleClick; **MouseDown/MouseUp/MouseMove** |
+| ⚠️ | `UserControl` | `Load` event; `AutoSize`/`AutoSizeMode`; `BorderStyle` painted (None/FixedSingle/Fixed3D); `OnCreateControl`/`CreateControl` lifecycle; `AutoScaleDimensions` designer support |
 | ⚠️ | `ToolStripMenuItem` | Dropdowns, check state, shortcuts, image, enabled |
 | ⚠️ | `ToolStripContainer` / `ToolStripPanel` | Auto-show/hide bands; row layout |
-| ⚠️ | **`PropertyGrid`** | Reflection-based two-column property browser; `SelectedObject`/`SelectedObjects`; `PropertySort`; `HelpVisible`; `ToolbarVisible`; inline editing; `SelectedGridItemChanged`; `PropertyValueChanged`; **nested object expansion** (sub-properties up to depth 2); **read-only greying**; **bold non-default values** |
+| ⚠️ | **`PropertyGrid`** | Reflection-based two-column property browser; `SelectedObject`/`SelectedObjects`; `PropertySort`; `HelpVisible`; `ToolbarVisible`; inline editing; `SelectedGridItemChanged`; `PropertyValueChanged`; **nested object expansion** (sub-properties up to depth 2); **read-only greying**; **bold non-default values**; **enum/bool dropdown overlay** (dropdown arrow button, Enter/F2/click opens list, Up/Down/Enter/Escape nav, Space toggles bool) |
 | ⚠️ | **`TrackBar`** | Slider; Horizontal/Vertical; tick marks; keyboard/mouse; SetRange |
 | ⚠️ | **`HScrollBar` / `VScrollBar`** | Standalone scrollbars; SmallChange/LargeChange; Scroll/ValueChanged events; mouse wheel; WinForms effective-maximum clamping (Maximum − LargeChange + 1) |
 | ⚠️ | **`DomainUpDown`** | String-list up-down; Sorted/Wrap; SelectedItem/SelectedIndex; mouse wheel scrolling; first-letter type-ahead; Home/End keyboard navigation |
-| 🔲 | **`HelpProvider`** | F1 help integration |
-| 🔲 | **`ToolStripProgressBar`** | Common in status strips for background tasks |
-| 🔲 | **`ToolStripSplitButton`** | Split-action toolbar button |
-| 🔲 | **`PrintDialog`** | Print workflow; business-app compat |
-| 🔲 | **`PrintPreviewDialog`** | Paired with `PrintDialog` |
-| 🔲 | **`PrintDocument`** | Underlying print model |
+| ⚠️ | **`HelpProvider`** | F1 help integration; per-control HelpString/HelpKeyword; browser tab for URLs; JS alert for text |
+| 🧩 | **`ToolStripProgressBar`** | Hosted progress bar in ToolStrip/StatusStrip; Value/Min/Max/Step; inline canvas rendering |
+| ⚠️ | **`ToolStripSplitButton`** | Split-action toolbar button; face click + dropdown; `DropDownClosed`/`DropDownOpened`/`DropDownOpening` events; hosted ProgressBar/TextBox/ComboBox rendering |
+| 🧩 | **`PrintDialog`** | Print workflow; browser-unavailable stub; full API surface for compiled compatibility |
+| 🧩 | **`PrintPreviewDialog`** | Paired with `PrintDialog`; browser stub |
+| 🧩 | **`PrintDocument`** | Underlying print model; PrintPage/BeginPrint/EndPrint events; browser stub |
 
 ### Tier 3 — Lower priority / legacy compat
 
 | Status | Control | Notes |
 |--------|---------|-------|
-| 🔲 | **`DataGrid`** (legacy) | Older apps use instead of `DataGridView` |
+| ⚠️ | **`DataGrid`** (legacy) | Subclasses DataGridView; TableStyles; DataGridTableStyle/ColumnStyle; CaptionText; DataGridCell |
 | ✅ | **`BindingSource`** | IList/IBindingList wrapper; `Current`/`Position`; `Filter`/`Sort`/`Find`; server-backed via `CanvasDataService` |
 | ⚠️ | **`BindingNavigator`** | Record-navigation bar; First/Prev/Next/Last/Add/Delete; bound to `BindingSource.Position`; **editable `PositionItem` textbox** (type 1-based record number + Enter to jump); `CountItem` label |
-| 🔲 | **`StatusBar`** (legacy) | Pre-`StatusStrip`; thin wrapper for translator compat |
-| ⚠️ | **`ToolBar`** (legacy) | Pre-`ToolStrip`; wraps `ToolStrip`; `ToolBarButton` / `ButtonClick`; `Appearance`, `TextAlign`, `ImageList`, `Wrappable` |
-| ⚠️ | **`MainMenu`** (legacy) | Pre-`MenuStrip`; wraps `MenuStrip`; `MenuItem` collection; `Form.Menu` property wires it into the control tree |
-| ⚠️ | **`ContextMenu`** (legacy) | Pre-`ContextMenuStrip`; wraps `ContextMenuStrip`; `MenuItem` collection; `Popup` event; `Control.ContextMenu` wires to `ContextMenuStrip` |
-| 🔲 | **`Splitter`** (legacy) | Pre-`SplitContainer` |
-| 🔲 | **`PrintPreviewControl`** | Embedded (non-dialog) print preview |
+| ⚠️ | **`StatusBar`** (legacy) | Panels; ShowPanels; SizingGrip; spring sizing; OwnerDraw; DrawItem event |
+| ⚠️ | **`ToolBar`** (legacy) | Pre-`ToolStrip`; wraps `ToolStrip`; `ToolBarButton` / `ButtonClick`; `Appearance`, `TextAlign`, `ImageList`, `Wrappable`; **`DropDownButton` style** with live arrow+menu via `ToolStripDropDownButton`; `DropDownMenu` accepts `ContextMenu`/`MainMenu`; **`DrawItem` owner-draw** |
+| ⚠️ | **`MainMenu`** (legacy) | Pre-`MenuStrip`; `MenuItem` collection; `Form.Menu` property; `MenuItem`: **`Click`/`Popup`/`Select` events**; **`RadioCheck`** mutual-exclusion; `PerformClick()` |
+| ⚠️ | **`ContextMenu`** (legacy) | Pre-`ContextMenuStrip`; `MenuItem` collection; `Popup` event; `Control.ContextMenu` wires to `ContextMenuStrip` |
+| ⚠️ | **`Splitter`** (legacy) | Docking drag-resize; MinSize/MinExtra; SplitterMoving/SplitterMoved; cursor follows dock |
+| 🧩 | **`PrintPreviewControl`** | Embedded print-preview stub; renders placeholder page; full WinForms API surface |
 | ⚠️ | **`Screen`** | `PrimaryScreen`/`AllScreens`; `Bounds` from `window.screen`; `WorkingArea` from `window.innerWidth/Height`; `FromControl`/`FromPoint`/`GetWorkingArea`/`GetBounds`; JS interop via `getScreenInfo`; 1920×1080 fallback; no multi-monitor |
 | ⚠️ | **`Clipboard`** | SetText/GetText (plain + HTML formats); async SetTextAsync/GetTextAsync/SetHtmlAsync/GetHtmlAsync; SetDataObject/GetDataObject; ContainsText/ContainsData; Clear; JS interop bridge |
 | ⚠️ | **`WebBrowser` / WebView2** | iframe overlay; Navigate, GoBack/Forward, Stop, Refresh, DocumentText, ExecuteScriptAsync, events; cross-origin DOM access blocked by browser sandbox |

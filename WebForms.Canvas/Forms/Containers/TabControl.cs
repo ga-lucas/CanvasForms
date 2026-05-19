@@ -43,6 +43,8 @@ public class TabControl : Control
 
     public bool Multiline { get; set; }
     public bool HotTrack { get; set; }
+    public bool ShowToolTips { get; set; } = false;
+    public int RowCount => Multiline ? GetMultilineRowCount() : 1;
 
     public int SelectedImageIndex { get; set; } = -1;
 
@@ -1115,6 +1117,7 @@ public class TabPage : Panel
     public int ImageIndex { get; set; } = -1;
     public string ImageKey { get; set; } = string.Empty;
     public bool UseVisualStyleBackColor { get; set; } = true;
+    public string ToolTipText { get; set; } = string.Empty;
 }
 
 public delegate void TabControlEventHandler(object? sender, TabControlEventArgs e);

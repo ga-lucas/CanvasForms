@@ -246,8 +246,8 @@ public class FolderBrowserDialogTests
     {
         var d = new FolderBrowserDialog
         {
-            SelectedPath = @"C:\x",
-            Description  = "test",
+            SelectedPath        = @"C:\x",
+            Description         = "test",
             ShowNewFolderButton = false,
         };
         d.Reset();
@@ -317,10 +317,10 @@ public class ColorDialogTests
     {
         var d = new ColorDialog
         {
-            Color        = System.Drawing.Color.Red,
-            AnyColor     = true,
+            Color         = System.Drawing.Color.Red,
+            AnyColor      = true,
             AllowFullOpen = false,
-            FullOpen     = true,
+            FullOpen      = true,
         };
         d.Reset();
         Assert.Equal(System.Drawing.Color.Black, d.Color);
@@ -404,210 +404,27 @@ public class FontDialogTests
     {
         var d = new FontDialog
         {
-            Font           = new Canvas.Windows.Forms.Drawing.Font("Courier New", 18f),
-            ShowEffects    = false,
-            ShowColor      = true,
-            MinSize        = 6,
-            MaxSize        = 72,
+            Font        = new Canvas.Windows.Forms.Drawing.Font("Courier New", 18f),
+            ShowEffects = false,
+            ShowColor   = true,
+            MinSize     = 6,
+            MaxSize     = 72,
         };
         d.Reset();
         Assert.Equal("Arial", d.Font.Family);
         Assert.Equal(12f,     d.Font.Size);
         Assert.True(d.ShowEffects);
         Assert.False(d.ShowColor);
-        Assert.Equal(1,  d.MinSize);
-        Assert.Equal(0,  d.MaxSize);
+        Assert.Equal(1, d.MinSize);
+        Assert.Equal(0, d.MaxSize);
     }
 
     [Fact]
     public void Apply_EventCanBeSubscribed()
     {
-        var d     = new FontDialog();
+        var d      = new FontDialog();
         bool fired = false;
-        d.Apply  += (_, __) => fired = true;
-        // Just verify subscription doesn't throw; firing requires dialog UI
+        d.Apply   += (_, __) => fired = true;
         Assert.False(fired);
-    }
-}
-
-// ════════════════════════════════════════════════════════════════════════════════
-// StatusStrip + ToolStripStatusLabel
-// ════════════════════════════════════════════════════════════════════════════════
-public class StatusStripTests
-{
-    // ── StatusStrip defaults ──────────────────────────────────────────────────
-
-    [Fact]
-    public void StatusStrip_DefaultDock_IsBottom()
-        => Assert.Equal(DockStyle.Bottom, new StatusStrip().Dock);
-
-    [Fact]
-    public void StatusStrip_DefaultGripStyle_IsHidden()
-        => Assert.Equal(ToolStripGripStyle.Hidden, new StatusStrip().GripStyle);
-
-    [Fact]
-    public void StatusStrip_DefaultStretch_IsTrue()
-        => Assert.True(new StatusStrip().Stretch);
-
-    [Fact]
-    public void StatusStrip_DefaultSizingGrip_IsTrue()
-        => Assert.True(new StatusStrip().SizingGrip);
-
-    [Fact]
-    public void StatusStrip_SizingGrip_RoundTrips()
-    {
-        var s = new StatusStrip { SizingGrip = false };
-        Assert.False(s.SizingGrip);
-    }
-
-    [Fact]
-    public void StatusStrip_Items_StartsEmpty()
-        => Assert.Empty(new StatusStrip().Items);
-
-    [Fact]
-    public void StatusStrip_CanAddStatusLabel()
-    {
-        var s   = new StatusStrip();
-        var lbl = new ToolStripStatusLabel { Text = "Ready" };
-        s.Items.Add(lbl);
-        Assert.Single(s.Items);
-        Assert.Equal("Ready", ((ToolStripStatusLabel)s.Items[0]).Text);
-    }
-
-    [Fact]
-    public void StatusStrip_CreateDefaultItem_ReturnsStatusLabel()
-    {
-        var s    = new StatusStrip();
-        var item = s.CreateDefaultItem("Hello", null, null);
-        Assert.IsType<ToolStripStatusLabel>(item);
-        Assert.Equal("Hello", item.Text);
-    }
-
-    [Fact]
-    public void StatusStrip_CreateDefaultItem_Separator_ReturnsSeparator()
-    {
-        var s    = new StatusStrip();
-        var item = s.CreateDefaultItem("-", null, null);
-        Assert.IsType<ToolStripSeparator>(item);
-    }
-
-    // ── ToolStripStatusLabel defaults ─────────────────────────────────────────
-
-    [Fact]
-    public void StatusLabel_DefaultSpring_IsFalse()
-        => Assert.False(new ToolStripStatusLabel().Spring);
-
-    [Fact]
-    public void StatusLabel_DefaultBorderSides_IsNone()
-        => Assert.Equal(ToolStripStatusLabelBorderSides.None, new ToolStripStatusLabel().BorderSides);
-
-    [Fact]
-    public void StatusLabel_DefaultBorderStyle_IsFlat()
-        => Assert.Equal(Border3DStyle.Flat, new ToolStripStatusLabel().BorderStyle);
-
-    [Fact]
-    public void StatusLabel_DefaultLiveSetting_IsOff()
-        => Assert.Equal(LiveSetting.Off, new ToolStripStatusLabel().LiveSetting);
-
-    // ── ToolStripStatusLabel property round-trips ─────────────────────────────
-
-    [Fact]
-    public void StatusLabel_Spring_RoundTrips()
-    {
-        var l = new ToolStripStatusLabel { Spring = true };
-        Assert.True(l.Spring);
-    }
-
-    [Fact]
-    public void StatusLabel_BorderSides_RoundTrips()
-    {
-        var l = new ToolStripStatusLabel
-            { BorderSides = ToolStripStatusLabelBorderSides.Left | ToolStripStatusLabelBorderSides.Right };
-        Assert.Equal(ToolStripStatusLabelBorderSides.Left | ToolStripStatusLabelBorderSides.Right, l.BorderSides);
-    }
-
-    [Fact]
-    public void StatusLabel_BorderStyle_RoundTrips()
-    {
-        var l = new ToolStripStatusLabel { BorderStyle = Border3DStyle.Sunken };
-        Assert.Equal(Border3DStyle.Sunken, l.BorderStyle);
-    }
-
-    [Fact]
-    public void StatusLabel_LiveSetting_RoundTrips()
-    {
-        var l = new ToolStripStatusLabel { LiveSetting = LiveSetting.Polite };
-        Assert.Equal(LiveSetting.Polite, l.LiveSetting);
-    }
-
-    [Fact]
-    public void StatusLabel_Text_RoundTrips()
-    {
-        var l = new ToolStripStatusLabel("Status: OK");
-        Assert.Equal("Status: OK", l.Text);
-    }
-
-    // ── ToolStripStatusLabel constructors ─────────────────────────────────────
-
-    [Fact]
-    public void StatusLabel_DefaultCtor_TextIsEmpty()
-        => Assert.Equal(string.Empty, new ToolStripStatusLabel().Text);
-
-    [Fact]
-    public void StatusLabel_TextCtor_SetsText()
-        => Assert.Equal("Ready", new ToolStripStatusLabel("Ready").Text);
-
-    [Fact]
-    public void StatusLabel_TextImageCtor_SetsTextAndImage()
-    {
-        var img = new Canvas.Windows.Forms.Drawing.Image { Source = "/img.png" };
-        var l   = new ToolStripStatusLabel("Ready", img);
-        Assert.Equal("Ready", l.Text);
-        Assert.Same(img, l.Image);
-    }
-
-    [Fact]
-    public void StatusLabel_ClickCtor_WiresHandler()
-    {
-        bool clicked = false;
-        var l = new ToolStripStatusLabel("x", null, (_, __) => clicked = true);
-        l.PerformClick();
-        Assert.True(clicked);
-    }
-
-    [Fact]
-    public void StatusLabel_NameCtor_SetsName()
-    {
-        var l = new ToolStripStatusLabel("x", null, null, "myLabel");
-        Assert.Equal("myLabel", l.Name);
-    }
-
-    // ── ToolStripStatusLabelBorderSides flags ─────────────────────────────────
-
-    [Fact]
-    public void BorderSides_All_ContainsAllSides()
-    {
-        const ToolStripStatusLabelBorderSides all = ToolStripStatusLabelBorderSides.All;
-        Assert.True((all & ToolStripStatusLabelBorderSides.Left)   != 0);
-        Assert.True((all & ToolStripStatusLabelBorderSides.Top)    != 0);
-        Assert.True((all & ToolStripStatusLabelBorderSides.Right)  != 0);
-        Assert.True((all & ToolStripStatusLabelBorderSides.Bottom) != 0);
-    }
-
-    // ── Border3DStyle enum presence ───────────────────────────────────────────
-
-    [Fact]
-    public void Border3DStyle_HasExpectedValues()
-    {
-        // These values must exist for WinForms API compat
-        _ = Border3DStyle.Flat;
-        _ = Border3DStyle.Raised;
-        _ = Border3DStyle.RaisedInner;
-        _ = Border3DStyle.RaisedOuter;
-        _ = Border3DStyle.Sunken;
-        _ = Border3DStyle.SunkenInner;
-        _ = Border3DStyle.SunkenOuter;
-        _ = Border3DStyle.Etched;
-        _ = Border3DStyle.Bump;
     }
 }

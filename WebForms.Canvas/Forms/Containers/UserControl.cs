@@ -109,11 +109,52 @@ public class UserControl : ContainerControl
     protected internal override void OnPaint(PaintEventArgs e)
     {
         DrawControlBackground(e.Graphics);
+
+        if (BorderStyle == BorderStyle.FixedSingle)
+        {
+            using var pen = new Pen(Color.FromArgb(122, 122, 122));
+            e.Graphics.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
+        }
+        else if (BorderStyle == BorderStyle.Fixed3D)
+        {
+            using var darkPen  = new Pen(Color.FromArgb(100, 100, 100));
+            using var lightPen = new Pen(Color.FromArgb(220, 220, 220));
+            e.Graphics.DrawLine(darkPen,  0, 0, Width - 2, 0);
+            e.Graphics.DrawLine(darkPen,  0, 0, 0, Height - 2);
+            e.Graphics.DrawLine(lightPen, Width - 1, 0, Width - 1, Height - 1);
+            e.Graphics.DrawLine(lightPen, 0, Height - 1, Width - 1, Height - 1);
+        }
+
         base.OnPaint(e);
     }
 
-    // ── WinForms designer scaffolding stubs ───────────────────────────────────
-    // These are called by InitializeComponent() in designer-generated code.
+    // ── Create-control lifecycle ──────────────────────────────────────────────
+
+    private bool _createControlFired;
+
+    /// <summary>
+    /// Called once when the control's handle is first created (after child controls are added).
+    /// Translated designer code overrides this to run post-init logic.
+    /// </summary>
+    protected virtual void OnCreateControl() { }
+
+    /// <summary>
+    /// Forces handle creation and fires <see cref="OnCreateControl"/> the first time it is called.
+    /// </summary>
+    public void CreateControl()
+    {
+        if (_createControlFired) return;
+        _createControlFired = true;
+        OnCreateControl();
+    }
+
+    // ── AutoScale designer support ────────────────────────────────────────────
+
+    /// <summary>
+    /// Read/write to satisfy <c>InitializeComponent()</c> designer-generated assignments.
+    /// The canvas layer does not perform DPI scaling at the control level.
+    /// </summary>
+    public System.Drawing.SizeF AutoScaleDimensions { get; set; } = new System.Drawing.SizeF(6f, 13f);
 
     /// <summary>Required by the Windows Form Designer — override to add child controls.</summary>
     protected virtual void InitializeComponent() { }

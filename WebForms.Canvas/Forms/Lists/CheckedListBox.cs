@@ -70,9 +70,14 @@ public class CheckedListBox : ListControl
     #region Events
 
     /// <summary>
-    /// Occurs when the checked state of an item changes
+    /// Occurs before the checked state of an item changes (allows cancellation via NewValue).
     /// </summary>
     public event ItemCheckEventHandler? ItemCheck;
+
+    /// <summary>
+    /// Occurs after the checked state of an item has changed.
+    /// </summary>
+    public event ItemCheckedEventHandler? ItemChecked;
 
     #endregion
 
@@ -117,6 +122,7 @@ public class CheckedListBox : ListControl
                 else
                     _checkedIndices.Remove(index);
 
+                OnItemChecked(new ItemCheckedEventArgs(index, args.NewValue));
                 Invalidate();
             }
         }
@@ -138,12 +144,16 @@ public class CheckedListBox : ListControl
         SetItemCheckState(index, value ? CheckState.Checked : CheckState.Unchecked);
     }
 
-    /// <summary>
-    /// Raises the ItemCheck event
-    /// </summary>
+    /// <summary>Raises the ItemCheck event.</summary>
     protected virtual void OnItemCheck(ItemCheckEventArgs e)
     {
         ItemCheck?.Invoke(this, e);
+    }
+
+    /// <summary>Raises the ItemChecked event after a state change has been committed.</summary>
+    protected virtual void OnItemChecked(ItemCheckedEventArgs e)
+    {
+        ItemChecked?.Invoke(this, e);
     }
 
     #endregion
@@ -674,5 +684,20 @@ public class ItemCheckEventArgs : EventArgs
 /// Represents the method that will handle the ItemCheck event
 /// </summary>
 public delegate void ItemCheckEventHandler(object? sender, ItemCheckEventArgs e);
+
+/// <summary>Provides data for the <see cref="CheckedListBox.ItemChecked"/> event.</summary>
+public class ItemCheckedEventArgs : EventArgs
+{
+    public int        Index      { get; }
+    public CheckState CheckState { get; }
+
+    public ItemCheckedEventArgs(int index, CheckState state)
+    {
+        Index      = index;
+        CheckState = state;
+    }
+}
+
+public delegate void ItemCheckedEventHandler(object? sender, ItemCheckedEventArgs e);
 
 #endregion

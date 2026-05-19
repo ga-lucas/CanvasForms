@@ -241,6 +241,9 @@ public class DataGridViewRowCollection : System.Collections.ObjectModel.Collecti
     {
         item.Index = index;
         item.DataGridView = _owner;
+        // Auto-populate cells to match current column count
+        while (item.Cells.Count < _owner.Columns.Count)
+            item.Cells.Add(new DataGridViewCell());
         base.InsertItem(index, item);
         for (int i = index + 1; i < Count; i++) this[i].Index = i;
         _owner.Invalidate();
@@ -254,8 +257,7 @@ public class DataGridViewRowCollection : System.Collections.ObjectModel.Collecti
         _owner.Invalidate();
     }
 
-    public new int Add(DataGridViewRow row) { Add((object)row); return row.Index; }
-    private void Add(object row) => Add((DataGridViewRow)row);
+    public new int Add(DataGridViewRow row) { base.Add(row); return row.Index; }
 }
 
 // ──────────────────────────────────────────────────────────────

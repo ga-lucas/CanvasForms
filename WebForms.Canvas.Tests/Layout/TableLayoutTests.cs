@@ -1,5 +1,6 @@
 using System.Windows.Forms;
 using Canvas.Windows.Forms.Drawing;
+using Xunit;
 
 namespace Canvas.Windows.Forms.Tests;
 
@@ -81,7 +82,6 @@ public class TableLayoutPanelLayoutTests
             Padding = new Padding(0)
         };
 
-        // Force a deterministic split.
         tlp.ColumnStyles[0].SizeType = SizeType.Absolute;
         tlp.ColumnStyles[0].Size = 100;
         tlp.ColumnStyles[1].SizeType = SizeType.Absolute;
