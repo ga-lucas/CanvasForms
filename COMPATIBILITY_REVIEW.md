@@ -58,8 +58,8 @@
 | Dialogs | `FolderBrowserDialog` | Partial | SelectedPath, Description, ShowNewFolderButton |
 | Dialogs | `ColorDialog` | Partial | Swatch palette + Hex/RGB/HSV inputs |
 | Dialogs | `FontDialog` | Partial | Family/style/size; ShowEffects; ShowColor; Apply event |
-| Dialogs | `PrintDialog` | Stub | API surface; browser cannot print natively; RunDialog returns Cancel |
-| Dialogs | `PageSetupDialog` | Stub | API surface; browser cannot print natively; RunDialog returns Cancel |
+| Dialogs | `PrintDialog` | Partial | Canvas dialog (printer/copies/page range); calls `Document.Print()` on OK; host-proxied via `IHostPrintService` |
+| Dialogs | `PageSetupDialog` | Partial | Canvas dialog (paper size/orientation/margins); writes back to `PageSettings`; host-proxied |
 | Menus (legacy) | `StatusBar` | Partial | Panels collection; ShowPanels; SizingGrip; spring layout; OwnerDraw; DrawItem event |
 | Data (legacy) | `DataGrid` | Partial | Subclasses DataGridView; TableStyles/DataGridTableStyle/DataGridColumnStyle; CaptionText/CaptionVisible; DataGridCell HitTest; legacy Expand/Collapse stubs |
 | Data | `DataGridView` | Partial | IList/BindingSource/DataTable binding; auto-col gen; sort; col types; frozen columns; clipboard copy (Ctrl+C); multi-column sort (Ctrl+click header); **DataGridViewComboBoxColumn in-cell dropdown** (double-click or F2); **DataGridViewCheckBoxColumn single-click/Space toggle** (fires CellValueChanged); `RowsRemoved`/`UserAddedRow`/`UserDeletingRow`/`UserDeletedRow`/`DefaultValuesNeeded` events |

@@ -462,9 +462,9 @@ Items are ordered by estimated prevalence in designer-generated / translated Win
 | ⚠️ | **`HelpProvider`** | F1 help integration; per-control HelpString/HelpKeyword; browser tab for URLs; JS alert for text |
 | 🧩 | **`ToolStripProgressBar`** | Hosted progress bar in ToolStrip/StatusStrip; Value/Min/Max/Step; inline canvas rendering |
 | ⚠️ | **`ToolStripSplitButton`** | Split-action toolbar button; face click + dropdown; `DropDownClosed`/`DropDownOpened`/`DropDownOpening` events; hosted ProgressBar/TextBox/ComboBox rendering |
-| 🧩 | **`PrintDialog`** | Print workflow; browser-unavailable stub; full API surface for compiled compatibility |
-| 🧩 | **`PrintPreviewDialog`** | Paired with `PrintDialog`; browser stub |
-| 🧩 | **`PrintDocument`** | Underlying print model; PrintPage/BeginPrint/EndPrint events; browser stub |
+| ⚠️ | **`PrintDialog`** | Canvas dialog (printer/copies/range); calls `PrintDocument.Print()` on OK; submits `PrintJob` to `IHostPrintService` |
+| 🧩 | **`PrintPreviewDialog`** | Placeholder preview; `PrintPreviewControl` renders stub page |
+| ⚠️ | **`PrintDocument`** | `Print()` drives `PrintPage` events with `PrintGraphics` capture surface; multi-page; submits `PrintJob` to `IHostPrintService` |
 
 ### Tier 3 — Lower priority / legacy compat
 
