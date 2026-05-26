@@ -430,6 +430,7 @@ Items are ordered by estimated prevalence in designer-generated / translated Win
 | ✅ | `NumericUpDown` | Spinner UI + value clamping; direct-type keyboard entry; TextAlign |
 | ✅ | `PictureBox` | URL/Image; Load/LoadAsync; SizeMode; LoadCompleted/LoadProgressChanged events |
 | ✅ | `ProgressBar` | Blocks/continuous/marquee; animated MarqueeAnimationSpeed; RightToLeftLayout |
+| ✅ | **`MessageBox`** | All `Show` overloads (text/caption/buttons/icon/defaultButton/options/owner); `ShowAsync`; `MessageBoxButtons`/`MessageBoxIcon`/`MessageBoxDefaultButton`/`MessageBoxOptions` enums; SignalR broadcast to browser; `CanvasApplication.MessageBoxHandler` hook |
 | ✅ | `TreeView` | Nodes, expand/collapse, selection; LabelEdit; ToolTipText; BeginUpdate/EndUpdate; CheckBoxes + `AfterCheck`/`BeforeCheck` events; Space-key toggle |
 | ✅ | `ListView` | Details/List/LargeIcon views; keyboard nav; EnsureVisible; BeginUpdate/EndUpdate; `Groups`/`ShowGroups`; `ListViewGroup`/`ListViewGroupCollection`; `ListViewItem.Group` |
 | ⚠️ | `OpenFileDialog` | Host FS + browser upload; `DereferenceLinks`, `SupportMultiDottedExtensions`, `ShowHelp` |
@@ -460,8 +461,8 @@ Items are ordered by estimated prevalence in designer-generated / translated Win
 | ⚠️ | **`HScrollBar` / `VScrollBar`** | Standalone scrollbars; SmallChange/LargeChange; Scroll/ValueChanged events; mouse wheel; WinForms effective-maximum clamping (Maximum − LargeChange + 1) |
 | ⚠️ | **`DomainUpDown`** | String-list up-down; Sorted/Wrap; SelectedItem/SelectedIndex; mouse wheel scrolling; first-letter type-ahead; Home/End keyboard navigation |
 | ⚠️ | **`HelpProvider`** | F1 help integration; per-control HelpString/HelpKeyword; browser tab for URLs; JS alert for text |
-| 🧩 | **`ToolStripProgressBar`** | Hosted progress bar in ToolStrip/StatusStrip; Value/Min/Max/Step; inline canvas rendering |
-| ⚠️ | **`ToolStripSplitButton`** | Split-action toolbar button; face click + dropdown; `DropDownClosed`/`DropDownOpened`/`DropDownOpening` events; hosted ProgressBar/TextBox/ComboBox rendering |
+| ⚠️ | **`ToolStripProgressBar`** | Hosted progress bar in ToolStrip/StatusStrip; Value/Min/Max/Step; inline canvas rendering; default Width=75; layout-aware width from inner ProgressBar |
+| ⚠️ | **`ToolStripSplitButton`** | Split-action toolbar button; face click + dropdown; `DropDownClosed`/`DropDownOpened`/`DropDownOpening` events; hosted ProgressBar(75px)/TextBox(100px)/ComboBox(100px) rendering with layout-aware widths |
 | ⚠️ | **`PrintDialog`** | Canvas dialog (printer/copies/range); calls `PrintDocument.Print()` on OK; submits `PrintJob` to `IHostPrintService` |
 | 🧩 | **`PrintPreviewDialog`** | Placeholder preview; `PrintPreviewControl` renders stub page |
 | ⚠️ | **`PrintDocument`** | `Print()` drives `PrintPage` events with `PrintGraphics` capture surface; multi-page; submits `PrintJob` to `IHostPrintService` |
@@ -471,7 +472,7 @@ Items are ordered by estimated prevalence in designer-generated / translated Win
 | Status | Control | Notes |
 |--------|---------|-------|
 | ⚠️ | **`DataGrid`** (legacy) | Subclasses DataGridView; TableStyles; DataGridTableStyle/ColumnStyle; CaptionText; DataGridCell |
-| ✅ | **`BindingSource`** | IList/IBindingList wrapper; `Current`/`Position`; `Filter`/`Sort`/`Find`; server-backed via `CanvasDataService` |
+| ✅ | **`BindingSource`** | IList/IBindingList wrapper; `Current`/`Position`; functional `Filter` (equality predicate) + `Sort` (multi-column ASC/DESC) + `Find`; DataView delegates to native RowFilter/Sort; server-backed via `CanvasDataService` |
 | ⚠️ | **`BindingNavigator`** | Record-navigation bar; First/Prev/Next/Last/Add/Delete; bound to `BindingSource.Position`; **editable `PositionItem` textbox** (type 1-based record number + Enter to jump); `CountItem` label |
 | ⚠️ | **`StatusBar`** (legacy) | Panels; ShowPanels; SizingGrip; spring sizing; OwnerDraw; DrawItem event |
 | ⚠️ | **`ToolBar`** (legacy) | Pre-`ToolStrip`; wraps `ToolStrip`; `ToolBarButton` / `ButtonClick`; `Appearance`, `TextAlign`, `ImageList`, `Wrappable`; **`DropDownButton` style** with live arrow+menu via `ToolStripDropDownButton`; `DropDownMenu` accepts `ContextMenu`/`MainMenu`; **`DrawItem` owner-draw** |

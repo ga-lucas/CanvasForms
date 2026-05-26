@@ -50,8 +50,7 @@ public sealed class CanvasHub : Hub
     /// </summary>
     public RenderFrame RenderForm(string formId)
     {
-        // For now we only have one form, but this supports future multi-form
-        return _runtime.Render();
+        return _runtime.Render(formId);
     }
 
     /// <summary>
@@ -107,22 +106,22 @@ public sealed class CanvasHub : Hub
     /// </summary>
     public async Task MouseEvent(string formId, string eventType, int x, int y, int button)
     {
-        _runtime.SendMouseEvent(eventType, x, y, button);
+        _runtime.SendMouseEvent(eventType, x, y, button, formId);
 
-        // Send updated render after input
-        var frame = _runtime.Render();
+        // Send updated render for the affected form after input
+        var frame = _runtime.Render(formId);
         await Clients.Caller.SendAsync("RenderFrame", frame);
     }
 
     /// <summary>
     /// Sends a keyboard event to the current app.
     /// </summary>
-    public async Task KeyEvent(string eventType, int keyCode, bool alt, bool ctrl, bool shift, char keyChar)
+    public async Task KeyEvent(string eventType, int keyCode, bool alt, bool ctrl, bool shift, char keyChar, string? formId = null)
     {
-        _runtime.SendKeyEvent(eventType, keyCode, alt, ctrl, shift, keyChar);
+        _runtime.SendKeyEvent(eventType, keyCode, alt, ctrl, shift, keyChar, formId);
 
-        // Send updated render after input
-        var frame = _runtime.Render();
+        // Send updated render for the affected form after input
+        var frame = _runtime.Render(formId);
         await Clients.Caller.SendAsync("RenderFrame", frame);
     }
 

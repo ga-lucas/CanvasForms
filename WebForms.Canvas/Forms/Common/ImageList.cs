@@ -14,6 +14,12 @@ public class ImageList : IDisposable
         _images = new ImageCollection(this);
     }
 
+    /// <summary>
+    /// Initialises a new <see cref="ImageList"/> owned by the specified
+    /// <see cref="System.ComponentModel.IContainer"/> (for designer compatibility).
+    /// </summary>
+    public ImageList(System.ComponentModel.IContainer container) : this() { }
+
     // ── Properties ────────────────────────────────────────────────────────────
 
     /// <summary>The size to use when drawing images from this list (default 16×16).</summary>

@@ -356,6 +356,14 @@ public class ToolStrip : ScrollableControl
 
     private static int EstimateItemWidth(string? text, ToolStripItem? item = null)
     {
+        // Hosted-control items: use the inner control's Width when available.
+        if (item is ToolStripTextBox stb && stb.TextBox.Width > 0)
+            return stb.TextBox.Width;
+        if (item is ToolStripComboBox scb && scb.ComboBox.Width > 0)
+            return scb.ComboBox.Width;
+        if (item is ToolStripProgressBar spb && spb.ProgressBar.Width > 0)
+            return spb.ProgressBar.Width;
+
         bool hasImage = item?.Image is not null &&
                         item.DisplayStyle != ToolStripItemDisplayStyle.Text;
         bool hasText  = !string.IsNullOrEmpty(text) &&
@@ -837,7 +845,7 @@ public class ToolStripLabel : ToolStripItem
 /// <summary>A ComboBox hosted on a ToolStrip.</summary>
 public class ToolStripComboBox : ToolStripItem
 {
-    public ComboBox ComboBox { get; } = new ComboBox();
+    public ComboBox ComboBox { get; } = new ComboBox { Width = 100 };
     public System.Windows.Forms.ComboBoxStyle DropDownStyle
     {
         get => ComboBox.DropDownStyle;
@@ -860,7 +868,7 @@ public class ToolStripComboBox : ToolStripItem
 /// <summary>A TextBox hosted on a ToolStrip.</summary>
 public class ToolStripTextBox : ToolStripItem
 {
-    public TextBox TextBox { get; } = new TextBox();
+    public TextBox TextBox { get; } = new TextBox { Width = 100 };
     public override string Text { get => TextBox.Text; set => TextBox.Text = value ?? string.Empty; }
     public bool AcceptsReturn { get => TextBox.AcceptsReturn; set => TextBox.AcceptsReturn = value; }
     public bool AcceptsTab    { get => TextBox.AcceptsTab;    set => TextBox.AcceptsTab    = value; }
@@ -878,7 +886,7 @@ public class ToolStripTextBox : ToolStripItem
 /// <summary>A ProgressBar hosted on a ToolStrip.</summary>
 public class ToolStripProgressBar : ToolStripItem
 {
-    public ProgressBar ProgressBar { get; } = new ProgressBar();
+    public ProgressBar ProgressBar { get; } = new ProgressBar { Width = 75 };
     public int Value   { get => ProgressBar.Value;   set => ProgressBar.Value   = value; }
     public int Minimum { get => ProgressBar.Minimum; set => ProgressBar.Minimum = value; }
     public int Maximum { get => ProgressBar.Maximum; set => ProgressBar.Maximum = value; }

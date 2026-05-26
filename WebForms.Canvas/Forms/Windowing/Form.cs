@@ -1,3 +1,4 @@
+using Icon = System.Drawing.Icon;
 
 namespace System.Windows.Forms;
 
@@ -436,7 +437,7 @@ public class Form : ContainerControl
     /// Shows the form as a modal dialog and returns the <see cref="DialogResult"/>.
     /// Awaitable — does not block the WASM thread.
     /// </summary>
-    public Task<DialogResult> ShowDialogAsync() => ShowDialogAsync(owner: null);
+    public Task<DialogResult> ShowDialogAsync() => ShowDialogAsync((Form?)null);
 
     /// <summary>
     /// Shows the form as a modal dialog owned by <paramref name="owner"/> and returns the <see cref="DialogResult"/>.
@@ -455,7 +456,14 @@ public class Form : ContainerControl
     /// Synchronous ShowDialog stub — returns <see cref="DialogResult.None"/>.
     /// Use <see cref="ShowDialogAsync()"/> for proper async modal behaviour.
     /// </summary>
-    public DialogResult ShowDialog() => ShowDialog(owner: null);
+    public DialogResult ShowDialog() => ShowDialog(owner: (Form?)null);
+
+    /// <summary>
+    /// ShowDialog with an <see cref="IWin32Window"/> owner (WinForms API compat).
+    /// Resolves the owner to a <see cref="Form"/> when possible.
+    /// </summary>
+    public DialogResult ShowDialog(IWin32Window? owner)
+        => ShowDialog(owner as Form);
 
     /// <summary>
     /// Synchronous ShowDialog stub with owner — returns <see cref="DialogResult.None"/>.
@@ -468,6 +476,12 @@ public class Form : ContainerControl
         BringToFront();
         return _dialogResult;
     }
+
+    /// <summary>
+    /// Async ShowDialogAsync with an <see cref="IWin32Window"/> owner.
+    /// </summary>
+    public Task<DialogResult> ShowDialogAsync(IWin32Window? owner)
+        => ShowDialogAsync(owner as Form);
 
     // ── ActiveControl (alias for FocusedControl) ─────────────────────────────
 
@@ -797,6 +811,16 @@ public class Form : ContainerControl
 
         // Notify container that state changed (for Blazor re-rendering)
         OnContainerChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Shows the form with the specified <paramref name="owner"/> window.
+    /// Sets the <see cref="Owner"/> reference so the form stays on top of its owner.
+    /// </summary>
+    public void Show(IWin32Window? owner)
+    {
+        if (owner is Form ownerForm) Owner = ownerForm;
+        Show();
     }
 
     protected internal override void OnPaint(PaintEventArgs e)

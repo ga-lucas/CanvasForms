@@ -1,4 +1,5 @@
 using Canvas.Windows.Forms.Services;
+using Icon = System.Drawing.Icon;
 
 namespace System.Windows.Forms;
 
@@ -9,6 +10,16 @@ namespace System.Windows.Forms;
 /// </summary>
 public class NotifyIcon : System.ComponentModel.Component
 {
+    public NotifyIcon() { }
+
+    /// <summary>
+    /// Initialises a new <see cref="NotifyIcon"/> owned by the specified container (for designer compatibility).
+    /// </summary>
+    public NotifyIcon(System.ComponentModel.IContainer container) : this()
+    {
+        container?.Add(this);
+    }
+
     private bool _visible = false;
     private string _text = string.Empty;
     private Icon? _icon;
@@ -144,11 +155,3 @@ internal sealed class BalloonTipInfo
 }
 
 public enum BalloonTipIcon { None, Info, Warning, Error }
-
-/// <summary>Stub icon class for API compatibility</summary>
-public class Icon : IDisposable
-{
-    public string? ResourcePath { get; }
-    public Icon(string path) => ResourcePath = path;
-    public void Dispose() { }
-}

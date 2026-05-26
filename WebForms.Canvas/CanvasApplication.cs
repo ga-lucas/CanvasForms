@@ -55,4 +55,31 @@ public static class CanvasApplication
     public static string CompanyName => "Canvas.Windows.Forms";
     public static string ProductName => "Canvas.Windows.Forms Application";
     public static string ProductVersion => "1.0.0";
+
+    // ── MessageBox integration ────────────────────────────────────────────────
+
+    /// <summary>
+    /// Optional synchronous handler for <see cref="System.Windows.Forms.MessageBox.Show"/>.
+    /// The host (e.g. Blazor Server) can assign this to forward messages to the browser.
+    /// Signature: (owner, text, caption, buttons, icon, defaultButton, options) → DialogResult
+    /// </summary>
+    public static Func<
+        System.Windows.Forms.IWin32Window?,
+        string, string,
+        System.Windows.Forms.MessageBoxButtons,
+        System.Windows.Forms.MessageBoxIcon,
+        System.Windows.Forms.MessageBoxDefaultButton,
+        System.Windows.Forms.MessageBoxOptions,
+        System.Windows.Forms.DialogResult>? MessageBoxHandler { get; set; }
+
+    /// <summary>
+    /// Optional async handler for <see cref="System.Windows.Forms.MessageBox.ShowAsync"/>.
+    /// Signature: (owner, text, caption, buttons, icon) → Task&lt;DialogResult&gt;
+    /// </summary>
+    public static Func<
+        System.Windows.Forms.IWin32Window?,
+        string, string,
+        System.Windows.Forms.MessageBoxButtons,
+        System.Windows.Forms.MessageBoxIcon,
+        Task<System.Windows.Forms.DialogResult>>? AsyncMessageBoxHandler { get; set; }
 }

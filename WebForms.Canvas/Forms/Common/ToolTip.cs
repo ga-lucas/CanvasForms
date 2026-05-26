@@ -58,6 +58,16 @@ public static class ToolTipRegistry
 /// </summary>
 public class ToolTip : System.ComponentModel.Component
 {
+    public ToolTip() { }
+
+    /// <summary>
+    /// Initialises a new <see cref="ToolTip"/> owned by the specified container (for designer compatibility).
+    /// </summary>
+    public ToolTip(System.ComponentModel.IContainer container) : this()
+    {
+        container?.Add(this);
+    }
+
     // Value: (caption, per-control AutoPopDelay; -1 = use global)
     private readonly Dictionary<Control, (string Caption, int PopDelay)> _toolTips = new();
     private bool   _active        = true;

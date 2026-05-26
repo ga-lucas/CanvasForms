@@ -20,6 +20,16 @@ public interface IExtenderProvider
 /// </summary>
 public class HelpProvider : System.ComponentModel.Component, IExtenderProvider
 {
+    public HelpProvider() { }
+
+    /// <summary>
+    /// Initialises a new <see cref="HelpProvider"/> owned by the specified container (for designer compatibility).
+    /// </summary>
+    public HelpProvider(System.ComponentModel.IContainer container) : this()
+    {
+        container?.Add(this);
+    }
+
     // ── Per-control registrations ─────────────────────────────────────────────
 
     private readonly Dictionary<Control, string>  _helpString  = new();

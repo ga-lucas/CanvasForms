@@ -92,6 +92,34 @@ runtime.DesktopChanged += async () =>
     catch { /* ignore broadcast errors */ }
 };
 
+// Push a fresh RenderFrame to all clients whenever a form invalidates itself
+// (e.g. due to a Timer tick, data binding refresh, or any app-logic mutation).
+runtime.RenderRequested += async (formId) =>
+{
+    try
+    {
+        var frame = runtime.Render(formId);
+        await hubContext.Clients.All.SendAsync("RenderFrame", frame);
+    }
+    catch { /* ignore broadcast errors */ }
+};
+
+// Register a synchronous MessageBox handler that forwards to the browser via SignalR.
+// The client is expected to handle "MessageBox" messages and reply via "MessageBoxResult".
+Canvas.Windows.Forms.CanvasApplication.MessageBoxHandler = (owner, text, caption, buttons, icon, defaultBtn, opts) =>
+{
+    // Best-effort sync: fire-and-forget the SignalR notification; return default result.
+    // For true interactive message boxes, translated apps should use MessageBox.ShowAsync.
+    _ = hubContext.Clients.All.SendAsync("MessageBox", new
+    {
+        text,
+        caption,
+        buttons = buttons.ToString(),
+        icon    = icon.ToString()
+    });
+    return MessageBox.DefaultResultFor(buttons);
+};
+
 // ============ API Endpoints ============
 
 // ============ Host File System Endpoints (for browser-hosted dialogs) ============

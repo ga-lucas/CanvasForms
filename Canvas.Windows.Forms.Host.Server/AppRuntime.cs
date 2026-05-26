@@ -10,7 +10,7 @@ namespace Canvas.Windows.Forms.Host.Server;
 
 /// <summary>
 /// Manages the lifecycle of running apps in the "OS".
-/// Only one app runs at a time.
+/// Supports multiple concurrently open forms per app session.
 /// </summary>
 public sealed class AppRuntime : IDisposable
 {
@@ -20,11 +20,22 @@ public sealed class AppRuntime : IDisposable
     private readonly object _lock = new();
 
     private AssemblyLoadContext? _appLoadContext;
+    // Primary entry-point form (first form shown by the app).
     private Form? _mainForm;
+    // Stable per-form IDs so the browser can reference individual windows.
+    private readonly Dictionary<Form, string> _formIds = new(ReferenceEqualityComparer.Instance);
+    private int _nextFormIndex = 0;
     private string? _currentAppId;
     private bool _isNativeApp;
 
     public event Action? DesktopChanged;
+
+    /// <summary>
+    /// Fired (debounced) when any tracked form calls <see cref="Control.Invalidate()"/>.
+    /// Carries the stable form ID of the form that triggered the render.
+    /// Subscribers (Program.cs) broadcast a fresh <see cref="RenderFrame"/> to SignalR clients.
+    /// </summary>
+    public event Action<string>? RenderRequested;
 
     public AppRuntime(
         ILogger<AppRuntime> logger,
@@ -36,9 +47,70 @@ public sealed class AppRuntime : IDisposable
         _providerResolver = providerResolver;
     }
 
-    public bool IsRunning => _mainForm != null;
+    public bool IsRunning => _mainForm != null || _formIds.Count > 0;
     public string? CurrentAppId => _currentAppId;
     public bool IsNativeApp => _isNativeApp;
+
+    /// <summary>Returns the stable browser-facing ID for a given form, or null if not tracked.</summary>
+    public string? GetFormId(Form form)
+    {
+        _formIds.TryGetValue(form, out var id);
+        return id;
+    }
+
+    /// <summary>Returns the form for a given stable ID, or null.</summary>
+    private Form? FindFormById(string formId)
+        => _formIds.FirstOrDefault(kv => kv.Value == formId).Key;
+
+    /// <summary>Registers a form and assigns it a stable ID; idempotent.</summary>
+    private string RegisterForm(Form form)
+    {
+        if (_formIds.TryGetValue(form, out var existing))
+            return existing;
+
+        var id = $"{_currentAppId}-w{++_nextFormIndex}";
+        _formIds[form] = id;
+
+        form.FormClosed += (_, _) =>
+        {
+            lock (_lock)
+            {
+                _formIds.Remove(form);
+                if (ReferenceEquals(form, _mainForm))
+                    _mainForm = _formIds.Keys.FirstOrDefault();
+                DesktopChanged?.Invoke();
+            }
+        };
+
+        form.OnContainerChanged = () => DesktopChanged?.Invoke();
+
+        // Wire Invalidate → RenderRequested (debounced: coalesce rapid calls).
+        var renderPending = false;
+        form.PropagateRequestRender(() =>
+        {
+            if (renderPending) return Task.CompletedTask;
+            renderPending = true;
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(16); // ~1 frame @ 60 fps
+                renderPending = false;
+                RenderRequested?.Invoke(id);
+            });
+            return Task.CompletedTask;
+        });
+
+        return id;
+    }
+
+    /// <summary>Hook invoked by FormManager whenever any new form is added during an app session.</summary>
+    private void OnFormAdded(object? sender, Form form)
+    {
+        lock (_lock)
+        {
+            RegisterForm(form);
+            DesktopChanged?.Invoke();
+        }
+    }
 
     /// <summary>
     /// Runs a native app (compiled directly with Canvas.Windows.Forms).
@@ -53,8 +125,11 @@ public sealed class AppRuntime : IDisposable
             _currentAppId = appId;
             _isNativeApp = true;
 
+            if (CanvasApplication.FormManager != null)
+                CanvasApplication.FormManager.FormAdded += OnFormAdded;
+
             _mainForm = formFactory();
-            _mainForm.OnContainerChanged = () => DesktopChanged?.Invoke();
+            RegisterForm(_mainForm);
             _mainForm.Show();
 
             DesktopChanged?.Invoke();
@@ -94,6 +169,10 @@ public sealed class AppRuntime : IDisposable
                 // Auto-load canvas-connections.json from the app directory
                 TryLoadConnectionsConfig(assemblyDir);
 
+                // Subscribe before invoking entry point so we capture all forms.
+                if (CanvasApplication.FormManager != null)
+                    CanvasApplication.FormManager.FormAdded += OnFormAdded;
+
                 var assembly = _appLoadContext.LoadFromAssemblyPath(assemblyPath);
 
                 // Find entry point or Form subclass
@@ -103,18 +182,6 @@ public sealed class AppRuntime : IDisposable
                     // Has Main method - invoke it
                     _logger.LogInformation("Invoking entry point: {Method}", entryPoint);
 
-                    // Capture the first form shown via Application.Run(form)
-                    Form? createdForm = null;
-                    void OnFormCreated(object? sender, Form f)
-                    {
-                        if (createdForm == null)
-                        {
-                            createdForm = f;
-                            _logger.LogInformation("Captured form from entry point: {Form}", f.GetType().Name);
-                        }
-                    }
-
-                    CanvasApplication.FormManager!.FormAdded += OnFormCreated;
                     try
                     {
                         var parameters = entryPoint.GetParameters();
@@ -126,13 +193,10 @@ public sealed class AppRuntime : IDisposable
                         _logger.LogError(ex.InnerException, "Error in app entry point");
                         throw ex.InnerException;
                     }
-                    finally
-                    {
-                        CanvasApplication.FormManager!.FormAdded -= OnFormCreated;
-                    }
 
-                    // Get the form - either captured from event or fall back to OpenForms
-                    _mainForm = createdForm ?? CanvasApplication.OpenForms.FirstOrDefault();
+                    // Use the first registered form as the main form.
+                    _mainForm = _formIds.Keys.FirstOrDefault()
+                                ?? CanvasApplication.OpenForms.FirstOrDefault();
                 }
                 else
                 {
@@ -152,7 +216,7 @@ public sealed class AppRuntime : IDisposable
 
                 if (_mainForm != null)
                 {
-                    _mainForm.OnContainerChanged = () => DesktopChanged?.Invoke();
+                    RegisterForm(_mainForm);
                     DesktopChanged?.Invoke();
                 }
             }
@@ -174,19 +238,19 @@ public sealed class AppRuntime : IDisposable
     {
         lock (_lock)
         {
-            if (_mainForm != null)
+            if (_mainForm != null || _formIds.Count > 0)
             {
                 _logger.LogInformation("Stopping app: {AppId}", _currentAppId);
 
-                try
-                {
-                    _mainForm.Close();
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Error closing form");
-                }
+                // Unsubscribe global form-added listener.
+                if (CanvasApplication.FormManager != null)
+                    CanvasApplication.FormManager.FormAdded -= OnFormAdded;
 
+                foreach (var form in _formIds.Keys.ToList())
+                {
+                    try { form.Close(); } catch (Exception ex) { _logger.LogWarning(ex, "Error closing form"); }
+                }
+                _formIds.Clear();
                 _mainForm = null;
             }
 
@@ -198,6 +262,7 @@ public sealed class AppRuntime : IDisposable
 
             _currentAppId = null;
             _isNativeApp = false;
+            _nextFormIndex = 0;
 
             // Clear app-registered data providers so next app starts clean
             _dataService?.ClearAppProviders();
@@ -226,7 +291,7 @@ public sealed class AppRuntime : IDisposable
     }
 
     /// <summary>
-    /// Gets the current form (if any).
+    /// Gets the primary (entry-point) form, if any.
     /// </summary>
     public Form? GetCurrentForm()
     {
@@ -237,31 +302,37 @@ public sealed class AppRuntime : IDisposable
     }
 
     /// <summary>
-    /// Gets a snapshot of the current desktop state.
+    /// Gets a snapshot of all open forms for the desktop renderer.
     /// </summary>
     public DesktopSnapshot GetSnapshot()
     {
         lock (_lock)
         {
-            if (_mainForm == null || !_mainForm.Visible)
+            var snapshots = new List<FormSnapshot>();
+
+            foreach (var (form, formId) in _formIds)
             {
-                return new DesktopSnapshot(Array.Empty<FormSnapshot>(), null);
+                if (!form.Visible) continue;
+
+                snapshots.Add(new FormSnapshot(
+                    Id: formId,
+                    Text: form.Text,
+                    Left: form.Left,
+                    Top: form.Top,
+                    Width: form.Width,
+                    Height: form.Height,
+                    ZIndex: form.ZIndex,
+                    Visible: form.Visible,
+                    IsMinimized: form.WindowState == FormWindowState.Minimized,
+                    IsMaximized: form.WindowState == FormWindowState.Maximized,
+                    BackColorHex: $"#{form.BackColor.R:X2}{form.BackColor.G:X2}{form.BackColor.B:X2}"));
             }
 
-            var snapshot = new FormSnapshot(
-                Id: _currentAppId ?? "unknown",
-                Text: _mainForm.Text,
-                Left: _mainForm.Left,
-                Top: _mainForm.Top,
-                Width: _mainForm.Width,
-                Height: _mainForm.Height,
-                ZIndex: _mainForm.ZIndex,
-                Visible: _mainForm.Visible,
-                IsMinimized: _mainForm.WindowState == FormWindowState.Minimized,
-                IsMaximized: _mainForm.WindowState == FormWindowState.Maximized,
-                BackColorHex: $"#{_mainForm.BackColor.R:X2}{_mainForm.BackColor.G:X2}{_mainForm.BackColor.B:X2}");
+            // Active form ID: prefer the FormManager's active form, fall back to main.
+            var activeForm = CanvasApplication.FormManager?.ActiveForm ?? _mainForm;
+            var activeId   = activeForm is not null && _formIds.TryGetValue(activeForm, out var aid) ? aid : snapshots.LastOrDefault()?.Id;
 
-            return new DesktopSnapshot(new[] { snapshot }, _currentAppId);
+            return new DesktopSnapshot(snapshots.ToArray(), activeId);
         }
     }
 
@@ -272,10 +343,10 @@ public sealed class AppRuntime : IDisposable
     {
         lock (_lock)
         {
-            if (_mainForm == null || _currentAppId != formId) return;
-
-            _mainForm.Left = left;
-            _mainForm.Top = top;
+            var form = FindFormById(formId);
+            if (form is null) return;
+            form.Left = left;
+            form.Top  = top;
             DesktopChanged?.Invoke();
         }
     }
@@ -287,12 +358,12 @@ public sealed class AppRuntime : IDisposable
     {
         lock (_lock)
         {
-            if (_mainForm == null || _currentAppId != formId) return;
-
-            _mainForm.Left = left;
-            _mainForm.Top = top;
-            _mainForm.Width = Math.Max(100, width);
-            _mainForm.Height = Math.Max(50, height);
+            var form = FindFormById(formId);
+            if (form is null) return;
+            form.Left   = left;
+            form.Top    = top;
+            form.Width  = Math.Max(100, width);
+            form.Height = Math.Max(50, height);
             DesktopChanged?.Invoke();
         }
     }
@@ -304,8 +375,9 @@ public sealed class AppRuntime : IDisposable
     {
         lock (_lock)
         {
-            if (_mainForm == null || _currentAppId != formId) return;
-            _mainForm.WindowState = FormWindowState.Minimized;
+            var form = FindFormById(formId);
+            if (form is null) return;
+            form.WindowState = FormWindowState.Minimized;
             DesktopChanged?.Invoke();
         }
     }
@@ -317,19 +389,20 @@ public sealed class AppRuntime : IDisposable
     {
         lock (_lock)
         {
-            if (_mainForm == null || _currentAppId != formId) return;
+            var form = FindFormById(formId);
+            if (form is null) return;
 
-            if (_mainForm.WindowState == FormWindowState.Maximized)
+            if (form.WindowState == FormWindowState.Maximized)
             {
-                _mainForm.WindowState = FormWindowState.Normal;
+                form.WindowState = FormWindowState.Normal;
             }
             else
             {
-                _mainForm.WindowState = FormWindowState.Maximized;
-                _mainForm.Left = 0;
-                _mainForm.Top = 0;
-                _mainForm.Width = desktopWidth;
-                _mainForm.Height = desktopHeight;
+                form.WindowState = FormWindowState.Maximized;
+                form.Left   = 0;
+                form.Top    = 0;
+                form.Width  = desktopWidth;
+                form.Height = desktopHeight;
             }
             DesktopChanged?.Invoke();
         }
@@ -342,36 +415,48 @@ public sealed class AppRuntime : IDisposable
     {
         lock (_lock)
         {
-            if (_mainForm == null || _currentAppId != formId) return;
+            var form = FindFormById(formId);
+            if (form is null) return;
 
-            if (_mainForm.WindowState == FormWindowState.Minimized)
-            {
-                _mainForm.WindowState = FormWindowState.Normal;
-            }
+            if (form.WindowState == FormWindowState.Minimized)
+                form.WindowState = FormWindowState.Normal;
+
+            CanvasApplication.FormManager?.ActivateForm(form);
             DesktopChanged?.Invoke();
         }
     }
 
     /// <summary>
-    /// Closes a specific form.
+    /// Closes a specific form by its stable ID.
     /// </summary>
     public void CloseForm(string formId)
     {
         lock (_lock)
         {
-            if (_mainForm == null || _currentAppId != formId) return;
-            Stop();
+            var form = FindFormById(formId);
+            if (form is null) return;
+
+            // If closing the main/last form, stop the whole session.
+            if (ReferenceEquals(form, _mainForm) && _formIds.Count <= 1)
+            {
+                Stop();
+                return;
+            }
+
+            try { form.Close(); } catch { /* ignored */ }
         }
     }
 
     /// <summary>
-    /// Renders the current form to draw commands.
+    /// Renders a specific form (or the main form if <paramref name="formId"/> is null) to draw commands.
     /// </summary>
-    public RenderFrame Render()
+    public RenderFrame Render(string? formId = null)
     {
         lock (_lock)
         {
-            if (_mainForm == null)
+            var form = (formId is not null ? FindFormById(formId) : null) ?? _mainForm;
+
+            if (form == null)
             {
                 return new RenderFrame(
                     FormId: "",
@@ -382,39 +467,38 @@ public sealed class AppRuntime : IDisposable
                     Commands: Array.Empty<object[]>());
             }
 
-            var graphics = new Graphics(_mainForm.Width, _mainForm.Height);
-            var paintArgs = new PaintEventArgs(graphics, new Rectangle(0, 0, _mainForm.Width, _mainForm.Height));
+            var resolvedId = _formIds.TryGetValue(form, out var fid) ? fid : formId ?? "unknown";
 
-            // Trigger paint
-            _mainForm.Invalidate();
+            var graphics  = new Graphics(form.Width, form.Height);
+            var paintArgs = new PaintEventArgs(graphics, new Rectangle(0, 0, form.Width, form.Height));
 
-            // Get the form to paint itself via reflection (OnPaint is protected internal)
+            form.Invalidate();
+
             var onPaintMethod = typeof(Control).GetMethod("OnPaint",
                 BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-            onPaintMethod?.Invoke(_mainForm, new object[] { paintArgs });
+            onPaintMethod?.Invoke(form, new object[] { paintArgs });
 
-            // Convert DrawingCommand[] to object[][] for serialization
             var commands = graphics.GetCommands().Select(cmd => cmd.ToCommand()).ToArray();
 
             return new RenderFrame(
-                FormId: _currentAppId ?? "unknown",
+                FormId: resolvedId,
                 BorderWidth: 4,
                 TitleBarHeightWithBorder: 36,
-                ClientWidth: _mainForm.Width,
-                ClientHeight: _mainForm.Height,
+                ClientWidth: form.Width,
+                ClientHeight: form.Height,
                 Commands: commands);
         }
     }
 
     /// <summary>
-    /// Sends a mouse event to the current form, routing through the form's
-    /// normal hit-test and event dispatch so child controls receive events.
+    /// Sends a mouse event to the specified form (or main form if null).
     /// </summary>
-    public void SendMouseEvent(string eventType, int x, int y, int button)
+    public void SendMouseEvent(string eventType, int x, int y, int button, string? formId = null)
     {
         lock (_lock)
         {
-            if (_mainForm == null) return;
+            var form = (formId is not null ? FindFormById(formId) : null) ?? _mainForm;
+            if (form is null) return;
 
             var mouseButton = button switch
             {
@@ -424,27 +508,24 @@ public sealed class AppRuntime : IDisposable
                 _ => MouseButtons.None
             };
 
-            _mainForm.DispatchMouseEvent(eventType, x, y, mouseButton);
+            form.DispatchMouseEvent(eventType, x, y, mouseButton);
         }
     }
 
     /// <summary>
-    /// Sends a keyboard event to the current form.
+    /// Sends a keyboard event to the specified form (or main form if null).
     /// </summary>
-    public void SendKeyEvent(string eventType, int keyCode, bool alt, bool ctrl, bool shift, char keyChar)
+    public void SendKeyEvent(string eventType, int keyCode, bool alt, bool ctrl, bool shift, char keyChar, string? formId = null)
     {
         lock (_lock)
         {
-            if (_mainForm == null) return;
+            var form = (formId is not null ? FindFormById(formId) : null) ?? _mainForm;
+            if (form is null) return;
 
             if (eventType == "keypress" && keyChar != '\0')
-            {
-                _mainForm.DispatchKeyPress(keyChar);
-            }
+                form.DispatchKeyPress(keyChar);
             else
-            {
-                _mainForm.DispatchKeyEvent(eventType, (Keys)keyCode, alt, ctrl, shift);
-            }
+                form.DispatchKeyEvent(eventType, (Keys)keyCode, alt, ctrl, shift);
         }
     }
 

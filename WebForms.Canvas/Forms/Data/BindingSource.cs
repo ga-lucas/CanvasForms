@@ -9,7 +9,9 @@ namespace System.Windows.Forms;
 /// </summary>
 public class BindingSource : Component, IList, IBindingList, INotifyPropertyChanged
 {
-    private IList _inner = new List<object?>();
+    // _source is the raw backing list; _inner is the active (possibly filtered/sorted) view.
+    private IList _source = new List<object?>();
+    private IList _inner  = new List<object?>();
     private string _dataMember = string.Empty;
     private object? _dataSource;
     private int _position = -1;
@@ -62,7 +64,7 @@ public class BindingSource : Component, IList, IBindingList, INotifyPropertyChan
 
     private void RebindInner()
     {
-        if (_dataSource == null) { _inner = new List<object?>(); return; }
+        if (_dataSource == null) { _source = new List<object?>(); ApplyFilterSort(); return; }
 
         // DataTable — bind through DefaultView (IBindingList)
         if (_dataSource is DataTable dt)
@@ -70,7 +72,8 @@ public class BindingSource : Component, IList, IBindingList, INotifyPropertyChan
             var view = string.IsNullOrEmpty(_dataMember)
                 ? dt.DefaultView
                 : (dt.DataSet?.Tables[_dataMember]?.DefaultView ?? dt.DefaultView);
-            _inner = view;
+            _source = view;
+            ApplyFilterSort();
             return;
         }
 
@@ -80,15 +83,112 @@ public class BindingSource : Component, IList, IBindingList, INotifyPropertyChan
             var table = string.IsNullOrEmpty(_dataMember)
                 ? ds.Tables[0]
                 : ds.Tables[_dataMember];
-            _inner = (IList?)table?.DefaultView ?? new List<object?>();
+            _source = (IList?)table?.DefaultView ?? new List<object?>();
+            ApplyFilterSort();
             return;
         }
 
-        if (_dataSource is IList list)      { _inner = list; return; }
-        if (_dataSource is IListSource src) { _inner = src.GetList(); return; }
-        if (_dataSource is IEnumerable<object> seq) { _inner = seq.ToList(); return; }
+        if (_dataSource is IList list)      { _source = list; ApplyFilterSort(); return; }
+        if (_dataSource is IListSource src) { _source = src.GetList(); ApplyFilterSort(); return; }
+        if (_dataSource is IEnumerable<object> seq) { _source = seq.ToList(); ApplyFilterSort(); return; }
         // Wrap scalar
-        _inner = new List<object?> { _dataSource };
+        _source = new List<object?> { _dataSource };
+        ApplyFilterSort();
+    }
+
+    /// <summary>
+    /// Rebuilds <c>_inner</c> by applying the current <see cref="Filter"/> and <see cref="Sort"/>
+    /// expressions.  For <see cref="DataView"/> sources the native RowFilter/Sort properties are
+    /// used; for plain <see cref="IList"/> sources a LINQ-based approach is used.
+    /// </summary>
+    private void ApplyFilterSort()
+    {
+        // DataView: delegate natively — DataView already implements IBindingList with filter/sort.
+        if (_source is DataView dv)
+        {
+            if (!string.IsNullOrEmpty(_filter)) dv.RowFilter = _filter;
+            if (!string.IsNullOrEmpty(_sort))   dv.Sort      = _sort;
+            _inner = dv;
+            ClampPosition();
+            return;
+        }
+
+        // Generic IList: apply filter then sort in-memory.
+        IEnumerable<object?> query = _source.Cast<object?>();
+
+        // --- Filter ---
+        // Simple equality filters: "PropertyName = 'value'" or "PropertyName = 123"
+        if (!string.IsNullOrWhiteSpace(_filter))
+        {
+            var pred = BuildFilterPredicate(_filter);
+            if (pred != null) query = query.Where(pred);
+        }
+
+        // --- Sort ---
+        // Supports "Property1 ASC, Property2 DESC" (WinForms DataView sort syntax)
+        if (!string.IsNullOrWhiteSpace(_sort))
+        {
+            query = ApplySortExpression(query, _sort);
+        }
+
+        _inner = query.ToList();
+        ClampPosition();
+    }
+
+    private static Func<object?, bool>? BuildFilterPredicate(string filter)
+    {
+        // Very lightweight parser for "PropName = 'value'" or "PropName = value"
+        var eq = filter.IndexOf('=');
+        if (eq < 0) return null;
+        var propName = filter[..eq].Trim();
+        var raw      = filter[(eq + 1)..].Trim().Trim('\'', '"');
+        return item =>
+        {
+            if (item is null) return false;
+            var prop = TypeDescriptor.GetProperties(item)[propName];
+            if (prop is null) return false;
+            var val = prop.GetValue(item);
+            return val?.ToString()?.Equals(raw, StringComparison.OrdinalIgnoreCase) == true;
+        };
+    }
+
+    private static IEnumerable<object?> ApplySortExpression(IEnumerable<object?> source, string sort)
+    {
+        var segments = sort.Split(',');
+        IOrderedEnumerable<object?>? ordered = null;
+        foreach (var seg in segments)
+        {
+            var parts = seg.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 0) continue;
+            var prop = parts[0];
+            bool desc = parts.Length > 1 && parts[1].Equals("DESC", StringComparison.OrdinalIgnoreCase);
+
+            if (ordered == null)
+            {
+                ordered = desc
+                    ? source.OrderByDescending(x => GetPropertyValue(x, prop))
+                    : source.OrderBy(x => GetPropertyValue(x, prop));
+            }
+            else
+            {
+                ordered = desc
+                    ? ordered.ThenByDescending(x => GetPropertyValue(x, prop))
+                    : ordered.ThenBy(x => GetPropertyValue(x, prop));
+            }
+        }
+        return ordered ?? source;
+    }
+
+    private static object? GetPropertyValue(object? item, string propName)
+    {
+        if (item is null) return null;
+        var pd = TypeDescriptor.GetProperties(item)[propName];
+        return pd?.GetValue(item);
+    }
+
+    private void ClampPosition()
+    {
+        _position = _inner.Count == 0 ? -1 : Math.Clamp(Math.Max(0, _position), 0, _inner.Count - 1);
     }
 
 
@@ -117,7 +217,8 @@ public class BindingSource : Component, IList, IBindingList, INotifyPropertyChan
     // ── List mutation ────────────────────────────────────────────
     public void Add(object? item)
     {
-        _inner.Add(item);
+        _source.Add(item);
+        ApplyFilterSort();
         if (_position < 0 && _inner.Count == 1) _position = 0;
         OnListChanged(new ListChangedEventArgs(ListChangedType.ItemAdded, _inner.Count - 1));
     }
@@ -130,14 +231,19 @@ public class BindingSource : Component, IList, IBindingList, INotifyPropertyChan
 
     public void RemoveAt(int index)
     {
-        _inner.RemoveAt(index);
+        // index refers to _inner (view); find and remove from _source
+        var item = _inner.Count > index ? _inner[index] : null;
+        if (item != null) _source.Remove(item);
+        else if (_source.Count > index) _source.RemoveAt(index);
+        ApplyFilterSort();
         if (_position >= _inner.Count) _position = _inner.Count - 1;
         OnListChanged(new ListChangedEventArgs(ListChangedType.ItemDeleted, index));
     }
 
     public void Clear()
     {
-        _inner.Clear();
+        _source.Clear();
+        _inner = new List<object?>();
         _position = -1;
         OnListChanged(new ListChangedEventArgs(ListChangedType.Reset, -1));
     }
@@ -153,9 +259,9 @@ public class BindingSource : Component, IList, IBindingList, INotifyPropertyChan
 
     // ── Filter / Sort ────────────────────────────────────────────
     /// <summary>
-    /// Gets or sets the expression used to filter which rows are viewed.
-    /// Stub: stores the value and raises ListChanged; actual row filtering
-    /// must be implemented by the caller or a derived class.
+    /// Filters the view to rows matching the expression (e.g. "Name = 'Alice'").
+    /// For <see cref="DataView"/> sources the native RowFilter is used; for plain
+    /// IList sources a simple equality predicate is applied.
     /// </summary>
     public string Filter
     {
@@ -164,15 +270,11 @@ public class BindingSource : Component, IList, IBindingList, INotifyPropertyChan
         {
             if (_filter == value) return;
             _filter = value ?? string.Empty;
+            ApplyFilterSort();
             OnListChanged(new ListChangedEventArgs(ListChangedType.Reset, -1));
         }
     }
 
-    /// <summary>
-    /// Gets or sets the column name(s) and sort direction used to sort rows.
-    /// Stub: stores the value and raises ListChanged; actual sort ordering
-    /// must be implemented by the caller or a derived class.
-    /// </summary>
     public string Sort
     {
         get => _sort;
@@ -180,6 +282,7 @@ public class BindingSource : Component, IList, IBindingList, INotifyPropertyChan
         {
             if (_sort == value) return;
             _sort = value ?? string.Empty;
+            ApplyFilterSort();
             OnListChanged(new ListChangedEventArgs(ListChangedType.Reset, -1));
         }
     }
@@ -240,14 +343,17 @@ public class BindingSource : Component, IList, IBindingList, INotifyPropertyChan
     bool IBindingList.AllowRemove => !_inner.IsReadOnly && !_inner.IsFixedSize;
     bool IBindingList.SupportsChangeNotification => true;
     bool IBindingList.SupportsSearching => true;
-    bool IBindingList.SupportsSorting => false;
-    bool IBindingList.IsSorted => false;
+    bool IBindingList.SupportsSorting => true;
+    bool IBindingList.IsSorted => !string.IsNullOrEmpty(_sort);
     PropertyDescriptor? IBindingList.SortProperty => null;
     ListSortDirection IBindingList.SortDirection => ListSortDirection.Ascending;
     void IBindingList.AddIndex(PropertyDescriptor property) { }
     void IBindingList.RemoveIndex(PropertyDescriptor property) { }
-    void IBindingList.ApplySort(PropertyDescriptor property, ListSortDirection direction) => throw new NotSupportedException();
-    void IBindingList.RemoveSort() => throw new NotSupportedException();
+    void IBindingList.ApplySort(PropertyDescriptor property, ListSortDirection direction)
+    {
+        Sort = direction == ListSortDirection.Descending ? $"{property.Name} DESC" : property.Name;
+    }
+    void IBindingList.RemoveSort() => RemoveSort();
     int IBindingList.Find(PropertyDescriptor property, object key) => Find(property.Name, key);
     object? IBindingList.AddNew()
     {

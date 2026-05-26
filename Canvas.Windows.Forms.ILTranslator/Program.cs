@@ -91,7 +91,96 @@ internal static class Program
     {
         var rewrites = 0;
         rewrites += RewriteDoDragDrop(module);
+        rewrites += RewriteEnvironmentExit(module);
         return rewrites;
+    }
+
+    // ── Environment.Exit rewrite ──────────────────────────────────────────────
+    //
+    // Problem: Environment.Exit(int) terminates the process — in a Blazor/WASM or
+    // Blazor Server host that would kill the entire server or hang the WASM sandbox.
+    //
+    // Replacement: redirect calls to Application.Exit() (no-op in CanvasForms, which
+    // signals the runtime to close the current session instead of killing the process).
+    //
+    //   Original IL:
+    //     ldc.i4.X / ldloc ...    ; exit code (arg to Environment.Exit)
+    //     call     [System.Runtime]System.Environment::Exit(int32)
+    //
+    //   Rewritten IL:
+    //     pop                     ; discard the exit-code arg (Application.Exit takes none)
+    //     call     [Canvas.Windows.Forms]System.Windows.Forms.Application::Exit()
+
+    private static int RewriteEnvironmentExit(ModuleDefinition module)
+    {
+        var count = 0;
+        MethodReference? appExitRef = null;
+
+        foreach (var type in module.GetTypes())
+        {
+            foreach (var method in type.Methods)
+            {
+                if (!method.HasBody) continue;
+
+                var il = method.Body.Instructions;
+                for (int i = 0; i < il.Count; i++)
+                {
+                    var instr = il[i];
+                    if (instr.OpCode != OpCodes.Call && instr.OpCode != OpCodes.Callvirt)
+                        continue;
+                    if (instr.Operand is not MethodReference callee)
+                        continue;
+                    if (!IsEnvironmentExitCall(callee))
+                        continue;
+
+                    // Resolve Application.Exit() lazily
+                    appExitRef ??= ResolveApplicationExit(module);
+                    if (appExitRef == null) break;
+
+                    var proc = method.Body.GetILProcessor();
+
+                    // Replace the Environment.Exit call with Application.Exit()
+                    // but first pop the int32 exit-code argument.
+                    var popInstr = proc.Create(OpCodes.Pop);
+                    proc.InsertBefore(instr, popInstr);
+
+                    // Swap the call target
+                    instr.Operand = appExitRef;
+
+                    // Advance past the inserted pop
+                    i++;
+                    count++;
+                }
+            }
+        }
+
+        return count;
+    }
+
+    private static bool IsEnvironmentExitCall(MethodReference m)
+        => m.Name == "Exit"
+        && m.DeclaringType.FullName == "System.Environment"
+        && m.Parameters.Count == 1
+        && m.Parameters[0].ParameterType.FullName == "System.Int32";
+
+    private static MethodReference? ResolveApplicationExit(ModuleDefinition module)
+    {
+        var canvasRef = module.AssemblyReferences
+            .FirstOrDefault(r => r.Name == "Canvas.Windows.Forms");
+        if (canvasRef == null) return null;
+
+        var appType = new TypeReference(
+            "System.Windows.Forms",
+            "Application",
+            module,
+            canvasRef);
+
+        var exit = new MethodReference("Exit", module.TypeSystem.Void, appType)
+        {
+            HasThis = false
+        };
+
+        return module.ImportReference(exit);
     }
 
     // ── DoDragDrop rewrite ────────────────────────────────────────────────────

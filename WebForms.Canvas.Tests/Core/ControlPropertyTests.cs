@@ -563,10 +563,10 @@ public class ControlPropertyFunctionalityTests
 
         // Data binding infrastructure is minimal
         Assert.Null(control.BindingContext);
-        Assert.Null(control.DataBindings);
+        Assert.NotNull(control.DataBindings); // lazily created, always non-null
         Assert.Null(control.DataContext);
 
-        control.BindingContext = new object();
+        control.BindingContext = new BindingContext();
         Assert.NotNull(control.BindingContext);
 
         control.DataContext = "Some data";

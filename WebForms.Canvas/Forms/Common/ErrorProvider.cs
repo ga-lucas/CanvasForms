@@ -137,6 +137,16 @@ public static class ErrorProviderRegistry
 /// </summary>
 public class ErrorProvider : System.ComponentModel.Component
 {
+    public ErrorProvider() { }
+
+    /// <summary>
+    /// Initialises a new <see cref="ErrorProvider"/> owned by the specified container (for designer compatibility).
+    /// </summary>
+    public ErrorProvider(System.ComponentModel.IContainer container) : this()
+    {
+        container?.Add(this);
+    }
+
     private readonly Dictionary<Control, string> _errors = new();
     private ContainerControl? _containerControl;
     private int _blinkRate  = 250;

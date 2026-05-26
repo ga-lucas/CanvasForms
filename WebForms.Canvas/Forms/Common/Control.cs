@@ -545,9 +545,10 @@ public abstract class Control
 
     public ContextMenuStrip? ContextMenuStrip { get; set; }
 
-    // Data binding (stubs)
-    public object? BindingContext { get; set; }
-    public object? DataBindings { get; private set; }
+    // Data binding
+    public BindingContext? BindingContext { get; set; }
+    private ControlBindingsCollection? _dataBindings;
+    public ControlBindingsCollection DataBindings => _dataBindings ??= new ControlBindingsCollection(this);
     public object? DataContext { get; set; }
 
     // Site (for design-time support)
@@ -1686,6 +1687,11 @@ public abstract class Control
 
     public void Invalidate()
     {
+        if (_layoutSuspendCount > 0)
+        {
+            _invalidatePending = true;
+            return;
+        }
         // Async fire-and-forget - render will happen asynchronously
         var task = RequestRender?.Invoke();
     }
@@ -1793,6 +1799,7 @@ public abstract class Control
     }
 
     private int _layoutSuspendCount = 0;
+    private bool _invalidatePending = false;
 
     protected bool IsLayoutSuspended => _layoutSuspendCount > 0;
 
@@ -1820,9 +1827,17 @@ public abstract class Control
         if (_layoutSuspendCount > 0)
         {
             _layoutSuspendCount--;
-            if (_layoutSuspendCount == 0 && performLayout)
+            if (_layoutSuspendCount == 0)
             {
-                PerformLayout();
+                if (performLayout)
+                    PerformLayout();
+
+                // Flush any Invalidate() calls that were deferred during suspension.
+                if (_invalidatePending)
+                {
+                    _invalidatePending = false;
+                    _ = RequestRender?.Invoke();
+                }
             }
         }
     }
@@ -2581,10 +2596,10 @@ public abstract class Control
         Invalidate();
     }
 
-    internal Func<Task>? RequestRender { get; set; }
+    public Func<Task>? RequestRender { get; set; }
 
     // Propagate RequestRender to all children
-    internal void PropagateRequestRender(Func<Task>? requestRender)
+    public void PropagateRequestRender(Func<Task>? requestRender)
     {
         RequestRender = requestRender;
         foreach (var child in _controls)
