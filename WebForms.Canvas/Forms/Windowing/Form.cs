@@ -81,13 +81,17 @@ public class Form : ContainerControl
     /// <summary>Gets or sets whether a Help button (?) is shown in the title bar.</summary>
     public bool HelpButton { get; set; } = false;
 
+    /// <summary>Gets or sets the style of the sizing grip at the bottom-right of the form.</summary>
+    public SizeGripStyle SizeGripStyle { get; set; } = SizeGripStyle.Auto;
+
     /// <summary>Gets or sets whether the form is shown in the Windows taskbar.</summary>
     public bool ShowInTaskbar { get; set; } = true;
 
     private bool _topMost;
     /// <summary>
     /// Gets or sets whether the form is always on top of other forms.
-    /// In canvas mode this sets an elevated base z-order.
+    /// In canvas mode TopMost forms are placed in a high z-index bucket (100 000+)
+    /// so they always render above normal forms regardless of activation order.
     /// </summary>
     public bool TopMost
     {
@@ -95,7 +99,7 @@ public class Form : ContainerControl
         set
         {
             _topMost = value;
-            if (value) BringToFront();
+            BringToFront();
         }
     }
 
@@ -433,7 +437,8 @@ public class Form : ContainerControl
 
     private TaskCompletionSource<DialogResult>? _modalTcs;
 
-    /// <summary>
+    /// <summary>Gets whether this form is currently shown as a modal dialog.</summary>
+    public bool Modal => _modalTcs is not null;
     /// Shows the form as a modal dialog and returns the <see cref="DialogResult"/>.
     /// Awaitable — does not block the WASM thread.
     /// </summary>
@@ -539,6 +544,9 @@ public class Form : ContainerControl
             OnMdiParentChanged();
         }
     }
+
+    /// <summary>Gets whether this form is an MDI child (i.e. has an MDI parent).</summary>
+    public bool IsMdiChild => _mdiParent != null;
 
     /// <summary>Returns the MDI child forms hosted by this MDI parent.</summary>
     public Form[] MdiChildren => [.. _mdiChildren];
@@ -771,9 +779,12 @@ public class Form : ContainerControl
         ZIndex = _nextZIndex++;
     }
 
+    // TopMost forms live in ZIndex bucket 100000+ so they always render above normal forms.
+    private const int TopMostZBase = 100_000;
+
     public new void BringToFront()
     {
-        ZIndex = _nextZIndex++;
+        ZIndex = (_topMost ? TopMostZBase : 0) + _nextZIndex++;
         OnActivated(EventArgs.Empty);
         Invalidate();
     }
@@ -1882,6 +1893,19 @@ public enum FormBorderStyle
     Sizable        = 4,
     FixedToolWindow   = 5,
     SizableToolWindow = 6,
+}
+
+/// <summary>
+/// Specifies the style of the sizing grip displayed in the lower-right corner of a form.
+/// </summary>
+public enum SizeGripStyle
+{
+    /// <summary>The sizing grip is displayed only when the form is resizable.</summary>
+    Auto   = 0,
+    /// <summary>The sizing grip is always displayed.</summary>
+    Show   = 1,
+    /// <summary>The sizing grip is never displayed.</summary>
+    Hide   = 2,
 }
 
 /// <summary>

@@ -9,8 +9,10 @@ namespace System.Windows.Forms;
 /// Supports in-process DataSource binding (IList, BindingSource, DataTable),
 /// auto-column generation, virtual/scrolled rendering, and row/cell selection.
 /// </summary>
-public class DataGridView : ScrollableControl
+public class DataGridView : ScrollableControl, System.ComponentModel.ISupportInitialize
 {
+    void System.ComponentModel.ISupportInitialize.BeginInit() { }
+    void System.ComponentModel.ISupportInitialize.EndInit() { }
     // ── Layout constants ────────────────────────────────────────
     private const int HeaderHeight = 26;
     private const int RowHeightDefault = 23;
@@ -1487,6 +1489,167 @@ public class DataGridView : ScrollableControl
     public IReadOnlyList<int> SelectedRowIndices =>
         _selectedRowIndex >= 0 ? new[] { _selectedRowIndex } : Array.Empty<int>();
 
+    // ── WinForms selection API ────────────────────────────────────
+
+    /// <summary>Returns a collection of selected <see cref="DataGridViewRow"/> objects.</summary>
+    public DataGridViewSelectedRowCollection SelectedRows
+    {
+        get
+        {
+            var coll = new DataGridViewSelectedRowCollection();
+            if (_selectedRowIndex >= 0 && _selectedRowIndex < Rows.Count)
+                coll.Add(Rows[_selectedRowIndex]);
+            return coll;
+        }
+    }
+
+    /// <summary>Returns a collection of selected <see cref="DataGridViewCell"/> objects.</summary>
+    public DataGridViewSelectedCellCollection SelectedCells
+    {
+        get
+        {
+            var coll = new DataGridViewSelectedCellCollection();
+            var (r, c) = _selectedCell;
+            if (r >= 0 && r < Rows.Count && c >= 0 && c < Columns.Count)
+                coll.Add(Rows[r].Cells[c]);
+            return coll;
+        }
+    }
+
+    /// <summary>Returns a collection of selected <see cref="DataGridViewColumn"/> objects.</summary>
+    public DataGridViewSelectedColumnCollection SelectedColumns
+    {
+        get
+        {
+            var coll = new DataGridViewSelectedColumnCollection();
+            if (_selectedColIndex >= 0 && _selectedColIndex < Columns.Count)
+                coll.Add(Columns[_selectedColIndex]);
+            return coll;
+        }
+    }
+
+    /// <summary>Gets the row containing the current cell, or null if no cell is current.</summary>
+    public DataGridViewRow? CurrentRow =>
+        _selectedCell.row >= 0 && _selectedCell.row < Rows.Count
+            ? Rows[_selectedCell.row]
+            : null;
+
+    /// <summary>Gets or sets the currently active cell.</summary>
+    public DataGridViewCell? CurrentCell
+    {
+        get
+        {
+            var (r, c) = _selectedCell;
+            if (r >= 0 && r < Rows.Count && c >= 0 && c < Rows[r].Cells.Count)
+                return Rows[r].Cells[c];
+            return null;
+        }
+        set
+        {
+            if (value == null) { _selectedCell = (-1, -1); return; }
+            // locate the cell in the rows collection
+            for (int ri = 0; ri < Rows.Count; ri++)
+            {
+                var row = Rows[ri];
+                for (int ci = 0; ci < row.Cells.Count; ci++)
+                {
+                    if (row.Cells[ci] == value)
+                    {
+                        _selectedCell     = (ri, ci);
+                        _selectedRowIndex = ri;
+                        _selectedColIndex = ci;
+                        SelectionChanged?.Invoke(this, EventArgs.Empty);
+                        Invalidate();
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets the template used to create new rows.
+    /// Setting a custom template stores it for use when new rows are added.
+    /// </summary>
+    public DataGridViewRow RowTemplate { get; set; } = new DataGridViewRow();
+
+    /// <summary>Selects all cells (or rows, depending on SelectionMode).</summary>
+    public void SelectAll()
+    {
+        if (Rows.Count == 0) return;
+        _selectedRowIndex = 0;
+        _selectedCell     = (0, 0);
+        SelectionChanged?.Invoke(this, EventArgs.Empty);
+        Invalidate();
+    }
+
+    /// <summary>Returns the number of selected cells with the given inclusion flag.</summary>
+    public int GetCellCount(DataGridViewElementStates includeFilter)
+        => (int)(includeFilter & DataGridViewElementStates.Selected) != 0
+            ? (_selectedCell.row >= 0 ? 1 : 0)
+            : 0;
+
+    /// <summary>Returns true when all cells satisfy the given state mask.</summary>
+    public bool AreAllCellsSelected(bool includeInvisible)
+        => SelectedCells.Count >= Rows.Count * Columns.Count;
+
+    // ── Column / row auto-sizing ──────────────────────────────────
+
+    /// <summary>Auto-resizes all columns to fit their content (heuristic).</summary>
+    public void AutoResizeColumns()
+        => AutoResizeColumns(DataGridViewAutoSizeColumnsMode.AllCells);
+
+    public void AutoResizeColumns(DataGridViewAutoSizeColumnsMode mode)
+    {
+        foreach (var col in Columns)
+            AutoResizeColumn(col.Index);
+    }
+
+    public void AutoResizeColumn(int columnIndex)
+        => AutoResizeColumn(columnIndex, DataGridViewAutoSizeColumnMode.AllCells);
+
+    public void AutoResizeColumn(int columnIndex, DataGridViewAutoSizeColumnMode mode)
+    {
+        if (columnIndex < 0 || columnIndex >= Columns.Count) return;
+        var col = Columns[columnIndex];
+        int maxLen = col.HeaderText?.Length ?? 0;
+        foreach (var row in Rows)
+        {
+            var text = columnIndex < row.Cells.Count ? row.Cells[columnIndex].Value?.ToString() ?? "" : "";
+            if (text.Length > maxLen) maxLen = text.Length;
+        }
+        col.Width = Math.Max(50, maxLen * 8 + 16);
+        Invalidate();
+    }
+
+    public void AutoResizeRows() => Invalidate(); // row height is fixed in this implementation
+    public void AutoResizeRow(int rowIndex) => Invalidate();
+
+    // ── Scrolling helpers ─────────────────────────────────────────
+
+    public int FirstDisplayedScrollingRowIndex
+    {
+        get => _scrollOffsetY / RowHeightDefault;
+        set { _scrollOffsetY = Math.Max(0, value * RowHeightDefault); Invalidate(); }
+    }
+
+    public int FirstDisplayedScrollingColumnIndex
+    {
+        get => 0;
+        set { }
+    }
+
+    public void ScrollIntoView(int rowIndex)
+    {
+        if (rowIndex < 0 || rowIndex >= RowCount) return;
+        int y = rowIndex * RowHeightDefault;
+        if (y < _scrollOffsetY) _scrollOffsetY = y;
+        int visibleH = Height - (ColumnHeadersVisible ? ColumnHeadersHeight : 0);
+        if (y + RowHeightDefault > _scrollOffsetY + visibleH)
+            _scrollOffsetY = y + RowHeightDefault - visibleH;
+        Invalidate();
+    }
+
     public void InvalidateRow(int rowIndex) => Invalidate();
     public void InvalidateCell(int columnIndex, int rowIndex) => Invalidate();
     public void UpdateCellValue(int columnIndex, int rowIndex) => Invalidate();
@@ -1665,4 +1828,69 @@ public class DataGridViewCellFormattingEventArgs : DataGridViewCellEventArgs
     /// instead of the default formatting.
     /// </summary>
     public bool FormattingApplied { get; set; }
+}
+
+// ── Selection collection types ────────────────────────────────
+
+/// <summary>Read-only collection of selected <see cref="DataGridViewRow"/> objects.</summary>
+public class DataGridViewSelectedRowCollection : System.Collections.ObjectModel.Collection<DataGridViewRow>
+{
+    public DataGridViewSelectedRowCollection() { }
+    internal new void Add(DataGridViewRow row) => base.Add(row);
+}
+
+/// <summary>Read-only collection of selected <see cref="DataGridViewCell"/> objects.</summary>
+public class DataGridViewSelectedCellCollection : System.Collections.ObjectModel.Collection<DataGridViewCell>
+{
+    public DataGridViewSelectedCellCollection() { }
+    internal new void Add(DataGridViewCell cell) => base.Add(cell);
+}
+
+/// <summary>Read-only collection of selected <see cref="DataGridViewColumn"/> objects.</summary>
+public class DataGridViewSelectedColumnCollection : System.Collections.ObjectModel.Collection<DataGridViewColumn>
+{
+    public DataGridViewSelectedColumnCollection() { }
+    internal new void Add(DataGridViewColumn col) => base.Add(col);
+}
+
+// ── Auto-size enums ───────────────────────────────────────────
+
+public enum DataGridViewAutoSizeColumnsMode
+{
+    None            = 1,
+    ColumnHeader    = 2,
+    AllCellsExceptHeader = 4,
+    AllCells        = 6,
+    DisplayedCellsExceptHeader = 8,
+    DisplayedCells  = 10,
+    Fill            = 16,
+}
+
+// DataGridViewAutoSizeColumnMode is defined in DataGridViewColumn.cs
+
+public enum DataGridViewAutoSizeRowsMode
+{
+    None                  = 0,
+    AllHeaders            = 1,
+    AllCellsExceptHeaders = 2,
+    AllCells              = 3,
+    DisplayedHeaders      = 4,
+    DisplayedCellsExceptHeaders = 5,
+    DisplayedCells        = 6,
+    Custom                = 7,
+}
+
+// ── Element state flags ───────────────────────────────────────
+
+[Flags]
+public enum DataGridViewElementStates
+{
+    None        = 0x00,
+    Displayed   = 0x01,
+    Frozen      = 0x02,
+    ReadOnly    = 0x04,
+    Resizable   = 0x08,
+    ResizableSet = 0x10,
+    Selected    = 0x20,
+    Visible     = 0x40,
 }

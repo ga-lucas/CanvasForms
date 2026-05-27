@@ -241,13 +241,18 @@ public enum TextImageRelation
 /// <summary>
 /// Specifies the visual state of a button
 /// </summary>
+[Flags]
 public enum ButtonState
 {
-    Normal,
-    Hot,
-    Pushed,
-    Disabled,
-    Focused
+    Normal   = 0,
+    Hot      = 0x0001,
+    Pushed   = 0x0200,
+    Checked  = 0x0400,
+    Inactive = 0x0100,
+    Disabled = 0x0100,  // alias Inactive for legacy code
+    Focused  = 0x0800,
+    Flat     = 0x4000,
+    All      = unchecked((int)0xFFFF),
 }
 
 /// <summary>

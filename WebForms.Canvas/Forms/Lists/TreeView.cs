@@ -113,7 +113,7 @@ public class TreeNodeCollection : IEnumerable<TreeNode>
 public class TreeView : Control
 {
     private const int Indent = 19;
-    private const int ItemHeight = 20;
+    private const int DefaultItemHeight = 20;
     private const int ExpandBoxSize = 9;
     private const int ExpandBoxOffset = 4;
     private const int LeftMargin = 2;
@@ -182,6 +182,108 @@ public class TreeView : Control
     private int _updateCount = 0;
     public void BeginUpdate() => _updateCount++;
     public void EndUpdate() { if (_updateCount > 0) _updateCount--; if (_updateCount == 0) Invalidate(); }
+
+    // ── WinForms API additions ────────────────────────────────────
+
+    /// <summary>Gets or sets the delimiter string used to build <see cref="TreeNode.FullPath"/>.</summary>
+    public string PathSeparator { get; set; } = @"\";
+
+    /// <summary>Gets the first visible node — the topmost node in the client area.</summary>
+    public TreeNode? TopNode
+    {
+        get
+        {
+            var all = new List<TreeNode>();
+            CollectAllVisible(Nodes, all);
+            return all.Count > 0 ? all[0] : null;
+        }
+        set
+        {
+            if (value == null) { _scrollOffset = 0; Invalidate(); return; }
+            var all = new List<TreeNode>();
+            CollectAllVisible(Nodes, all);
+            int idx = all.IndexOf(value);
+            _scrollOffset = idx >= 0 ? idx * ItemHeight : 0;
+            Invalidate();
+        }
+    }
+
+    /// <summary>Gets the total number of tree nodes, optionally including all subtrees.</summary>
+    public int GetNodeCount(bool includeSubTrees)
+    {
+        if (!includeSubTrees) return Nodes.Count;
+        return CountNodes(Nodes);
+    }
+
+    private static int CountNodes(IEnumerable<TreeNode> nodes)
+    {
+        int count = 0;
+        foreach (var n in nodes) { count++; count += CountNodes(n.Nodes); }
+        return count;
+    }
+
+    /// <summary>Returns the tree node at the specified point, or null if no node is there.</summary>
+    public TreeNode? GetNodeAt(System.Drawing.Point pt) => GetNodeAt(pt.X, pt.Y);
+
+    /// <summary>Returns the tree node at the specified client coordinates.</summary>
+    public TreeNode? GetNodeAt(int x, int y) => HitTestInternal(x, y).node;
+
+    /// <summary>Returns hit-test information for the specified point.</summary>
+    public TreeViewHitTestInfo HitTest(System.Drawing.Point pt) => HitTest(pt.X, pt.Y);
+
+    public new TreeViewHitTestInfo HitTest(int x, int y)
+    {
+        var (node, onExpander) = HitTestInternal(x, y);
+        var loc = node == null ? TreeViewHitTestLocations.None
+                : onExpander   ? TreeViewHitTestLocations.PlusMinus
+                :                TreeViewHitTestLocations.Label;
+        return new TreeViewHitTestInfo(node, loc);
+    }
+
+    /// <summary>Expands all nodes in the tree.</summary>
+    public void ExpandAll()
+    {
+        foreach (var n in Nodes) n.ExpandAll();
+        Invalidate();
+    }
+
+    /// <summary>Collapses all nodes in the tree.</summary>
+    public void CollapseAll()
+    {
+        foreach (var n in Nodes) n.CollapseAll();
+        Invalidate();
+    }
+
+    /// <summary>Sorts the nodes using the tree's <see cref="TreeViewNodeSorter"/> or alphabetically.</summary>
+    public void Sort()
+    {
+        SortNodes(Nodes);
+        Invalidate();
+    }
+
+    private void SortNodes(TreeNodeCollection nodes)
+    {
+        var sorted = nodes.OrderBy(n => n.Text).ToList();
+        nodes.Clear();
+        foreach (var n in sorted) { nodes.Add(n); SortNodes(n.Nodes); }
+    }
+
+    /// <summary>Gets or sets a custom node comparer used by <see cref="Sort"/>.</summary>
+    public System.Collections.IComparer? TreeViewNodeSorter { get; set; }
+
+    /// <summary>Gets or sets whether nodes are sorted automatically when a child is added.</summary>
+    public bool Sorted { get; set; } = false;
+
+    /// <summary>
+    /// Gets or sets the default <see cref="ImageList"/> index for node images.
+    /// </summary>
+    public int ImageIndex { get; set; } = 0;
+    public int SelectedImageIndex { get; set; } = 0;
+    public string ImageKey { get; set; } = string.Empty;
+    public string SelectedImageKey { get; set; } = string.Empty;
+    public ImageList? StateImageList { get; set; }
+    private int _itemHeight = DefaultItemHeight;
+    public int ItemHeight { get => _itemHeight; set { _itemHeight = value; Invalidate(); } }
 
     protected internal override void OnPaint(PaintEventArgs e)
     {
@@ -298,7 +400,7 @@ public class TreeView : Control
     protected internal override void OnMouseDown(MouseEventArgs e)
     {
         Focus();
-        var (node, onExpander) = HitTest(e.X, e.Y);
+        var (node, onExpander) = HitTestInternal(e.X, e.Y);
         if (node != null)
         {
             if (onExpander && node.HasChildren)
@@ -375,7 +477,7 @@ public class TreeView : Control
         AfterCheck?.Invoke(this, new TreeViewEventArgs(node, TreeViewAction.Unknown));
     }
 
-    private (TreeNode? node, bool onExpander) HitTest(int x, int y)
+    private (TreeNode? node, bool onExpander) HitTestInternal(int x, int y)
     {
         var allVisible = new List<(TreeNode node, int depth, int y)>();
         CollectVisible(Nodes, 0, 2 - _scrollOffset, allVisible);
@@ -463,4 +565,35 @@ public class NodeLabelEditEventArgs : EventArgs
     public string? Label { get; }
     public bool CancelEdit { get; set; }
     public NodeLabelEditEventArgs(TreeNode? node, string? label) { Node = node; Label = label; }
+}
+
+// ── Hit-test types ────────────────────────────────────────────────────────────
+
+[Flags]
+public enum TreeViewHitTestLocations
+{
+    None        = 0x0000,
+    Nowhere     = 0x0001,
+    Image       = 0x0002,
+    Label       = 0x0004,
+    Indent      = 0x0008,
+    AboveClientArea  = 0x0100,
+    BelowClientArea  = 0x0200,
+    LeftOfClientArea = 0x0400,
+    RightOfClientArea = 0x0800,
+    StateImage  = 0x1000,
+    PlusMinus   = 0x2000,
+    RightOfLabel = 0x4000,
+}
+
+/// <summary>Holds the result of a <see cref="TreeView.HitTest"/> call.</summary>
+public sealed class TreeViewHitTestInfo
+{
+    public TreeNode? Node { get; }
+    public TreeViewHitTestLocations Location { get; }
+    public TreeViewHitTestInfo(TreeNode? node, TreeViewHitTestLocations location)
+    {
+        Node = node;
+        Location = location;
+    }
 }

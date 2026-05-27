@@ -164,7 +164,7 @@ public class PrintGraphics
     public void DrawLine(CPen pen, int x1, int y1, int x2, int y2)
         => DrawLine(pen, (float)x1, (float)y1, (float)x2, (float)y2);
 
-    public void DrawLine(CPen pen, System.Drawing.Point pt1, System.Drawing.Point pt2)
+    public void DrawLine(CPen pen, global::System.Drawing.Point pt1, global::System.Drawing.Point pt2)
         => DrawLine(pen, pt1.X, pt1.Y, pt2.X, pt2.Y);
 
     public void DrawRectangle(CPen pen, float x, float y, float w, float h)
@@ -173,7 +173,7 @@ public class PrintGraphics
     public void DrawRectangle(CPen pen, int x, int y, int w, int h)
         => DrawRectangle(pen, (float)x, (float)y, (float)w, (float)h);
 
-    public void DrawRectangle(CPen pen, System.Drawing.Rectangle rect)
+    public void DrawRectangle(CPen pen, global::System.Drawing.Rectangle rect)
         => DrawRectangle(pen, rect.X, rect.Y, rect.Width, rect.Height);
 
     public void FillRectangle(CBrush brush, float x, float y, float w, float h)
@@ -185,7 +185,7 @@ public class PrintGraphics
     public void FillRectangle(CBrush brush, int x, int y, int w, int h)
         => FillRectangle(brush, (float)x, (float)y, (float)w, (float)h);
 
-    public void FillRectangle(CBrush brush, System.Drawing.Rectangle rect)
+    public void FillRectangle(CBrush brush, global::System.Drawing.Rectangle rect)
         => FillRectangle(brush, rect.X, rect.Y, rect.Width, rect.Height);
 
     public void DrawEllipse(CPen pen, float x, float y, float w, float h)
@@ -194,7 +194,7 @@ public class PrintGraphics
     public void DrawEllipse(CPen pen, int x, int y, int w, int h)
         => DrawEllipse(pen, (float)x, (float)y, (float)w, (float)h);
 
-    public void DrawEllipse(CPen pen, System.Drawing.Rectangle rect)
+    public void DrawEllipse(CPen pen, global::System.Drawing.Rectangle rect)
         => DrawEllipse(pen, rect.X, rect.Y, rect.Width, rect.Height);
 
     public void FillEllipse(CBrush brush, float x, float y, float w, float h)
@@ -206,7 +206,7 @@ public class PrintGraphics
     public void FillEllipse(CBrush brush, int x, int y, int w, int h)
         => FillEllipse(brush, (float)x, (float)y, (float)w, (float)h);
 
-    public void FillEllipse(CBrush brush, System.Drawing.Rectangle rect)
+    public void FillEllipse(CBrush brush, global::System.Drawing.Rectangle rect)
         => FillEllipse(brush, rect.X, rect.Y, rect.Width, rect.Height);
 
     public void DrawString(string text, CFont font, CBrush brush, float x, float y)
@@ -218,17 +218,17 @@ public class PrintGraphics
     public void DrawString(string text, CFont font, CBrush brush, int x, int y)
         => DrawString(text, font, brush, (float)x, (float)y);
 
-    public void DrawString(string text, CFont font, CBrush brush, System.Drawing.RectangleF rect)
+    public void DrawString(string text, CFont font, CBrush brush, global::System.Drawing.RectangleF rect)
         => DrawString(text, font, brush, rect.X, rect.Y);
 
-    public void DrawString(string text, CFont font, CBrush brush, System.Drawing.Rectangle rect)
+    public void DrawString(string text, CFont font, CBrush brush, global::System.Drawing.Rectangle rect)
         => DrawString(text, font, brush, (float)rect.X, (float)rect.Y);
 
     /// <summary>Measures the bounding box of a string (estimation).</summary>
-    public System.Drawing.SizeF MeasureString(string text, CFont font)
-        => new System.Drawing.SizeF(text.Length * font.Size * 0.6f, font.Size * 1.2f);
+    public global::System.Drawing.SizeF MeasureString(string text, CFont font)
+        => new global::System.Drawing.SizeF(text.Length * font.Size * 0.6f, font.Size * 1.2f);
 
-    public System.Drawing.SizeF MeasureString(string text, CFont font, int maxWidth)
+    public global::System.Drawing.SizeF MeasureString(string text, CFont font, int maxWidth)
         => MeasureString(text, font);
 
     public void DrawImage(CImage image, float x, float y, float w, float h)
@@ -237,13 +237,13 @@ public class PrintGraphics
     public void DrawImage(CImage image, int x, int y, int w, int h)
         => DrawImage(image, (float)x, (float)y, (float)w, (float)h);
 
-    public void DrawImage(CImage image, System.Drawing.Rectangle rect)
+    public void DrawImage(CImage image, global::System.Drawing.Rectangle rect)
         => DrawImage(image, rect.X, rect.Y, rect.Width, rect.Height);
 
     // Clip / transform stubs (no-op — PoC)
-    public System.Drawing.RectangleF ClipBounds => new System.Drawing.RectangleF(0, 0, float.MaxValue, float.MaxValue);
-    public void SetClip(System.Drawing.Rectangle rect) { }
-    public void SetClip(System.Drawing.RectangleF rect) { }
+    public global::System.Drawing.RectangleF ClipBounds => new global::System.Drawing.RectangleF(0, 0, float.MaxValue, float.MaxValue);
+    public void SetClip(global::System.Drawing.Rectangle rect) { }
+    public void SetClip(global::System.Drawing.RectangleF rect) { }
     public void ResetClip() { }
     public void TranslateTransform(float dx, float dy) { }
     public void ScaleTransform(float sx, float sy) { }
@@ -252,3 +252,4 @@ public class PrintGraphics
     public void Flush() { }
     public void Dispose() { }
 }
+

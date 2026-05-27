@@ -37,6 +37,8 @@ internal static class CanvasCommandOp
     public const int DrawPolygon           = 20;
     public const int FillPolygon           = 21;
     public const int TranslateTransform    = 22;
+    public const int DrawPie               = 23;
+    public const int FillPie               = 24;
 }
 
 /// <summary>
@@ -703,4 +705,34 @@ public class FillPathCommand : DrawingCommand
         var header = new object[] { CanvasCommandOp.FillPath, fillStyle, segments.Length };
         return header.Concat(segments).ToArray();
     }
+}
+
+public class DrawPieCommand : DrawingCommand
+{
+    public Pen Pen { get; }
+    public int X { get; } public int Y { get; }
+    public int Width { get; } public int Height { get; }
+    public float StartAngle { get; } public float SweepAngle { get; }
+
+    public DrawPieCommand(Pen pen, int x, int y, int w, int h, float start, float sweep)
+    { Pen = pen; X = x; Y = y; Width = w; Height = h; StartAngle = start; SweepAngle = sweep; }
+
+    public override string ToJavaScript() => string.Empty;
+    public override object[] ToCommand()
+        => new object[] { CanvasCommandOp.DrawPie, X, Y, Width, Height, StartAngle, SweepAngle, Pen.Width, Pen.Color.ToRgbaString(), PenHelper.ToDashToken(Pen) };
+}
+
+public class FillPieCommand : DrawingCommand
+{
+    public string FillStyle { get; }
+    public int X { get; } public int Y { get; }
+    public int Width { get; } public int Height { get; }
+    public float StartAngle { get; } public float SweepAngle { get; }
+
+    public FillPieCommand(string fillStyle, int x, int y, int w, int h, float start, float sweep)
+    { FillStyle = fillStyle; X = x; Y = y; Width = w; Height = h; StartAngle = start; SweepAngle = sweep; }
+
+    public override string ToJavaScript() => string.Empty;
+    public override object[] ToCommand()
+        => new object[] { CanvasCommandOp.FillPie, X, Y, Width, Height, StartAngle, SweepAngle, FillStyle };
 }

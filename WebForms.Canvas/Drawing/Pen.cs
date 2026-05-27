@@ -22,6 +22,13 @@ public class Pen : IDisposable
 
     /// <summary>Custom dash pattern used when <see cref="DashStyle"/> is <see cref="DashStyle.Custom"/>.</summary>
     public float[]? DashPattern { get; set; }
+    public float DashOffset { get; set; } = 0f;
+    public System.Drawing.Drawing2D.LineJoin LineJoin { get; set; } = System.Drawing.Drawing2D.LineJoin.Miter;
+    public System.Drawing.Drawing2D.LineCap StartCap { get; set; } = System.Drawing.Drawing2D.LineCap.Flat;
+    public System.Drawing.Drawing2D.LineCap EndCap { get; set; } = System.Drawing.Drawing2D.LineCap.Flat;
+    public float MiterLimit { get; set; } = 10f;
+    public System.Drawing.Drawing2D.PenAlignment Alignment { get; set; } = System.Drawing.Drawing2D.PenAlignment.Center;
+    public Brush? Brush { get; set; }
 
     public Pen(Color color) : this(color, 1.0f) { }
 

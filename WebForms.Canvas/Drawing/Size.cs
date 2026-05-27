@@ -37,4 +37,12 @@ public struct SizeF
     }
 
     public static SizeF Empty => new(0, 0);
+
+    public static implicit operator System.Drawing.SizeF(SizeF s) => new System.Drawing.SizeF(s.Width, s.Height);
+    public static implicit operator SizeF(System.Drawing.SizeF s) => new SizeF(s.Width, s.Height);
+
+    public static bool operator ==(SizeF left, SizeF right) => left.Width == right.Width && left.Height == right.Height;
+    public static bool operator !=(SizeF left, SizeF right) => !(left == right);
+    public override bool Equals(object? obj) => obj is SizeF s && this == s;
+    public override int GetHashCode() => HashCode.Combine(Width, Height);
 }

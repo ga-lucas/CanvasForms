@@ -86,6 +86,23 @@ public sealed class Bitmap : IDisposable
     /// <summary>No-op save stub.</summary>
     public void Save(System.IO.Stream stream, Imaging.ImageFormat format) { }
 
+    // ── Graphics factory ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns a canvas-layer <see cref="Canvas.Windows.Forms.Drawing.Graphics"/> for
+    /// drawing onto this bitmap (stub — actual pixel writes are not supported).
+    /// </summary>
+    public Canvas.Windows.Forms.Drawing.Graphics GetGraphics()
+        => new Canvas.Windows.Forms.Drawing.Graphics(Width, Height);
+
+    // ── Clone ─────────────────────────────────────────────────────────────────
+
+    /// <summary>Returns a shallow copy (stub — no pixel data is copied).</summary>
+    public Bitmap Clone() => new Bitmap(this);
+
+    /// <summary>Returns a cropped copy (stub — no pixel data is copied).</summary>
+    public Bitmap Clone(Rectangle rect, Imaging.PixelFormat format) => new Bitmap(rect.Width, rect.Height, format);
+
     // ── IDisposable ───────────────────────────────────────────────────────────
 
     public void Dispose() { }
@@ -100,7 +117,27 @@ public abstract class Image : IDisposable
     public virtual void Dispose() { }
 
     public static Image FromFile(string filename) => new _FileImage(filename);
+    public static Image FromFile(string filename, bool useEmbeddedColorManagement) => new _FileImage(filename);
     public static Image FromStream(System.IO.Stream stream) => new _StreamImage();
+    public static Image FromStream(System.IO.Stream stream, bool useEmbeddedColorManagement) => new _StreamImage();
+    public static Bitmap FromHbitmap(IntPtr hbitmap) => new Bitmap(0, 0);
+
+    public Bitmap GetThumbnailImage(int thumbWidth, int thumbHeight,
+        System.Drawing.Image.GetThumbnailImageAbort? callback, IntPtr callbackData)
+        => new Bitmap(thumbWidth, thumbHeight);
+
+    public delegate bool GetThumbnailImageAbort();
+
+    public void Save(string filename) { }
+    public void Save(System.IO.Stream stream, Imaging.ImageFormat format) { }
+    public void Save(string filename, Imaging.ImageFormat format) { }
+
+    public Imaging.PixelFormat PixelFormat => Imaging.PixelFormat.Format32bppArgb;
+    public SizeF PhysicalDimension => new SizeF(Width, Height);
+    public System.Drawing.Size Size => new System.Drawing.Size(Width, Height);
+    public float HorizontalResolution => 96f;
+    public float VerticalResolution => 96f;
+    public Imaging.ImageFormat RawFormat => Imaging.ImageFormat.Png;
 
     private sealed class _FileImage : Image
     {

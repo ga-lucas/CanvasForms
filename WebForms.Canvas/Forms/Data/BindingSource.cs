@@ -7,8 +7,12 @@ namespace System.Windows.Forms;
 /// WinForms-compatible BindingSource: wraps an IList and raises ListChanged
 /// so DataGridView (and any control honouring IBindingList) stays in sync.
 /// </summary>
-public class BindingSource : Component, IList, IBindingList, INotifyPropertyChanged
+public class BindingSource : Component, IList, IBindingList, INotifyPropertyChanged,
+    System.ComponentModel.ISupportInitialize
 {
+    void System.ComponentModel.ISupportInitialize.BeginInit() { }
+    void System.ComponentModel.ISupportInitialize.EndInit() { }
+
     // _source is the raw backing list; _inner is the active (possibly filtered/sorted) view.
     private IList _source = new List<object?>();
     private IList _inner  = new List<object?>();

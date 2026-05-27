@@ -12,7 +12,7 @@
 
         <!-- Window buttons -->
         <div style="display: flex; align-items: center; flex: 1; overflow: hidden; gap: 0;">
-        @foreach (var form in _formManager.TopLevelForms.OrderBy(f => f.CreatedAt))
+        @foreach (var form in _formManager.TopLevelForms.Where(f => f.ShowInTaskbar).OrderBy(f => f.CreatedAt))
         {
             var isActive = form == _formManager.ActiveForm;
             var isMinimized = form.WindowState == FormWindowState.Minimized;

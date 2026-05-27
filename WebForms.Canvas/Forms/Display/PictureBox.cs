@@ -2,8 +2,10 @@ using Microsoft.JSInterop;
 
 namespace System.Windows.Forms;
 
-public class PictureBox : Control
+public class PictureBox : Control, System.ComponentModel.ISupportInitialize
 {
+    void System.ComponentModel.ISupportInitialize.BeginInit() { }
+    void System.ComponentModel.ISupportInitialize.EndInit() { }
     private string _imageUrl = string.Empty;
     private PictureBoxSizeMode _sizeMode = PictureBoxSizeMode.Normal;
     private BorderStyle _borderStyle = BorderStyle.None;

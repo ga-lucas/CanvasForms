@@ -13,6 +13,16 @@ public class DataGridViewCell
     public string? ToolTipText { get; set; }
     public DataGridViewCellStyle? Style { get; set; }
     public string FormattedValue => Value?.ToString() ?? string.Empty;
+    public string ErrorText { get; set; } = string.Empty;
+    public bool ReadOnly { get; set; } = false;
+    public bool Selected { get; set; } = false;
+    public bool Displayed { get; set; } = false;
+    public DataGridViewColumn? OwningColumn { get; internal set; }
+    public DataGridViewRow? OwningRow { get; internal set; }
+    public int RowIndex => OwningRow?.Index ?? -1;
+    public int ColumnIndex => OwningColumn?.Index ?? -1;
+    public DataGridViewCellStyle InheritedStyle => Style ?? new DataGridViewCellStyle();
+    public DataGridView? DataGridView => OwningRow?.DataGridView;
 }
 
 /// <summary>
@@ -88,6 +98,7 @@ public class DataGridViewColumn
 
     public DataGridViewCellStyle DefaultCellStyle { get; set; } = new DataGridViewCellStyle();
     public DataGridViewCellStyle HeaderCell_Style { get; set; } = new DataGridViewCellStyle();
+    public DataGridViewColumnHeaderCell HeaderCell { get; set; } = new DataGridViewColumnHeaderCell();
 
     public object? Tag { get; set; }
 
@@ -217,6 +228,9 @@ public class DataGridViewRow
     public bool Visible { get; set; } = true;
     public bool Selected { get; set; } = false;
     public bool ReadOnly { get; set; } = false;
+    public string ErrorText { get; set; } = string.Empty;
+    public bool IsNewRow { get; internal set; } = false;
+    public DataGridViewRowHeaderCell HeaderCell { get; set; } = new DataGridViewRowHeaderCell();
     /// <summary>
     /// When <c>true</c> this row is pinned below the column header and is
     /// unaffected by vertical scrolling — mirrors <see cref="DataGridViewColumn.Frozen"/>.
@@ -329,3 +343,23 @@ public enum DataGridViewColumnHeadersHeightSizeMode
 }
 
 public enum DataGridViewScrollBars { None, Horizontal, Vertical, Both }
+
+/// <summary>Stub header cell for a DataGridView column.</summary>
+public class DataGridViewColumnHeaderCell
+{
+    public string? Value { get; set; }
+    public string? ToolTipText { get; set; }
+    public DataGridViewCellStyle Style { get; set; } = new DataGridViewCellStyle();
+    public DataGridViewSortOrder SortGlyphDirection { get; set; } = DataGridViewSortOrder.None;
+}
+
+/// <summary>Stub header cell for a DataGridView row.</summary>
+public class DataGridViewRowHeaderCell
+{
+    public string? Value { get; set; }
+    public string? ToolTipText { get; set; }
+    public DataGridViewCellStyle Style { get; set; } = new DataGridViewCellStyle();
+    public string ErrorText { get; set; } = string.Empty;
+}
+
+public enum DataGridViewSortOrder { None = 0, Ascending = 1, Descending = 2 }

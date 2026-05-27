@@ -27,3 +27,18 @@ public enum Border3DStyle
     SunkenInner = 0x0008,
     SunkenOuter = 0x0002
 }
+
+/// <summary>
+/// Specifies the sides of a rectangle on which to draw a 3D border.
+/// </summary>
+[Flags]
+public enum Border3DSide
+{
+    Left   = 0x0001,
+    Top    = 0x0002,
+    Right  = 0x0004,
+    Bottom = 0x0008,
+    Middle = 0x0800,
+    All    = Left | Top | Right | Bottom,
+    None   = 0,
+}

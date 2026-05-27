@@ -1,5 +1,16 @@
 namespace System.Windows.Forms;
 
+/// <summary>Specifies if controls use right-to-left text layout.</summary>
+public enum RightToLeft
+{
+    /// <summary>Use left-to-right text layout.</summary>
+    No = 0,
+    /// <summary>Use right-to-left text layout.</summary>
+    Yes = 1,
+    /// <summary>Inherit the value from the parent control.</summary>
+    Inherit = 2,
+}
+
 /// <summary>
 /// Specifies how a control anchors to the edges of its container.
 /// </summary>

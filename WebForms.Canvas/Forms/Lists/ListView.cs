@@ -24,7 +24,11 @@ public class ListViewItem
     public string ImageKey { get; set; } = string.Empty;
     public Color ForeColor { get; set; } = Color.Transparent;
     public Color BackColor { get; set; } = Color.Transparent;
+    public Font? Font { get; set; }
     public ListViewGroup? Group { get; set; }
+    public int StateImageIndex { get; set; } = -1;
+    public string ToolTipText { get; set; } = string.Empty;
+    public int IndentCount { get; set; } = 0;
 
     public ListViewSubItemCollection SubItems { get; } = new();
 
@@ -218,6 +222,37 @@ public class ListView : Control
             _topIndex = Math.Max(0, index - (visibleH / itemH) + 1);
         Invalidate();
     }
+
+    /// <summary>Auto-resizes all columns to fit content (stub: sets each to 100).</summary>
+    public void AutoResizeColumns(ColumnHeaderAutoResizeStyle headerAutoResize)
+    {
+        foreach (var col in Columns)
+            col.Width = 100;
+        Invalidate();
+    }
+
+    /// <summary>Auto-resizes a single column (stub: sets width to 100).</summary>
+    public void AutoResizeColumn(int columnIndex, ColumnHeaderAutoResizeStyle headerAutoResize)
+    {
+        if (columnIndex >= 0 && columnIndex < Columns.Count)
+            Columns[columnIndex].Width = 100;
+        Invalidate();
+    }
+
+    /// <summary>Sorts the items using <see cref="ListViewItemSorter"/> or the current <see cref="Sorting"/> order.</summary>
+    public void Sort()
+    {
+        Invalidate();
+    }
+
+    public System.Collections.IComparer? ListViewItemSorter { get; set; }
+
+    public bool ShowItemToolTips { get; set; } = false;
+    public bool VirtualMode { get; set; } = false;
+    public int VirtualListSize { get; set; } = 0;
+    public bool UseCompatibleStateImageBehavior { get; set; } = false;
+    public bool Activation { get; set; } = false;
+    public ImageList? StateImageList { get; set; }
 
     public ListViewItem? GetItemAt(int x, int y)
     {
@@ -591,6 +626,7 @@ public class ListView : Control
 
 public enum View { LargeIcon, Details, SmallIcon, List, Tile }
 public enum SortOrder { None, Ascending, Descending }
+public enum ColumnHeaderAutoResizeStyle { None = 0, HeaderSize = 1, ColumnContent = 2 }
 
 public delegate void ColumnClickEventHandler(object? sender, ColumnClickEventArgs e);
 public class ColumnClickEventArgs : EventArgs

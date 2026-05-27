@@ -257,7 +257,7 @@ public class MainMenu : System.ComponentModel.Component, Menu
 
     // ── RightToLeft ───────────────────────────────────────────────────────────
 
-    public bool RightToLeft
+    public RightToLeft RightToLeft
     {
         get => _menuStrip.RightToLeft;
         set => _menuStrip.RightToLeft = value;

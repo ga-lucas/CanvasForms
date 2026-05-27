@@ -427,7 +427,7 @@ public abstract class Control
     public bool UseWaitCursor { get; set; } = false;
 
     // Right to left
-    public bool RightToLeft { get; set; } = false;
+    public RightToLeft RightToLeft { get; set; } = RightToLeft.Inherit;
 
     // Region
     private Region? _region;
@@ -553,6 +553,7 @@ public abstract class Control
 
     // Site (for design-time support)
     public object? Site { get; set; }
+    public bool DesignMode => false;
     public bool IsAncestorSiteInDesignMode { get; protected set; } = false;
 
     // IME support (stubs)
@@ -704,7 +705,7 @@ public abstract class Control
 
     // Obsolete properties
     [Obsolete("This property is obsolete")]
-    public bool RenderRightToLeft => false;
+    public bool RenderRightToLeft => RightToLeft == RightToLeft.Yes;
 
     [Obsolete("This property is not relevant for this class")]
     public object? WindowTarget { get; set; }
@@ -959,6 +960,8 @@ public abstract class Control
         Paint?.Invoke(this, e);
     }
 
+    protected virtual void OnPaintBackground(PaintEventArgs e) { }
+
     protected internal virtual void OnMouseDown(MouseEventArgs e)
     {
         if (IsMouseRoutingContainer && Enabled)
@@ -1157,7 +1160,7 @@ public abstract class Control
     }
 
     /// <summary>
-    /// Returns true when (x,y) — in content coordinates — hits the child,
+    /// Returns true when (x,y) ï¿½ in content coordinates ï¿½ hits the child,
     /// including any popup/overlay regions the child may extend into.
     /// </summary>
     protected virtual bool ChildHitTest(Control child, int x, int y)
@@ -1907,7 +1910,7 @@ public abstract class Control
     /// <see cref="DragDropManager.DragStarted"/> so the renderer can set
     /// <c>draggable=true</c> on the canvas element.  Because WebAssembly runs on a
     /// single thread, this method returns <see cref="DragDropEffects.None"/>
-    /// immediately — it cannot block waiting for the drop.  The actual resulting
+    /// immediately ï¿½ it cannot block waiting for the drop.  The actual resulting
     /// effect is delivered asynchronously through <see cref="DragDropManager.LastResult"/>
     /// once <c>HandleDrop</c> fires in <c>FormRenderer</c>.
     /// </para>
@@ -1929,7 +1932,7 @@ public abstract class Control
         // Notify source that the drag has started.
         OnQueryContinueDrag(new QueryContinueDragEventArgs(0, false, DragAction.Continue));
 
-        // WASM constraint: cannot block here — the UI thread must remain free so
+        // WASM constraint: cannot block here ï¿½ the UI thread must remain free so
         // HandleDrop/HandleDragLeave can fire.  The result will be available via
         // DragDropManager.LastResult after the drop completes.
         return DragDropEffects.None;
@@ -2337,6 +2340,15 @@ public abstract class Control
         // Stub implementation - no Windows messages in canvas environment
     }
 
+    /// <summary>Default WndProc pass-through â€” no-op in canvas environment.</summary>
+    protected void DefWndProc(ref Message m) { }
+
+    /// <summary>Pre-processes a message before dispatch â€” always returns false.</summary>
+    public virtual bool PreProcessMessage(ref Message msg) => false;
+
+    /// <summary>Pre-processes a control message â€” always returns false.</summary>
+    public virtual bool PreProcessControlMessage(ref Message msg) => false;
+
     /// <summary>
     /// Determines if a character is an input character that the control recognizes
     /// </summary>
@@ -2475,7 +2487,7 @@ public abstract class Control
             }
         }
 
-        // Available client area for layout — inset by this container's Padding (WinForms parity)
+        // Available client area for layout ï¿½ inset by this container's Padding (WinForms parity)
         var clientRect = new Rectangle(
             Padding.Left,
             Padding.Top,

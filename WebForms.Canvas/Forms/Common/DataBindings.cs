@@ -298,11 +298,39 @@ public class ControlBindingsCollection : System.Collections.ObjectModel.Collecti
 // ── BindingContext ────────────────────────────────────────────────────────────
 
 /// <summary>
-/// Stub for <c>System.Windows.Forms.BindingContext</c>.
-/// Accepted for API compatibility — the canvas host uses direct <see cref="Binding"/>
-/// push/pull without a separate currency manager layer.
+/// Manages the collection of <see cref="BindingManagerBase"/> objects for a container.
+/// When a data source is first requested, a <see cref="CurrencyManager"/> (for lists)
+/// or <see cref="PropertyManager"/> (for scalar objects) is created and cached.
 /// </summary>
-public class BindingContext : System.Collections.Hashtable { }
+public class BindingContext : System.Collections.Hashtable
+{
+    /// <summary>
+    /// Returns the <see cref="BindingManagerBase"/> for the specified data source.
+    /// Creates one on first access.
+    /// </summary>
+    public new BindingManagerBase? this[object dataSource]
+    {
+        get
+        {
+            if (dataSource is null) return null;
+            if (ContainsKey(dataSource)) return (BindingManagerBase)base[dataSource]!;
+            var mgr = CreateManager(dataSource);
+            base[dataSource] = mgr;
+            return mgr;
+        }
+    }
+
+    /// <summary>Returns the manager for the specified data source and data member (data member ignored in stub).</summary>
+    public BindingManagerBase? this[object dataSource, string dataMember]
+        => this[dataSource];
+
+    private static BindingManagerBase CreateManager(object dataSource)
+    {
+        if (dataSource is System.Collections.IList || dataSource is System.ComponentModel.IListSource)
+            return new CurrencyManager(dataSource);
+        return new PropertyManager(dataSource);
+    }
+}
 
 public enum ControlUpdateMode   { OnPropertyChanged = 0, Never = 1 }
 public enum DataSourceUpdateMode { OnValidation = 0, OnPropertyChanged = 1, Never = 2 }

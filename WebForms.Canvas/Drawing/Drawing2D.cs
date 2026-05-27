@@ -2,6 +2,32 @@ namespace System.Drawing.Drawing2D;
 
 // ── Enumerations ──────────────────────────────────────────────────────────────
 
+/// <summary>Specifies the style of dashes used in a drawn line.</summary>
+public enum DashStyle
+{
+    Solid       = 0,
+    Dash        = 1,
+    Dot         = 2,
+    DashDot     = 3,
+    DashDotDot  = 4,
+    Custom      = 5,
+}
+
+/// <summary>Specifies how the source colors in a drawing are combined with the destination colors.</summary>
+public enum CompositingMode
+{
+    SourceOver = 0,
+    SourceCopy = 1,
+}
+
+/// <summary>Specifies how the contents of a new Graphics object are composited with existing contents.</summary>
+public enum DashCap
+{
+    Flat     = 0,
+    Round    = 2,
+    Triangle = 3,
+}
+
 /// <summary>Specifies the overall quality of rendering.</summary>
 public enum SmoothingMode
 {
@@ -154,18 +180,46 @@ public sealed class GraphicsPath : IDisposable
 {
     public void AddLine(float x1, float y1, float x2, float y2) { }
     public void AddLine(System.Drawing.Point pt1, System.Drawing.Point pt2) { }
+    public void AddLine(System.Drawing.PointF pt1, System.Drawing.PointF pt2) { }
+    public void AddLines(System.Drawing.Point[] points) { }
+    public void AddLines(System.Drawing.PointF[] points) { }
     public void AddRectangle(System.Drawing.Rectangle rect) { }
+    public void AddRectangle(System.Drawing.RectangleF rect) { }
+    public void AddRectangles(System.Drawing.Rectangle[] rects) { }
     public void AddEllipse(float x, float y, float width, float height) { }
     public void AddEllipse(System.Drawing.Rectangle rect) { }
+    public void AddEllipse(System.Drawing.RectangleF rect) { }
     public void AddArc(float x, float y, float w, float h, float startAngle, float sweepAngle) { }
+    public void AddArc(System.Drawing.Rectangle rect, float startAngle, float sweepAngle) { }
     public void AddBezier(float x1, float y1, float x2, float y2,
                           float x3, float y3, float x4, float y4) { }
+    public void AddBeziers(System.Drawing.Point[] points) { }
     public void AddPolygon(System.Drawing.Point[] points) { }
+    public void AddPolygon(System.Drawing.PointF[] points) { }
     public void AddString(string s, System.Drawing.FontFamily? family, int style, float emSize,
                           System.Drawing.Point origin, System.Drawing.StringFormat? format) { }
+    public void AddString(string s, System.Drawing.FontFamily? family, int style, float emSize,
+                          System.Drawing.PointF origin, System.Drawing.StringFormat? format) { }
+    public void AddString(string s, System.Drawing.FontFamily? family, int style, float emSize,
+                          System.Drawing.Rectangle layoutRect, System.Drawing.StringFormat? format) { }
+    public void AddPath(GraphicsPath addingPath, bool connect) { }
     public void CloseFigure() { }
+    public void CloseAllFigures() { }
     public void StartFigure() { }
+    public void Flatten() { }
+    public void Flatten(Matrix? matrix) { }
+    public void Widen(System.Drawing.Pen pen) { }
+    public void Transform(Matrix matrix) { }
     public System.Drawing.RectangleF GetBounds() => System.Drawing.RectangleF.Empty;
+    public System.Drawing.RectangleF GetBounds(Matrix? matrix) => System.Drawing.RectangleF.Empty;
+    public bool IsVisible(System.Drawing.Point pt) => false;
+    public bool IsVisible(float x, float y) => false;
+    public System.Drawing.PointF[] PathPoints => Array.Empty<System.Drawing.PointF>();
+    public byte[] PathTypes => Array.Empty<byte>();
+    public int PointCount => 0;
+    public FillMode FillMode { get; set; } = FillMode.Alternate;
+    public void Reset() { }
+    public GraphicsPath Clone() => new GraphicsPath();
     public void Dispose() { }
 }
 
@@ -197,7 +251,16 @@ public sealed class LinearGradientBrush : System.Drawing.Brush
         System.Drawing.Color color1, System.Drawing.Color color2) { }
 
     public LinearGradientBrush(
+        System.Drawing.PointF point1, System.Drawing.PointF point2,
+        System.Drawing.Color color1, System.Drawing.Color color2) { }
+
+    public LinearGradientBrush(
         System.Drawing.Rectangle rect,
+        System.Drawing.Color color1, System.Drawing.Color color2,
+        LinearGradientMode mode) { }
+
+    public LinearGradientBrush(
+        System.Drawing.RectangleF rect,
         System.Drawing.Color color1, System.Drawing.Color color2,
         LinearGradientMode mode) { }
 
@@ -206,7 +269,14 @@ public sealed class LinearGradientBrush : System.Drawing.Brush
         System.Drawing.Color color1, System.Drawing.Color color2,
         float angle) { }
 
+    public LinearGradientBrush(
+        System.Drawing.RectangleF rect,
+        System.Drawing.Color color1, System.Drawing.Color color2,
+        float angle, bool isAngleScaleable = false) { }
+
     public WrapMode WrapMode { get; set; } = WrapMode.Tile;
+    public System.Drawing.Color[] LinearColors { get; set; } = Array.Empty<System.Drawing.Color>();
+    public System.Drawing.RectangleF Rectangle { get; } = System.Drawing.RectangleF.Empty;
 }
 
 /// <summary>
@@ -233,6 +303,16 @@ public sealed class HatchBrush : System.Drawing.Brush
     }
 }
 
+/// <summary>Controls how pixels are offset during rendering.</summary>
+public enum PixelOffsetMode
+{
+    Default     = 0,
+    HighSpeed   = 1,
+    HighQuality = 2,
+    None        = 3,
+    Half        = 4,
+}
+
 /// <summary>
 /// Stub for <c>System.Drawing.Drawing2D.PathGradientBrush</c>.
 /// </summary>
@@ -243,4 +323,41 @@ public sealed class PathGradientBrush : System.Drawing.Brush
 
     public PathGradientBrush(System.Drawing.Point[] points) { }
     public PathGradientBrush(GraphicsPath path) { }
+}
+
+/// <summary>Specifies the order for matrix transform operations.</summary>
+public enum MatrixOrder
+{
+    Prepend = 0,
+    Append  = 1,
+}
+
+/// <summary>Specifies the alignment of a Pen object in relation to the theoretical, zero-width line.</summary>
+public enum PenAlignment
+{
+    Center  = 0,
+    Inset   = 1,
+    Outset  = 2,
+    Left    = 3,
+    Right   = 4,
+}
+
+/// <summary>Specifies how the interior of a closed path is filled.</summary>
+public enum FillMode
+{
+    Alternate = 0,
+    Winding   = 1,
+}
+
+/// <summary>Specifies whether the system or the calling program manages the graphics buffer.</summary>
+public enum FlushIntention
+{
+    Flush = 0,
+    Sync  = 1,
+}
+
+/// <summary>Stub representing a saved graphics-container state.</summary>
+public sealed class GraphicsContainer
+{
+    internal GraphicsContainer() { }
 }

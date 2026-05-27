@@ -16,7 +16,7 @@ public class ContainerControl : ScrollableControl
 {
     public Control? ActiveControl { get; set; }
 
-    public bool AutoValidate { get; set; } = true;
+    public AutoValidate AutoValidate { get; set; } = AutoValidate.EnablePreventFocusChange;
 
     public System.Drawing.SizeF AutoScaleDimensions { get; set; } = new System.Drawing.SizeF(6f, 13f);
 
@@ -77,5 +77,14 @@ public enum AutoScaleMode
     None = 0,
     Font = 1,
     Dpi = 2,
+    Inherit = 3,
+}
+
+/// <summary>Specifies the automatic validation behavior when focus changes.</summary>
+public enum AutoValidate
+{
+    Disable = 0,
+    EnablePreventFocusChange = 1,
+    EnableAllowFocusChange = 2,
     Inherit = 3,
 }

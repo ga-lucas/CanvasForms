@@ -27,6 +27,16 @@ public class ToolStripPanel : ContainerControl
     /// </summary>
     public Orientation Orientation { get; set; } = Orientation.Horizontal;
 
+    /// <summary>When true the panel cannot be moved by the user (stub — ignored in canvas mode).</summary>
+    public bool Locked { get; set; }
+
+    /// <summary>Docks a ToolStrip onto this panel.</summary>
+    public void Join(ToolStrip toolStrip)                 => Controls.Add(toolStrip);
+    /// <summary>Docks a ToolStrip onto a specific row of this panel.</summary>
+    public void Join(ToolStrip toolStrip, int row)        => Controls.Add(toolStrip);
+    /// <summary>Docks a ToolStrip onto this panel at the specified location.</summary>
+    public void Join(ToolStrip toolStrip, Point location) => Controls.Add(toolStrip);
+
     // ── Auto-visibility ───────────────────────────────────────────────────────
 
     /// <summary>
@@ -125,6 +135,12 @@ public class ToolStripContentPanel : Panel
         BackColor = System.Drawing.Color.FromArgb(255, 255, 255);
     }
 
+    /// <summary>Gets or sets the renderer used to paint this panel.</summary>
+    public ToolStripRenderer? Renderer { get; set; }
+
+    /// <summary>Gets or sets the render mode for this panel.</summary>
+    public ToolStripRenderMode RenderMode { get; set; } = ToolStripRenderMode.ManagerRenderMode;
+
     /// <summary>
     /// Called when the content panel is first rendered.  Override in derived classes.
     /// </summary>
@@ -178,6 +194,11 @@ public class ToolStripContainer : ContainerControl
     public ToolStripPanel        LeftToolStripPanel   => _left;
     public ToolStripPanel        RightToolStripPanel  => _right;
     public ToolStripContentPanel ContentPanel         => _content;
+
+    public bool TopToolStripPanelVisible    { get => _top.Visible;     set => _top.Visible     = value; }
+    public bool BottomToolStripPanelVisible { get => _bottom.Visible;  set => _bottom.Visible  = value; }
+    public bool LeftToolStripPanelVisible   { get => _left.Visible;    set => _left.Visible    = value; }
+    public bool RightToolStripPanelVisible  { get => _right.Visible;   set => _right.Visible   = value; }
 
     // ── Layout ────────────────────────────────────────────────────────────────
 

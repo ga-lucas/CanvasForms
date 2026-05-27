@@ -49,6 +49,7 @@
                    outline: none;
                    cursor: @GetCanvasCursor();
                    user-select: none;
+                   opacity: @(Form.FormOpacity.ToString("F3", System.Globalization.CultureInfo.InvariantCulture));
                    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
                    border-radius: @(Canvas.Windows.Forms.Theming.CanvasTheme.Current.WindowCornerRadius)px;
                    transition:

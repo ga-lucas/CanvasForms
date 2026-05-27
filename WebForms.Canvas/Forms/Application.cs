@@ -84,6 +84,34 @@ public static class Application
 
     public static string ProductVersion => CanvasApp.ProductVersion;
 
+    public static string ExecutablePath => System.Environment.ProcessPath ?? string.Empty;
+    public static string StartupPath => System.AppContext.BaseDirectory;
+    /// <summary>
+    /// Raised when the application finishes processing messages and is about to enter
+    /// an idle state.  In CanvasForms the message loop does not exist, so this event is
+    /// provided for API compatibility only.
+    /// </summary>
+    public static event EventHandler? Idle;
+
+    /// <summary>Fires the <see cref="Idle"/> event.  Called by the host between render cycles when appropriate.</summary>
+    internal static void RaiseIdle() => Idle?.Invoke(null, EventArgs.Empty);
+
+    /// <summary>
+    /// Adds a message filter to monitor messages routed to the application.
+    /// In CanvasForms there is no Win32 message loop, so filters are registered but
+    /// never invoked.  Accepted for API compatibility.
+    /// </summary>
+    public static void AddMessageFilter(IMessageFilter value) { }
+
+    /// <summary>Removes a previously added message filter.</summary>
+    public static void RemoveMessageFilter(IMessageFilter value) { }
+
+    /// <summary>
+    /// Restarts the application.  In CanvasForms this is equivalent to calling
+    /// <see cref="Exit()"/> because the browser tab (not the host) controls navigation.
+    /// </summary>
+    public static void Restart() => CanvasApp.Exit();
+
     /// <summary>Raises <see cref="ThreadException"/> (called by the canvas host on unhandled exceptions).</summary>
     internal static void RaiseThreadException(Exception ex)
         => ThreadException?.Invoke(null, new ThreadExceptionEventArgs(ex));
@@ -169,4 +197,19 @@ public enum HighDpiMode
     PerMonitorV2 = 2,
     DpiUnaware = 3,
     DpiUnawareGdiScaled = 4,
+}
+
+/// <summary>
+/// Defines a message filter interface.  Implementations can intercept messages before
+/// they are dispatched to a control.  In CanvasForms this interface is provided for
+/// API compatibility — no Win32 message loop exists in the browser.
+/// </summary>
+public interface IMessageFilter
+{
+    /// <summary>
+    /// Filters a message before it is dispatched.
+    /// Return <c>true</c> to suppress the message, <c>false</c> to allow dispatch.
+    /// In CanvasForms this method is never called; it exists for API compatibility.
+    /// </summary>
+    bool PreFilterMessage(ref Message m);
 }

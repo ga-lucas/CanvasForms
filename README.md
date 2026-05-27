@@ -466,6 +466,7 @@ Items are ordered by estimated prevalence in designer-generated / translated Win
 | ⚠️ | **`PrintDialog`** | Canvas dialog (printer/copies/range); calls `PrintDocument.Print()` on OK; submits `PrintJob` to `IHostPrintService` |
 | 🧩 | **`PrintPreviewDialog`** | Placeholder preview; `PrintPreviewControl` renders stub page |
 | ⚠️ | **`PrintDocument`** | `Print()` drives `PrintPage` events with `PrintGraphics` capture surface; multi-page; submits `PrintJob` to `IHostPrintService` |
+| ✅ | **`BackgroundWorker`** | `DoWork`/`ProgressChanged`/`RunWorkerCompleted` events; `RunWorkerAsync`/`CancelAsync`/`ReportProgress`; runs on `Task.Run`; `WorkerReportsProgress`/`WorkerSupportsCancellation` flags |
 
 ### Tier 3 — Lower priority / legacy compat
 

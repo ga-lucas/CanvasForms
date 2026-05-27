@@ -896,3 +896,34 @@ public class ToolStripProgressBar : ToolStripItem
     public void Increment(int value) => ProgressBar.Increment(value);
 }
 
+// ── ToolStripControlHost ──────────────────────────────────────────────────────
+/// <summary>
+/// Hosts any <see cref="Control"/> as a <see cref="ToolStripItem"/>.
+/// The hosted control participates in normal ToolStrip layout using its Width/Height.
+/// </summary>
+public class ToolStripControlHost : ToolStripItem
+{
+    public Control Control { get; }
+
+    public ToolStripControlHost(Control c)
+    {
+        Control = c;
+        Width   = c.Width;
+        Height  = c.Height;
+    }
+
+    public ToolStripControlHost(Control c, string name) : this(c)
+    {
+        Name = name;
+    }
+
+    public override string Text
+    {
+        get => Control.Text;
+        set => Control.Text = value;
+    }
+
+    public bool Focused => Control.Focused;
+
+    public void Focus() => Control.Focus();
+}

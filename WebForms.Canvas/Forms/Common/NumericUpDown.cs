@@ -3,8 +3,10 @@ namespace System.Windows.Forms;
 /// <summary>
 /// Represents a Windows Forms NumericUpDown control
 /// </summary>
-public class NumericUpDown : UpDownBase
+public class NumericUpDown : UpDownBase, System.ComponentModel.ISupportInitialize
 {
+    void System.ComponentModel.ISupportInitialize.BeginInit() { }
+    void System.ComponentModel.ISupportInitialize.EndInit() { }
     private decimal _value = 0;
     private decimal _minimum = 0;
     private decimal _maximum = 100;

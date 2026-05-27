@@ -576,4 +576,3 @@ public class ToolStripItemCollection : IList<ToolStripItem>
 
     private void Attach(ToolStripItem item) { if (_owner != null) item.Owner = _owner; }
 }
-

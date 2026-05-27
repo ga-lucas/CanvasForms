@@ -671,8 +671,8 @@ public class ControlPropertyFunctionalityTests
         control.AutoScrollOffset = new Point(10, 20);
         Assert.Equal(new Point(10, 20), control.AutoScrollOffset);
 
-        control.RightToLeft = true;
-        Assert.True(control.RightToLeft);
+        control.RightToLeft = RightToLeft.Yes;
+        Assert.Equal(RightToLeft.Yes, control.RightToLeft);
 
         Assert.False(control.IsMirrored); // Read-only, always false
 
