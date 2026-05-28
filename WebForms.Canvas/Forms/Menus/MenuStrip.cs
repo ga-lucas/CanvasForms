@@ -264,4 +264,85 @@ public class MenuStrip : ToolStrip
 
     private static bool WalkShortcut(ToolStripMenuItem item, Keys keys)
         => ContextMenuStrip.WalkShortcut(item, keys);
+
+    // ── Alt + mnemonic support ────────────────────────────────────────────────
+
+    private bool _altMode = false;
+
+    /// <summary>
+    /// Activates or deactivates Alt-mode (underline indicators + mnemonic routing).
+    /// Called by the parent <see cref="Form"/> when the Alt key is pressed or released.
+    /// </summary>
+    public void SetAltMode(bool active)
+    {
+        _altMode = active;
+        Invalidate();
+    }
+
+    /// <summary>
+    /// Attempts to open the top-level menu item whose text contains the mnemonic
+    /// character <paramref name="mnemonic"/> (e.g. the character after '&amp;').
+    /// </summary>
+    /// <returns><c>true</c> if a matching item was found and opened.</returns>
+    protected internal override bool ProcessMnemonic(char mnemonic)
+    {
+        mnemonic = char.ToUpperInvariant(mnemonic);
+
+        // First pass: look for explicit &X mnemonic markers.
+        for (int i = 0; i < Items.Count; i++)
+        {
+            var item = Items[i];
+            if (!item.Enabled || !item.Visible) continue;
+            var text = item.Text ?? string.Empty;
+            int amp = text.IndexOf('&');
+            if (amp >= 0 && amp < text.Length - 1)
+            {
+                if (char.ToUpperInvariant(text[amp + 1]) == mnemonic)
+                {
+                    ActivateTopLevelItem(i, item);
+                    return true;
+                }
+            }
+        }
+
+        // Second pass: match first character of item text (no explicit marker).
+        for (int i = 0; i < Items.Count; i++)
+        {
+            var item = Items[i];
+            if (!item.Enabled || !item.Visible) continue;
+            var text = item.Text ?? string.Empty;
+            // Strip any leading & before comparing first visible char.
+            var firstChar = text.TrimStart('&').FirstOrDefault();
+            if (firstChar != '\0' && char.ToUpperInvariant(firstChar) == mnemonic)
+            {
+                ActivateTopLevelItem(i, item);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void ActivateTopLevelItem(int index, ToolStripItem item)
+    {
+        CloseAllTopLevelDropDowns();
+        _altMode = false;
+
+        if (item is ToolStripMenuItem mi)
+        {
+            if (mi.HasDropDownItems)
+            {
+                OnMenuActivate(EventArgs.Empty);
+                var layout = ComputeItemLayout();
+                var (lx, _) = layout[index];
+                var formPt = GetFormPosition();
+                mi.OpenDropDown(new Point(formPt.X + lx, formPt.Y + Height));
+            }
+            else
+            {
+                mi.OnClick(EventArgs.Empty);
+            }
+        }
+        Invalidate();
+    }
 }

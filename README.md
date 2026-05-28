@@ -250,16 +250,10 @@ The following WinForms controls/types currently exist under `WebForms.Canvas/For
 
 ### Not yet implemented (common WinForms controls)
 
-Controls below have **no source file** in the repo yet. Everything else either has at least a stub or partial implementation — check the [Controls roadmap](#controls-roadmap) table for its current status.
-
-**Data / inspection**
-
-**Print**
-- `PrintDialog`, `PrintPreviewDialog`, `PrintDocument`, `PrintPreviewControl`
+Controls below have **no source file** in the repo yet. Everything else either has at least a stub or
 
 **Other**
-- `HelpProvider`
-- `Chart`
+<!-- Chart is now implemented -->
 
 Controls live in `WebForms.Canvas/Forms/...` (project: `Canvas.Windows.Forms`).
 See [`COMPATIBILITY_REVIEW.md`](COMPATIBILITY_REVIEW.md) for a full per-control breakdown of implemented APIs, known gaps, and session notes.
@@ -472,7 +466,8 @@ Items are ordered by estimated prevalence in designer-generated / translated Win
 
 | Status | Control | Notes |
 |--------|---------|-------|
-| ⚠️ | **`DataGrid`** (legacy) | Subclasses DataGridView; TableStyles; DataGridTableStyle/ColumnStyle; CaptionText; DataGridCell |
+| ⚠️ | **`Chart`** | Chart.js bridge; Line/Bar/Column/Area/Pie/Doughnut/Radar/Scatter/Bubble/Spline/StackedBar; WinForms-compatible Series/ChartArea/Legend/Title API; DOM overlay rendered via `ChartRenderer.razor` + `chart-bridge.js`; ILTranslator retargets `DataVisualization.Charting` |
+| ⚠️ | **`DataGrid`** (legacy)
 | ✅ | **`BindingSource`** | IList/IBindingList wrapper; `Current`/`Position`; functional `Filter` (equality predicate) + `Sort` (multi-column ASC/DESC) + `Find`; DataView delegates to native RowFilter/Sort; server-backed via `CanvasDataService` |
 | ⚠️ | **`BindingNavigator`** | Record-navigation bar; First/Prev/Next/Last/Add/Delete; bound to `BindingSource.Position`; **editable `PositionItem` textbox** (type 1-based record number + Enter to jump); `CountItem` label |
 | ⚠️ | **`StatusBar`** (legacy) | Panels; ShowPanels; SizingGrip; spring sizing; OwnerDraw; DrawItem event |

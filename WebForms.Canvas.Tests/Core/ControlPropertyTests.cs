@@ -677,7 +677,7 @@ public class ControlPropertyFunctionalityTests
         Assert.False(control.IsMirrored); // Read-only, always false
 
 #pragma warning disable CS0618 // Type or member is obsolete
-        Assert.False(control.RenderRightToLeft); // Obsolete
+        Assert.True(control.RenderRightToLeft); // Obsolete; returns true when RightToLeft == Yes
         control.WindowTarget = new object(); // Obsolete
         Assert.NotNull(control.WindowTarget);
 #pragma warning restore CS0618

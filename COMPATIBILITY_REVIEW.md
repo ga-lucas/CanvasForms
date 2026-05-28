@@ -44,7 +44,7 @@
 | Containers | `SplitContainer` | Good | Resizable panes; fixed/min-size; double-click reset |
 | Layout | `FlowLayoutPanel` | Good | FlowDirection + wrap/break; SetFlowBreak |
 | Layout | `TableLayoutPanel` | Good | Row/column styles + spans; CellBorderStyle; GetControlFromPosition |
-| Menus | `MenuStrip` | Partial | Top-level menu bar with dropdowns; **`ProcessShortcut(Keys)` dispatches `ShortcutKeys` to matching `ToolStripMenuItem` (including nested dropdowns)** |
+| Menus | `MenuStrip` | Good | Top-level menu bar with dropdowns; **`ProcessShortcut(Keys)`** dispatc
 | Menus | `ContextMenuStrip` | Partial | Right-click overlay; Opening/Closing events; **`ProcessShortcut(Keys)` dispatches shortcut keys to menu items** |
 | Menus | `ToolStrip` | Partial | Toolbar with icons, hover, checked state; **ToolStripSplitButton (split face + dropdown); hosted ProgressBar/TextBox/ComboBox rendering** |
 | Menus | `StatusStrip / ToolStripStatusLabel` | Partial | Status bar; Spring; BorderSides; SizingGrip |
@@ -63,7 +63,7 @@
 | Menus (legacy) | `StatusBar` | Partial | Panels collection; ShowPanels; SizingGrip; spring layout; OwnerDraw; DrawItem event |
 | Data (legacy) | `DataGrid` | Partial | Subclasses DataGridView; TableStyles/DataGridTableStyle/DataGridColumnStyle; CaptionText/CaptionVisible; DataGridCell HitTest; legacy Expand/Collapse stubs |
 | Data | `DataGridView` | Partial | IList/BindingSource/DataTable binding; auto-col gen; sort; col types; frozen columns; clipboard copy (Ctrl+C); multi-column sort (Ctrl+click header); **DataGridViewComboBoxColumn in-cell dropdown** (double-click or F2); **DataGridViewCheckBoxColumn single-click/Space toggle** (fires CellValueChanged); `RowsRemoved`/`UserAddedRow`/`UserDeletingRow`/`UserDeletedRow`/`DefaultValuesNeeded` events |
-| Data | `PropertyGrid` | Partial | Reflection-based two-column browser; SelectedObject/SelectedObjects; PropertySort; HelpVisible; ToolbarVisible; inline editing; SelectedGridItemChanged; PropertyValueChanged |
+| Data | `PropertyGrid` | Partial | Reflection-based two-column browser; SelectedObject/SelectedObjects; PropertySort; HelpVisible; ToolbarVisible; inline editing; SelectedGridItemChanged; PropertyValueChanged; **enum inline dropdown** (all valid names; arrow-key navigation; Enter/Escape commit/cancel); **bool toggle editor** (click/Enter/Space toggles; True/False dropdown) |
 | Data | `BindingSource` | Partial | IList/IBindingList; Filter/Sort/Find; server-backed |
 | Data | `BindingNavigator` | Partial | ToolStrip-based navigation bar; First/Prev/Next/Last/Add/Delete; **editable PositionItem textbox** (type record number + Enter); count label; bound to BindingSource events |
 | Data | `DataTable` | Partial | DataView/DefaultView; DataRowView (ICustomTypeDescriptor); typed RowChanged/RowDeleted/ColumnChanged events; Select(filter, sort); DataSet/DataTableCollection/DataRelation; IListSource; BindingSource wired |
@@ -148,9 +148,10 @@
 - TopMost (via ZIndex), ShowInTaskbar, Opacity (CSS opacity)
 - Controls, ActiveControl (focus tracking with proper old/new state propagation)
 - EnsureTitleBarVisible() (canvas extension for viewport-clamp)
+- **`Form.ActiveForm`** static property — delegates to `FormManager.Current.ActiveForm` (WinForms-compatible)
 
 ### Partial
-- MainMenuStrip: property wired; rendered in-form, not OS chrome
+- MainMenuStrip: property wired; rendered in-form, not OS chrome; **Alt + mnemonic** (`Alt+F` → File menu) activates top-level items via `SetAltMode` / `ProcessMnemonic`; supports explicit `&` marker and first-char fallback
 - ControlBox, MinimizeBox, MaximizeBox: properties present; chrome rendering simplified
 - AutoScroll, AutoScrollPosition: via ScrollableControl; partial
 
@@ -217,7 +218,9 @@
 - FindString(), FindStringExact()
 - GetItemRectangle(), GetItemText()
 - TopIndex, EnsureVisible()
-- **DataSource binding** — `IList<T>`, `IEnumerable`, `BindingSource`; `DisplayMember`/`ValueMember` resolve via reflection; `SelectedValue` get/set; `IBindingList.ListChanged` triggers automatic repopulation; selection restored by value after refresh
+- **`BeginUpdate()` / `EndUpdate()`** — suppresses redraws during bulk item population (matches WinForms behavior)
+- **`IndexFromPoint(Point)` / `IndexFromPoint(int, int)`** — returns item index at client coordinates or `NoMatches` (-1)
+- **DataSource binding**
 
 ---
 
@@ -880,3 +883,36 @@ These gaps are architectural — they require OS integration unavailable in a br
 ---
 
 For per-property tracking see `Canvas.Windows.Forms.Tests/PROPERTY_COMPLETENESS.md` and `CONTROLS_IMPLEMENTATION_STRATEGY.md`.
+
+---
+
+## Chart (`System.Windows.Forms.DataVisualization.Charting`)
+
+Rendered via a DOM overlay (`ChartRenderer.razor`) backed by **Chart.js 4** through `chart-bridge.js`.  
+See full progress document: [`docs/CHART_IMPLEMENTATION.md`](docs/CHART_IMPLEMENTATION.md)
+
+### Core API
+
+| Member | Status | Notes |
+|--------|--------|-------|
+| `Chart` control | ✅ | Subclasses `Control`; overlay positioning matches `WebBrowser` pattern |
+| `Series` collection | ✅ | `SeriesCollection` — add/remove; mutations trigger re-render |
+| `ChartAreas` collection | ✅ | Default `ChartArea1` always present |
+| `Legends` collection | ✅ | Default `Legend1` always present; `Enabled`, `Docking` |
+| `Titles` collection | ✅ | `Title.Text` rendered via Chart.js `plugins.title` |
+| `DataPoint` | ✅ | `XValue`, `YValues[]`, `AxisLabel`, `IsEmpty`, `Color`, `Label` |
+| `DataPointCollection.AddXY` | ✅ | Both `(double, double)` and `(string, double)` overloads |
+| `SeriesChartType` enum | ✅ | 19 values; all mapped (Candlestick/Stock fall back to bar) |
+| `Series.Color` | ✅ | CSS color string; auto-palette fallback |
+| `Series.BorderWidth` | ✅ | |
+| `Series.IsVisibleInLegend` | ✅ | |
+| `ChartArea.AxisX/Y.Title` | ⚠️ | Passed to Chart.js scale title |
+| `ChartArea.AxisY.Minimum/Maximum` | ✅ | |
+| `Axis.IsLogarithmic` | ⏳ | Parsed, not wired to Chart.js |
+| `DataPoint.Label` callout | ⏳ | Needs `chartjs-plugin-datalabels` |
+| `SaveImage()` | ❌ | Not implemented |
+| `Area3DStyleEnable3D` | ❌ | No 3D in Chart.js |
+
+### ILTranslator
+
+`System.Windows.Forms.DataVisualization.Charting` assembly references are retargeted to `Canvas.Windows.Forms` automatically.

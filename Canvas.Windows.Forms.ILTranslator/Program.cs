@@ -74,6 +74,7 @@ internal static class Program
         {
             if (reference.Name is "System.Windows.Forms"
                                 or "System.Windows.Forms.Primitives"
+                                or "System.Windows.Forms.DataVisualization.Charting"
                                 or "WebForms.Canvas")
             {
                 // All WinForms surface area lives in Canvas.Windows.Forms.

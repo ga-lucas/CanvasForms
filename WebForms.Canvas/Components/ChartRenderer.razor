@@ -1,0 +1,85 @@
+@using Forms = System.Windows.Forms
+@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
+
+@* Chart.js canvas overlay — absolutely positioned to match Chart control bounds *@
+<div id="@_wrapperId"
+	 style="position: absolute;
+			left: @(_left)px;
+			top: @(_top)px;
+			width: @(_width)px;
+			height: @(_height)px;
+			z-index: @(_zIndex);
+			display: @(_visible ? "block" : "none");
+			pointer-events: none;
+			background: @(_backColor);
+			overflow: hidden;">
+	<canvas id="@Chart.ChartId" style="width:100%;height:100%;"></canvas>
+</div>
+
+@code {
+	[Parameter, EditorRequired] public Forms.Chart Chart { get; set; } = default!;
+	[Parameter] public int Left        { get; set; }
+	[Parameter] public int Top         { get; set; }
+	[Parameter] public int Width       { get; set; }
+	[Parameter] public int Height      { get; set; }
+	[Parameter] public int ZIndex      { get; set; }
+	[Parameter] public bool Visible    { get; set; } = true;
+
+	private int    _left, _top, _width, _height, _zIndex;
+	private bool   _visible;
+	private string _backColor  = "white";
+	private string _wrapperId  => $"chart-wrap-{Chart.ChartId}";
+	private bool   _initialized;
+
+	protected override void OnParametersSet()
+	{
+		_left      = Left;
+		_top       = Top;
+		_width     = Width;
+		_height    = Height;
+		_zIndex    = ZIndex;
+		_visible   = Visible;
+		_backColor = ColorToCss(Chart.BackColor);
+	}
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (!_visible) return;
+
+		if (firstRender || Chart.NeedsRender)
+		{
+			await RenderChart();
+			Chart.ClearNeedsRender();
+		}
+	}
+
+	private async Task RenderChart()
+	{
+		try
+		{
+			var json = Chart.SerializeModel();
+			await JSRuntime.InvokeVoidAsync("chartBridge.init", Chart.ChartId, json);
+			_initialized = true;
+		}
+		catch (Exception ex)
+		{
+			Console.Error.WriteLine($"[ChartRenderer] JS init failed: {ex.Message}");
+		}
+	}
+
+	public async ValueTask DisposeAsync()
+	{
+		if (_initialized)
+		{
+			try { await JSRuntime.InvokeVoidAsync("chartBridge.destroy", Chart.ChartId); }
+			catch { /* ignore disposal errors */ }
+		}
+	}
+
+	private static string ColorToCss(System.Drawing.Color c)
+	{
+		if (c.IsEmpty || c == System.Drawing.Color.Transparent) return "transparent";
+		return $"rgba({c.R},{c.G},{c.B},{c.A / 255.0:F3})";
+	}
+}

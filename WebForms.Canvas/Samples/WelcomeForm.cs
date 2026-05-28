@@ -120,6 +120,7 @@ public class WelcomeForm : Form
         // Row 6
         Btn("WebBrowser & NotifyIcon", lx,   y).Click += (s, e) => Launch<DemoWebNotifyForm>();
         Btn("MDI Demo",                col2, y).Click += (s, e) => Launch<MdiDemoForm>();
+        Btn("Charts Demo",             col3, y).Click += (s, e) => Launch<ChartDemoForm>();
         y += rh;
 
         // ── Links ────────────────────────────────────────────────────────

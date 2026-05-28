@@ -5,6 +5,13 @@ namespace System.Windows.Forms;
 public class Form : ContainerControl
 {
     private static int _nextZIndex = 1;
+
+    /// <summary>
+    /// Gets the currently active form for the application.
+    /// Delegates to <see cref="FormManager"/> (the canvas equivalent of the real WinForms static).
+    /// </summary>
+    public static Form? ActiveForm => Canvas.Windows.Forms.CanvasApplication.FormManager?.ActiveForm;
+
     private const int TitleBarHeight = 32; // Height of the title bar
     private Control? _focusedControl;
     private Control? _capturedControl;
@@ -1591,6 +1598,25 @@ public class Form : ContainerControl
             base.OnKeyDown(e);
         }
 
+        // ── Alt key — toggle mnemonic mode on MenuStrip ───────────────────────
+        if (!e.Handled && e.KeyCode == Keys.Menu && MainMenuStrip != null)
+        {
+            MainMenuStrip.SetAltMode(true);
+            e.Handled = true;
+            return;
+        }
+
+        // ── Alt + letter — activate mnemonic on MenuStrip ────────────────────
+        if (!e.Handled && e.Alt && e.KeyCode >= Keys.A && e.KeyCode <= Keys.Z && MainMenuStrip != null)
+        {
+            char mnemonic = (char)('A' + (e.KeyCode - Keys.A));
+            if (MainMenuStrip.ProcessMnemonic(mnemonic))
+            {
+                e.Handled = true;
+                return;
+            }
+        }
+
         // ── ToolStripMenuItem shortcut key dispatch ─────────────────────────
         // Walk the MainMenuStrip (and any ContextMenuStrip on the focused control)
         // to fire the first matching ShortcutKeys handler.
@@ -1617,6 +1643,12 @@ public class Form : ContainerControl
         {
             base.OnKeyUp(e);
             if (e.Handled) return;
+        }
+
+        // Clear Alt-mode when the Alt key is released without a letter combination.
+        if (e.KeyCode == Keys.Menu && MainMenuStrip != null)
+        {
+            MainMenuStrip.SetAltMode(false);
         }
 
         if (FocusedControl != null && FocusedControl.Enabled)

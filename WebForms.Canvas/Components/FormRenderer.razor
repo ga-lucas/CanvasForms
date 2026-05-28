@@ -97,6 +97,20 @@
                 @onload="@(() => wb.RaiseDocumentCompleted())" />
     }
 
+    @* ── Chart overlays ──────────────────────────────────────────────────────── *@
+    @foreach (var chart in GetCharts())
+    {
+        var chartLeft   = Form.Left + BorderWidth + chart.Left;
+        var chartTop    = Form.Top  + TitleBarHeight + BorderWidth + chart.Top;
+        <ChartRenderer Chart="@chart"
+                       Left="@chartLeft"
+                       Top="@chartTop"
+                       Width="@chart.Width"
+                       Height="@chart.Height"
+                       ZIndex="@(Form.ZIndex + 1)"
+                       Visible="@chart.Visible" />
+    }
+
     @* ── ToolTip overlay ──────────────────────────────────────────────────────── *@
     @if (Forms.ToolTipRegistry.IsVisible)
     {
@@ -364,6 +378,9 @@
 
             // Subscribe to WebBrowserRegistry so iframe overlays are re-rendered when state changes
             WebBrowserRegistry.Instance.SetChangeCallback(() => InvokeAsync(StateHasChanged));
+
+            // Subscribe chart RenderRequested events on all Chart controls in the form
+            PropagateChartRenderCallback(Form);
 
             // Subscribe to ToolTipRegistry so the tooltip overlay re-renders when it shows/hides
             Forms.ToolTipRegistry.Changed += (_, _) => InvokeAsync(StateHasChanged);
@@ -1919,6 +1936,26 @@
         }
     }
 
+    // ── Chart overlay helpers ──────────────────────────────────────────────────
+
+    private IEnumerable<Forms.Chart> GetCharts()
+    {
+        if (Form is null) yield break;
+        foreach (var c in CollectCharts(Form))
+            yield return c;
+    }
+
+    private static IEnumerable<Forms.Chart> CollectCharts(Forms.Control parent)
+    {
+        foreach (Forms.Control child in parent.Controls)
+        {
+            if (child is Forms.Chart chart)
+                yield return chart;
+            foreach (var nested in CollectCharts(child))
+                yield return nested;
+        }
+    }
+
     /// <summary>
     /// Injects the Blazor <see cref="IJSRuntime"/> into all <see cref="Forms.WebBrowser"/>
     /// controls so they can call JS navigation helpers.
@@ -1948,5 +1985,17 @@
             if (FormHasContextMenuStrip(child)) return true;
         }
         return false;
+    }
+
+    // ── Chart rendering callback propagation ──────────────────────────────────
+
+    private void PropagateChartRenderCallback(Forms.Control parent)
+    {
+        foreach (Forms.Control child in parent.Controls)
+        {
+            if (child is Forms.Chart chart)
+                chart.ChartInvalidated += () => InvokeAsync(StateHasChanged);
+            PropagateChartRenderCallback(child);
+        }
     }
 }

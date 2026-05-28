@@ -133,6 +133,7 @@ public class ListBox : ListControl
 
     protected internal override void OnPaint(PaintEventArgs e)
     {
+        if (_updateCount > 0) return; // suspended by BeginUpdate
         var g = e.Graphics;
         var bounds = new Rectangle(0, 0, Width, Height);
 
@@ -562,6 +563,47 @@ public class ListBox : ListControl
 
         return -1;
     }
+
+    // ── Update batching ───────────────────────────────────────────────────────
+
+    private int _updateCount = 0;
+
+    /// <summary>
+    /// Suspends painting the list box while items are added.  Matches WinForms
+    /// <c>ListBox.BeginUpdate()</c> — call <see cref="EndUpdate"/> to resume.
+    /// </summary>
+    public void BeginUpdate() => _updateCount++;
+
+    /// <summary>
+    /// Resumes painting the list box after a call to <see cref="BeginUpdate"/>.
+    /// </summary>
+    public void EndUpdate()
+    {
+        if (_updateCount > 0) _updateCount--;
+        if (_updateCount == 0) Invalidate();
+    }
+
+    /// <summary>
+    /// Returns the index of the item at the specified client-area point,
+    /// or <c>ListBox.NoMatches</c> (-1) if no item is at that location.
+    /// Matches WinForms <c>ListBox.IndexFromPoint(Point)</c>.
+    /// </summary>
+    public int IndexFromPoint(Point p) => IndexFromPoint(p.X, p.Y);
+
+    /// <summary>
+    /// Returns the index of the item at the specified client-area coordinates,
+    /// or <c>ListBox.NoMatches</c> (-1) if no item is at that location.
+    /// </summary>
+    public int IndexFromPoint(int x, int y)
+    {
+        var contentArea = GetContentBounds();
+        if (!contentArea.Contains(x, y)) return NoMatches;
+        int idx = _topIndex + (y - contentArea.Y) / ItemHeight;
+        return idx >= 0 && idx < Items.Count ? idx : NoMatches;
+    }
+
+    /// <summary>Constant returned by <see cref="IndexFromPoint"/> when no item is found.</summary>
+    public const int NoMatches = -1;
 
     /// <summary>
     /// Collection of selected indices
