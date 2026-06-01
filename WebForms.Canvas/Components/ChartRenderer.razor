@@ -14,7 +14,7 @@
 			pointer-events: none;
 			background: @(_backColor);
 			overflow: hidden;">
-	<canvas id="@Chart.ChartId" style="width:100%;height:100%;"></canvas>
+	<canvas id="@Chart.ChartId" width="@_width" height="@_height" style="display:block;width:100%;height:100%;"></canvas>
 </div>
 
 @code {
@@ -28,6 +28,7 @@
 
 	private int    _left, _top, _width, _height, _zIndex;
 	private bool   _visible;
+	private bool   _prevVisible;
 	private string _backColor  = "white";
 	private string _wrapperId  => $"chart-wrap-{Chart.ChartId}";
 	private bool   _initialized;
@@ -39,6 +40,7 @@
 		_width     = Width;
 		_height    = Height;
 		_zIndex    = ZIndex;
+		_prevVisible = _visible;
 		_visible   = Visible;
 		_backColor = ColorToCss(Chart.BackColor);
 	}
@@ -47,7 +49,8 @@
 	{
 		if (!_visible) return;
 
-		if (firstRender || Chart.NeedsRender)
+		// Render on first paint, when data changes, or when becoming visible for the first time
+		if (firstRender || Chart.NeedsRender || (!_prevVisible && _visible) || !_initialized)
 		{
 			await RenderChart();
 			Chart.ClearNeedsRender();

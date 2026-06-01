@@ -98,17 +98,17 @@
     }
 
     @* ── Chart overlays ──────────────────────────────────────────────────────── *@
-    @foreach (var chart in GetCharts())
+    @foreach (var (chart, absLeft, absTop, visible) in GetCharts())
     {
-        var chartLeft   = Form.Left + BorderWidth + chart.Left;
-        var chartTop    = Form.Top  + TitleBarHeight + BorderWidth + chart.Top;
+        var chartLeft = Form.Left + BorderWidth + absLeft;
+        var chartTop  = Form.Top  + TitleBarHeight + BorderWidth + absTop;
         <ChartRenderer Chart="@chart"
                        Left="@chartLeft"
                        Top="@chartTop"
                        Width="@chart.Width"
                        Height="@chart.Height"
                        ZIndex="@(Form.ZIndex + 1)"
-                       Visible="@chart.Visible" />
+                       Visible="@(visible && chart.Visible)" />
     }
 
     @* ── ToolTip overlay ──────────────────────────────────────────────────────── *@
@@ -1938,21 +1938,31 @@
 
     // ── Chart overlay helpers ──────────────────────────────────────────────────
 
-    private IEnumerable<Forms.Chart> GetCharts()
+    private IEnumerable<(Forms.Chart chart, int absLeft, int absTop, bool visible)> GetCharts()
     {
         if (Form is null) yield break;
-        foreach (var c in CollectCharts(Form))
-            yield return c;
+        foreach (var entry in CollectCharts(Form, 0, 0, true))
+            yield return entry;
     }
 
-    private static IEnumerable<Forms.Chart> CollectCharts(Forms.Control parent)
+    private static IEnumerable<(Forms.Chart chart, int absLeft, int absTop, bool visible)> CollectCharts(
+        Forms.Control parent, int offsetX, int offsetY, bool parentVisible)
     {
         foreach (Forms.Control child in parent.Controls)
         {
+            var childVisible = parentVisible && child.Visible;
+            var childX = offsetX + child.Left;
+            var childY = offsetY + child.Top;
+
             if (child is Forms.Chart chart)
-                yield return chart;
-            foreach (var nested in CollectCharts(child))
-                yield return nested;
+            {
+                yield return (chart, childX, childY, childVisible);
+            }
+            else
+            {
+                foreach (var nested in CollectCharts(child, childX, childY, childVisible))
+                    yield return nested;
+            }
         }
     }
 

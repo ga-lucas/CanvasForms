@@ -309,9 +309,17 @@
             return;
         }
 
+        _initWithModel(canvasId, model, 0);
+    }
+
+    function _initWithModel(canvasId, model, attempt) {
         const canvas = document.getElementById(canvasId);
         if (!canvas) {
-            console.warn('[chart-bridge] Canvas not found:', canvasId);
+            if (attempt < 10) {
+                setTimeout(() => _initWithModel(canvasId, model, attempt + 1), 50);
+            } else {
+                console.warn('[chart-bridge] Canvas not found after retries:', canvasId);
+            }
             return;
         }
 
@@ -324,7 +332,9 @@
             chart.options = config.options;
             chart.update();
         } else {
-            // Create new
+            // Destroy any stale Chart.js instance that may be attached to this canvas
+            const stale = Chart.getChart(canvas);
+            if (stale) stale.destroy();
             _instances[canvasId] = new Chart(canvas, config);
         }
     }

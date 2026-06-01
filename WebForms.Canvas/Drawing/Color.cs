@@ -226,7 +226,7 @@ public struct Color
         { 0x778899, "LightSlateGray" },  { 0xB0C4DE, "LightSteelBlue" },
         { 0xFFFFE0, "LightYellow" },     { 0x00FF00, "Lime" },
         { 0x32CD32, "LimeGreen" },       { 0xFAF0E6, "Linen" },
-        { 0xFF00FF, "Magenta" },         { 0x800000, "Maroon" },
+        { 0x800000, "Maroon" },
         { 0x66CDAA, "MediumAquamarine" },{ 0x0000CD, "MediumBlue" },
         { 0xBA55D3, "MediumOrchid" },    { 0x9370DB, "MediumPurple" },
         { 0x3CB371, "MediumSeaGreen" },  { 0x7B68EE, "MediumSlateBlue" },
